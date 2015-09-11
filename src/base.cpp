@@ -1,0 +1,372 @@
+/*
+	Copyright (c) openheap, uplusware
+	uplusware@gmail.com
+*/
+
+#include "base.h"
+#include "util/security.h"
+
+//////////////////////////////////////////////////////////////////////////
+//CHttpBase
+//
+//Software Version
+string CHttpBase::m_sw_version = "1.6.06";
+
+//Global
+string CHttpBase::m_encoding = "UTF-8";
+
+string CHttpBase::m_private_path = "/tmp/niuhttpd/private";
+string CHttpBase::m_work_path = "/var/niuhttpd/";
+
+
+string CHttpBase::m_localhostname = "uplusware.com";
+string CHttpBase::m_hostip = "";
+
+BOOL		CHttpBase::m_enablehttp = TRUE;
+unsigned short	CHttpBase::m_httpport = 8080;
+
+BOOL		CHttpBase::m_enablehttps = TRUE;
+unsigned short	CHttpBase::m_httpsport = 443;
+
+string CHttpBase::m_www_authenticate = "";
+BOOL   CHttpBase::m_enableclientcacheck = FALSE;
+string CHttpBase::m_ca_crt_root   = "/var/niuhttpd/cert/niuhttpd-root.crt";
+string CHttpBase::m_ca_crt_server = "/var/niuhttpd/cert/niuhttpd-server.crt";
+string CHttpBase::m_ca_key_server = "/var/niuhttpd/cert/niuhttpd-server.key";
+string CHttpBase::m_ca_crt_client = "/var/niuhttpd/cert/niuhttpd-client.crt";
+string CHttpBase::m_ca_key_client = "/var/niuhttpd/cert/niuhttpd-client.key";
+string CHttpBase::m_ca_password = "";
+
+string	CHttpBase::m_php_mode = "fpm";
+string	CHttpBase::m_fpm_addr = "127l.0.0.1";
+unsigned short CHttpBase::m_fpm_port = 9000;
+string CHttpBase::m_phpcgi_path = "/usr/bin/php-cgi";
+
+volatile unsigned int CHttpBase::m_global_uid = 0;
+
+unsigned int CHttpBase::m_max_instance_num = 10;
+unsigned int CHttpBase::m_max_instance_thread_num = 1024;
+
+unsigned int CHttpBase::m_runtime = 0;
+string	CHttpBase::m_config_file = CONFIG_FILE_PATH;
+string	CHttpBase::m_permit_list_file = PERMIT_FILE_PATH;
+string	CHttpBase::m_reject_list_file = REJECT_FILE_PATH;
+
+vector<stReject> CHttpBase::m_reject_list;
+vector<string> CHttpBase::m_permit_list;
+
+unsigned char CHttpBase::m_rsa_pub_key[128];
+unsigned char CHttpBase::m_rsa_pri_key[128];
+
+CHttpBase::CHttpBase()
+{
+
+}
+
+CHttpBase::~CHttpBase()
+{
+	UnLoadConfig();
+}
+
+void CHttpBase::SetConfigFile(const char* config_file, const char* permit_list_file, const char* reject_list_file)
+{
+	m_config_file = config_file;
+	m_permit_list_file = permit_list_file;
+	m_reject_list_file = reject_list_file;
+}
+
+BOOL CHttpBase::LoadConfig()
+{	
+	m_permit_list.clear();
+	m_reject_list.clear();
+	
+	ifstream configfilein(m_config_file.c_str(), ios_base::binary);
+	string strline;
+	if(!configfilein.is_open())
+	{
+		printf("%s is not exist.", m_config_file.c_str());
+		return FALSE;
+	}
+	while(getline(configfilein, strline))
+	{
+		strtrim(strline);
+		
+		if(strline == "")
+			continue;
+		strtrim(strline);
+		if(strncasecmp(strline.c_str(), "#", strlen("#")) != 0)
+		{	
+			if(strncasecmp(strline.c_str(), "PrivatePath", strlen("PrivatePath")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_private_path);
+				strtrim(m_private_path);
+				//printf("%s\n", m_private_path.c_str());
+			}
+			else if(strncasecmp(strline.c_str(), "WorkPath", strlen("WorkPath")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_work_path);
+				strtrim(m_work_path);
+				//printf("%s\n", m_work_path.c_str());
+			}
+			else if(strncasecmp(strline.c_str(), "LocalHostName", strlen("LocalHostName")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_localhostname );
+				strtrim(m_localhostname);
+				//printf("%s\n", m_localhostname.c_str());
+			}
+			else if(strncasecmp(strline.c_str(), "HostIP", strlen("HostIP")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_hostip );
+				strtrim(m_hostip);
+				//printf("[%s]\n", m_hostip.c_str());
+			}
+			else if(strncasecmp(strline.c_str(), "InstanceNum", strlen("InstanceNum")) == 0)
+			{
+				string maxconn;
+				strcut(strline.c_str(), "=", NULL, maxconn );
+				strtrim(maxconn);
+				m_max_instance_num = atoi(maxconn.c_str());
+				//printf("%d\n", m_max_conn);
+			}
+			else if(strncasecmp(strline.c_str(), "InstanceThreadNum", strlen("InstanceThreadNum")) == 0)
+			{
+				string maxconn;
+				strcut(strline.c_str(), "=", NULL, maxconn );
+				strtrim(maxconn);
+				m_max_instance_thread_num = atoi(maxconn.c_str());
+				//printf("%d\n", m_max_conn);
+			}
+			else if(strncasecmp(strline.c_str(), "HTTPEnable", strlen("HTTPEnable")) == 0)
+			{
+				string HTTPEnable;
+				strcut(strline.c_str(), "=", NULL, HTTPEnable );
+				strtrim(HTTPEnable);
+				m_enablehttps= (strcasecmp(HTTPEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
+			}
+			else if(strncasecmp(strline.c_str(), "HTTPPort", strlen("HTTPPort")) == 0)
+			{
+				string httpport;
+				strcut(strline.c_str(), "=", NULL, httpport );
+				strtrim(httpport);
+				m_httpport = atoi(httpport.c_str());
+				//printf("%d\n", m_httpport);
+			}
+			else if(strncasecmp(strline.c_str(), "HTTPSEnable", strlen("HTTPSEnable")) == 0)
+			{
+				string HTTPSEnable;
+				strcut(strline.c_str(), "=", NULL, HTTPSEnable );
+				strtrim(HTTPSEnable);
+				m_enablehttps= (strcasecmp(HTTPSEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
+			}
+			else if(strncasecmp(strline.c_str(), "HTTPSPort", strlen("HTTPSPort")) == 0)
+			{
+				string httpsport;
+				strcut(strline.c_str(), "=", NULL, httpsport );
+				strtrim(httpsport);
+				m_httpsport = atoi(httpsport.c_str());
+				//printf("%d\n", m_httpsport);
+			}
+			else if(strncasecmp(strline.c_str(), "WWWAuthenticate", strlen("WWWAuthenticate")) == 0)
+			{
+				string www_authenticate;
+				strcut(strline.c_str(), "=", NULL, m_www_authenticate );
+				strtrim(m_www_authenticate);
+			}
+			else if(strncasecmp(strline.c_str(), "CheckClientCA", strlen("CheckClientCA")) == 0)
+			{
+				string CheckClientCA;
+				strcut(strline.c_str(), "=", NULL, CheckClientCA );
+				strtrim(CheckClientCA);
+				m_enableclientcacheck = (strcasecmp(CheckClientCA.c_str(), "yes")) == 0 ? TRUE : FALSE;
+			}
+			else if(strncasecmp(strline.c_str(), "CARootCrt", strlen("CARootCrt")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_ca_crt_root);
+				strtrim(m_ca_crt_root);
+				//printf("%s\n", m_ca_crt_root.c_str());
+			}
+			else if(strncasecmp(strline.c_str(), "CAServerCrt", strlen("CAServerCrt")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_ca_crt_server);
+				strtrim(m_ca_crt_server);
+				//printf("%s\n", m_ca_crt_server.c_str());
+			}
+			else if(strncasecmp(strline.c_str(), "CAServerKey", strlen("CAServerKey")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_ca_key_server);
+				strtrim(m_ca_key_server);
+				//printf("%s\n", m_ca_crt_server.c_str());
+			}
+			else if(strncasecmp(strline.c_str(), "CAClientCrt", strlen("CAClientCrt")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_ca_crt_client);
+				strtrim(m_ca_crt_client);
+				//printf("%s\n", m_ca_crt_client.c_str());
+			}
+			else if(strncasecmp(strline.c_str(), "CAClientKey", strlen("CAClientKey")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_ca_key_client);
+				strtrim(m_ca_key_client);
+				//printf("%s\n", m_ca_crt_client.c_str());
+			}
+			else if(strncasecmp(strline.c_str(), "CAPassword", strlen("CAPassword")) == 0)
+			{
+				m_ca_password = "";
+				
+				string strEncoded;
+				strcut(strline.c_str(), "=", NULL, strEncoded);
+				strtrim(strEncoded);
+
+				Security::Decrypt(strEncoded.c_str(), strEncoded.length(), m_ca_password);
+			}
+			else if(strncasecmp(strline.c_str(), "PHPMode", strlen("PHPMode")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_php_mode);
+				strtrim(m_php_mode);
+			}
+			else if(strncasecmp(strline.c_str(), "FPMAddress", strlen("FPMAddress")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_fpm_addr);
+				strtrim(m_fpm_addr);
+			}
+			else if(strncasecmp(strline.c_str(), "FPMPort", strlen("FPMPort")) == 0)
+			{
+				string fpm_port;
+				strcut(strline.c_str(), "=", NULL, fpm_port);
+				strtrim(fpm_port);
+				m_fpm_port = atoi(fpm_port.c_str());
+			}
+            else if(strncasecmp(strline.c_str(), "PHPCGIPath", strlen("PHPCGIPath")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_phpcgi_path);
+				strtrim(m_phpcgi_path);
+			}
+			else
+			{
+				printf("%s\n", strline.c_str());
+			}
+		}
+		
+	}
+	configfilein.close();
+
+	ifstream permitfilein(m_permit_list_file.c_str(), ios_base::binary);
+	if(!permitfilein.is_open())
+	{
+		printf("%s is not exist. please creat it", m_permit_list_file.c_str());
+		return FALSE;
+	}
+	while(getline(permitfilein, strline))
+	{
+		strtrim(strline);
+		if((strline != "")&&(strncmp(strline.c_str(), "#", 1) != 0))
+			m_permit_list.push_back(strline);
+	}
+	permitfilein.close();
+
+	
+	ifstream rejectfilein(m_reject_list_file.c_str(), ios_base::binary);
+	if(!rejectfilein.is_open())
+	{
+		printf("%s is not exist. please creat it", m_reject_list_file.c_str());
+		return FALSE;
+	}
+	while(getline(rejectfilein, strline))
+	{
+		strtrim(strline);
+		if((strline != "")&&(strncmp(strline.c_str(), "#", 1) != 0))
+		{
+			stReject sr;
+			sr.ip = strline;
+			sr.expire = 0xFFFFFFFF;
+			m_reject_list.push_back(sr);
+		}
+	}
+	rejectfilein.close();
+		
+	m_runtime = time(NULL);
+
+	//generate the RSA keys
+	RSA* rsa = RSA_generate_key(1024, 0x10001, NULL, NULL);
+	if(rsa)
+	{
+		BN_bn2bin( rsa->n, m_rsa_pub_key);
+		BN_bn2bin( rsa->d, m_rsa_pri_key );
+		
+		RSA_free(rsa);
+	}
+	
+	return TRUE;
+}
+
+BOOL CHttpBase::UnLoadConfig()
+{
+
+}
+
+BOOL CHttpBase::LoadList()
+{
+	string strline;
+	sem_t* plock = NULL;
+	///////////////////////////////////////////////////////////////////////////////
+	// GLOBAL_REJECT_LIST
+	plock = sem_open("/.GLOBAL_REJECT_LIST.sem", O_CREAT | O_RDWR, 0644, 1);
+	if(plock != SEM_FAILED)
+	{
+		sem_wait(plock);
+
+		m_permit_list.clear();
+		ifstream permitfilein(m_permit_list_file.c_str(), ios_base::binary);
+		if(!permitfilein.is_open())
+		{
+			printf("%s is not exist. please creat it", m_permit_list_file.c_str());
+			return FALSE;
+		}
+		while(getline(permitfilein, strline))
+		{
+			strtrim(strline);
+			if((strline != "")&&(strncmp(strline.c_str(), "#", 1) != 0))
+				m_permit_list.push_back(strline);
+		}
+		permitfilein.close();
+		sem_post(plock);
+		sem_close(plock);
+	}
+	/////////////////////////////////////////////////////////////////////////////////
+	// GLOBAL_PERMIT_LIST
+	plock = sem_open("/.GLOBAL_PERMIT_LIST.sem", O_CREAT | O_RDWR, 0644, 1);
+	if(plock != SEM_FAILED)
+	{
+		sem_wait(plock);
+
+		m_reject_list.clear();
+		ifstream rejectfilein(m_reject_list_file.c_str(), ios_base::binary);
+		if(!rejectfilein.is_open())
+		{
+			printf("%s is not exist. please creat it", m_reject_list_file.c_str());
+			return FALSE;
+		}
+		while(getline(rejectfilein, strline))
+		{
+			strtrim(strline);
+			if((strline != "")&&(strncmp(strline.c_str(), "#", 1) != 0))
+			{
+				stReject sr;
+				sr.ip = strline;
+				sr.expire = 0xFFFFFFFF;
+				m_reject_list.push_back(sr);
+			}
+		}
+		rejectfilein.close();
+		sem_post(plock);
+		sem_close(plock);
+	}
+}
+
+BOOL CHttpBase::UnLoadList()
+{
+
+}
+
+
+
