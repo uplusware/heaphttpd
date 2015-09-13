@@ -5,6 +5,8 @@
 
 #include "echo.h"
 #include "websocket.h"
+#include <string>
+using namespace std;
 
 void* ws_echo_main(int sockfd, SSL* ssl)
 {
@@ -13,11 +15,12 @@ void* ws_echo_main(int sockfd, SSL* ssl)
     WebSocket_Buffer wsBuffer;
     WebSocket_Buffer_Alloc(&wsBuffer);
     web_socket.Recv(&wsBuffer);
-    printf("%s\n", wsBuffer.buf);
+    string strRecv = wsBuffer.buf;
     WebSocket_Buffer_Free(&wsBuffer);
     
     WebSocket_Buffer_Alloc(&wsBuffer, 1024, false, OPCODE_TEXT);
-    strcpy(wsBuffer.buf, "Hello websocket client, this is the answer.");
+    strcpy(wsBuffer.buf, "You sent: ");
+    strcat(wsBuffer.buf, strRecv.c_str());
     wsBuffer.len = strlen(wsBuffer.buf);
     wsBuffer.opcode = OPCODE_TEXT;
     wsBuffer.mask = false;
