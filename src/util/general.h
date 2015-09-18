@@ -51,7 +51,7 @@ typedef void* HANDLE;
 #define HICH(c) (( (c) >= 'a' )&&((c) <= 'z')) ? ((c)+'A'-'a'):(c)
 #define LOCH(c) (( (c) >= 'A' )&&((c) <= 'Z')) ? ((c)-'A'+'a'):(c)
 
-#ifdef _SOLARIS_OS_
+ #if defined  _SOLARIS_OS_ || defined CYGWIN
 __inline__ char* strcasestr(const char *s, const char* f)
 {
 	char c, sc;
