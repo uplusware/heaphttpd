@@ -10,7 +10,7 @@
 //CHttpBase
 //
 //Software Version
-string CHttpBase::m_sw_version = "1.6.06";
+string CHttpBase::m_sw_version = "0.3";
 
 //Global
 string CHttpBase::m_encoding = "UTF-8";
@@ -38,7 +38,7 @@ string CHttpBase::m_ca_key_client = "/var/niuhttpd/cert/niuhttpd-client.key";
 string CHttpBase::m_ca_password = "";
 
 string	CHttpBase::m_php_mode = "fpm";
-string	CHttpBase::m_fpm_addr = "127l.0.0.1";
+string	CHttpBase::m_fpm_addr = "127.0.0.1";
 unsigned short CHttpBase::m_fpm_port = 9000;
 string CHttpBase::m_phpcgi_path = "/usr/bin/php-cgi";
 
