@@ -36,7 +36,7 @@ DBStorage::DBStorage(const char* encoding, const char* private_path)
 	{
 		exit(1);
 	}
-	m_hMySQL = mysql_init(NULL);
+	
     pthread_mutex_init(&m_thread_pool_mutex, NULL);
 }
 
@@ -56,7 +56,7 @@ int DBStorage::Connect(const char * host, const char* username, const char* pass
 	else
 	{
 		mysql_thread_init();
-
+                m_hMySQL = mysql_init(NULL);
 		if(mysql_real_connect(m_hMySQL, host, username, password, database, 0 ,NULL ,0) != NULL)
 		{
 			m_host = host;
@@ -72,6 +72,7 @@ int DBStorage::Connect(const char * host, const char* username, const char* pass
 		else
 		{
 			m_bOpened = FALSE;
+			m_hMySQL = NULL;
 			printf("mysql_real_connect %s\n", mysql_error(m_hMySQL));
 			return -1;	
 		}
@@ -103,7 +104,7 @@ int DBStorage::Ping()
 
 void DBStorage::KeepLive()
 {
-	if(Ping() == -1)
+	if(Ping() != 0)
 	{
 		Close();
 		Connect(m_host.c_str(), m_username.c_str(), m_password.c_str(), m_database.c_str());
