@@ -77,7 +77,7 @@ DBStorage* StorageEngine::WaitEngine(int &index)
     
 	pthread_mutex_unlock(&m_engineMutex);
     
-	if(m_engine[index].storage->Ping() < 0)
+	if(m_engine[index].storage->Ping() != 0)
     {
         printf("Reconnect\n");
         m_engine[index].storage->Close();
