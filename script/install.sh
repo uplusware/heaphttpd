@@ -75,10 +75,18 @@ then
 	cp -f ${path}/libniuauth.so /usr/bin/libniuauth.so
 	cp -f ${path}/libniuwebsocket.so /usr/bin/libniuwebsocket.so
 else
-	cp -f ${path}/libniuhttp.so /usr/lib64/libniuhttp.so
-	cp -f ${path}/libniuauth.so /usr/lib64/libniuauth.so
-	cp -f ${path}/libniuwebsocket.so /usr/lib64/libniuwebsocket.so
-	cp -f ${path}/niuhttpd.sh  /etc/init.d/niuhttpd
+        if [ -x /usr/lib ]; then
+        	cp -f ${path}/libniuhttp.so /usr/lib/libniuhttp.so
+		cp -f ${path}/libniuauth.so /usr/lib/libniuauth.so
+		cp -f ${path}/libniuwebsocket.so /usr/lib/libniuwebsocket.so
+        elif [ -x /usr/lib64 ]; then 
+		cp -f ${path}/libniuhttp.so /usr/lib64/libniuhttp.so
+		cp -f ${path}/libniuauth.so /usr/lib64/libniuauth.so
+		cp -f ${path}/libniuwebsocket.so /usr/lib64/libniuwebsocket.so
+	else
+    		exit -1
+  	fi
+  	cp -f ${path}/niuhttpd.sh  /etc/init.d/niuhttpd
 	chmod a+x /etc/init.d/niuhttpd
 fi
 
