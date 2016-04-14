@@ -24,7 +24,7 @@ $(HTTPAPI): $(HTTPAPIOBJS)
 	$(CC) -shared -W -fPIC -o $@ $(HTTPAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp 
 
 $(MYSQLDEMOAPI): $(MYSQLDEMOAPIOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(MYSQLDEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp -lmysqlclient_r
+	$(CC) -shared -W -fPIC -o $@ $(MYSQLDEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp -lmariadbclient_r
 	
 %.o : %.cpp
 	$(CC) $(INCDIR) $(FLAGS) -c $< -o $@
