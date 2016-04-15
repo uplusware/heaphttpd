@@ -38,8 +38,10 @@ string CHttpBase::m_ca_key_client = "/var/niuhttpd/cert/niuhttpd-client.key";
 string CHttpBase::m_ca_password = "";
 
 string	CHttpBase::m_php_mode = "fpm";
+string  CHttpBase::m_fpm_socktype = "UNIX";
 string	CHttpBase::m_fpm_addr = "127.0.0.1";
 unsigned short CHttpBase::m_fpm_port = 9000;
+string CHttpBase::m_fpm_sockfile = "/var/run/php5-fpm.sock";
 string CHttpBase::m_phpcgi_path = "/usr/bin/php-cgi";
 
 volatile unsigned int CHttpBase::m_global_uid = 0;
@@ -224,7 +226,12 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, m_php_mode);
 				strtrim(m_php_mode);
 			}
-			else if(strncasecmp(strline.c_str(), "FPMAddress", strlen("FPMAddress")) == 0)
+            else if(strncasecmp(strline.c_str(), "FPMSockType", strlen("FPMSockType")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_fpm_socktype);
+				strtrim(m_fpm_socktype);
+			}
+			else if(strncasecmp(strline.c_str(), "FPMIPAddr", strlen("FPMIPAddr")) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_fpm_addr);
 				strtrim(m_fpm_addr);
@@ -235,6 +242,11 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, fpm_port);
 				strtrim(fpm_port);
 				m_fpm_port = atoi(fpm_port.c_str());
+			}
+            else if(strncasecmp(strline.c_str(), "FPMSockFile", strlen("FPMSockFile")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_fpm_sockfile);
+				strtrim(m_fpm_sockfile);
 			}
             else if(strncasecmp(strline.c_str(), "PHPCGIPath", strlen("PHPCGIPath")) == 0)
 			{

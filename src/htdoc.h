@@ -30,18 +30,24 @@ class Htdoc
 {
 protected:
 	CHttp* m_session; 
-    string m_work_path;
+	string m_work_path;
 	string m_php_mode;
+    string m_fpm_socktype;
+    string m_fpm_sockfile;
 	string m_fpm_addr;
 	unsigned short m_fpm_port;
-    string m_phpcgi_path;
+	string m_phpcgi_path;
 	
 public:
-	Htdoc(CHttp* session, const char* work_path, const char* php_mode, const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path)
+	Htdoc(CHttp* session, const char* work_path, const char* php_mode, 
+        const char* fpm_socktype, const char* fpm_sockfile, 
+        const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path)
 	{
 		m_session = session;
         m_work_path = work_path;
 		m_php_mode = php_mode;
+        m_fpm_socktype = fpm_socktype;
+        m_fpm_sockfile = fpm_sockfile;
 		m_fpm_addr = fpm_addr;
 		m_fpm_port = fpm_port;
         m_phpcgi_path = phpcgi_path;

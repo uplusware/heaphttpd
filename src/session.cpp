@@ -42,14 +42,21 @@ void Session::Process()
             if(m_st == stHTTP)
             {
                 pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport, m_clientip.c_str(), m_cache,
-					CHttpBase::m_work_path.c_str(), CHttpBase::m_php_mode.c_str(), CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(), CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme);
-                CHttpBase::m_global_uid++;
+					CHttpBase::m_work_path.c_str(), CHttpBase::m_php_mode.c_str(),
+                    CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
+                    CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
+                    CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme);
+                    CHttpBase::m_global_uid++;
             }
             else if(m_st == stHTTPS)
             {
                 pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport, m_clientip.c_str(), m_cache,
-					CHttpBase::m_work_path.c_str(), CHttpBase::m_php_mode.c_str(), CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(), CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme,
-                    TRUE, CHttpBase::m_ca_crt_root.c_str(), CHttpBase::m_ca_crt_server.c_str(), CHttpBase::m_ca_password.c_str(), CHttpBase::m_ca_key_server.c_str(), CHttpBase::m_enableclientcacheck);
+					CHttpBase::m_work_path.c_str(), CHttpBase::m_php_mode.c_str(), 
+                    CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
+                    CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(), 
+                    CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme, TRUE,
+                    CHttpBase::m_ca_crt_root.c_str(), CHttpBase::m_ca_crt_server.c_str(),
+                    CHttpBase::m_ca_password.c_str(), CHttpBase::m_ca_key_server.c_str(), CHttpBase::m_enableclientcacheck);
                     CHttpBase::m_global_uid++;
             }
             else

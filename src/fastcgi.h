@@ -121,11 +121,16 @@ typedef struct {
 	unsigned char valueData[valueLength((B3 & 0x7f) << 24) + (B2 << 16) + (B1 << 8) + B0];*/
 } FCGI_NameValuePair44;
 
+typedef enum {
+    INET_SOCK = 0,
+    UNIX_SOCK
+}FASTCGI_SOCK;
 
 class FastCGI
 {
 public:
-	FastCGI(const char* ipaddr = "127.0.0.1", unsigned short port = 9000);
+	FastCGI(const char* ipaddr, unsigned short port);
+	FastCGI(const char* sock_file);
 	virtual ~FastCGI();
 	
 	int Connect();
@@ -147,7 +152,10 @@ private:
 	unsigned char m_RequestIDB1;
 	string m_strIP;
 	unsigned short m_nPort;
+	string m_strSockfile;
 	int m_sockfd;
+    FASTCGI_SOCK m_sockType;
 };
 
 #endif /* _FASTCGI_H_ */
+

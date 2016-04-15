@@ -3,8 +3,6 @@
 	uplusware@gmail.com
 */
 
-#include "service.h"
-#include "session.h"
 #include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -13,9 +11,13 @@
 #include <semaphore.h>
 #include <mqueue.h>
 #include <pthread.h>
+#include <queue>
+#include <sys/syscall.h>
+#define gettid() syscall(__NR_gettid)
+#include "service.h"
+#include "session.h"
 #include "cache.h"
 #include "pool.h"
-#include <queue>
 #include "util/trace.h"
 
 typedef struct
@@ -185,6 +187,12 @@ static void LEAVE_THREAD_POOL_HANDLER()
 
 	pthread_mutex_destroy(&STATIC_THREAD_POOL_MUTEX);
 	sem_close(&STATIC_THREAD_POOL_SEM);
+
+    char local_sockfile[256];
+    sprintf(local_sockfile, "/tmp/niuhttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
+
+    //printf("remove sock file: %s\n", local_sockfile);
+    unlink(local_sockfile);
 
 	unsigned long timeout = 200;
 	while(STATIC_THREAD_POOL_SIZE > 0 && timeout > 0)

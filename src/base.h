@@ -508,8 +508,10 @@ public:
 	
     static string   m_phpcgi_path;
 	static string	m_php_mode;
+    static string   m_fpm_socktype;
 	static string	m_fpm_addr;
 	static unsigned short m_fpm_port;
+    static string   m_fpm_sockfile;
 	static volatile unsigned int	m_global_uid;
 	
 	static unsigned int 	m_relaytasknum;

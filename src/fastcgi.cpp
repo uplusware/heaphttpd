@@ -4,11 +4,14 @@
 */
 #include <unistd.h>
 #include <fcntl.h>
-#include            <stdio.h> 
-#include            <sys/types.h> 
-#include            <sys/socket.h> 
-#include            <netinet/in.h> 
-#include            <arpa/inet.h>
+#include <stdio.h> 
+#include <sys/types.h> 
+#include <sys/socket.h> 
+#include <netinet/in.h> 
+#include <arpa/inet.h>
+#include <sys/un.h>
+#include <sys/syscall.h>
+#define gettid() syscall(__NR_gettid) 
 #include "fastcgi.h"
 #include "util/general.h"
 
@@ -17,6 +20,14 @@ FastCGI::FastCGI(const char* ipaddr, unsigned short port)
 	m_sockfd = -1;
 	m_strIP = ipaddr;
 	m_nPort = port;
+    m_sockType = INET_SOCK;
+}
+
+FastCGI::FastCGI(const char* sock_file)
+{
+	m_sockfd = -1;
+	m_strSockfile = sock_file;
+    m_sockType = UNIX_SOCK;
 }
 
 FastCGI::~FastCGI()
@@ -32,10 +43,12 @@ int FastCGI::Connect()
 	int err_code_len = sizeof(err_code);
 	int res;
 	struct sockaddr_in ser_addr;
+    struct sockaddr_un ser_unix;
+
 	fd_set mask_r, mask_w; 
 	struct timeval timeout; 
 	
-	m_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	m_sockfd = socket(m_sockType == INET_SOCK ? AF_INET : AF_UNIX, SOCK_STREAM, 0);
 	if(m_sockfd < 0)
 	{
 		err_msg = "system error\r\n";
@@ -45,15 +58,46 @@ int FastCGI::Connect()
 	int flags = fcntl(m_sockfd, F_GETFL, 0); 
 	fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK); 
 	
-	ser_addr.sin_family = AF_INET;
-	ser_addr.sin_port = htons(m_nPort);
-	ser_addr.sin_addr.s_addr = inet_addr(m_strIP.c_str());
-	
+    if(m_sockType == INET_SOCK)
+    {
+	    ser_addr.sin_family = AF_INET;
+	    ser_addr.sin_port = htons(m_nPort);
+	    ser_addr.sin_addr.s_addr = inet_addr(m_strIP.c_str());
+
+        res = connect(m_sockfd, (struct sockaddr*)&ser_addr,sizeof(struct sockaddr));
+    }
+    else
+    {
+        char local_sockfile[256];
+        sprintf(local_sockfile, "/tmp/niuhttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
+
+        //printf("local sock file: %s\n", local_sockfile);        
+        memset(&ser_unix, 0, sizeof(ser_unix));
+	    ser_unix.sun_family = AF_UNIX;
+	    strcpy(ser_unix.sun_path, local_sockfile);
+        unlink(ser_unix.sun_path);
+
+        int size = offsetof(struct sockaddr_un, sun_path) + strlen(ser_unix.sun_path);
+	    if (bind(m_sockfd, (struct sockaddr *)&ser_unix, size) < 0)
+        {
+		   err_msg = "system error\r\n";
+		   return -1;
+	    }
+        
+        memset(&ser_unix, 0, sizeof(ser_unix));
+    	ser_unix.sun_family = AF_UNIX;
+    	strcpy(ser_unix.sun_path, m_strSockfile.c_str());
+    	size = offsetof(struct sockaddr_un, sun_path) + strlen(ser_unix.sun_path);
+
+        res = connect(m_sockfd, (struct sockaddr*)&ser_unix, size);
+
+    }
+    
+    // printf("connect res: %d\n", res);
+
 	timeout.tv_sec = 10; 
-	timeout.tv_usec = 0;
-	
-	connect(m_sockfd,(struct sockaddr*)&ser_addr,sizeof(struct sockaddr));
-	
+	timeout.tv_usec = 0;      
+
 	FD_ZERO(&mask_r);
 	FD_ZERO(&mask_w);
 	
@@ -61,13 +105,13 @@ int FastCGI::Connect()
 	FD_SET(m_sockfd, &mask_w);
 	res = select(m_sockfd + 1, &mask_r, &mask_w, NULL, &timeout);
 	
-	//printf("res: %d\n", res);
+	// printf("select res: %d\n", res);
 	if( res != 1) 
 	{
 		close(m_sockfd);
 		m_sockfd = -1;
 		err_msg = "can not connect the ";
-		err_msg += m_strIP;
+		err_msg += m_sockType == INET_SOCK ? m_strIP : m_strSockfile;
 		err_msg += ".\r\n";
 		
 		return -1;

@@ -32,7 +32,10 @@ class CHttp
 {
 public:
 	CHttp(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport, const char* clientip, memory_cache* ch,
-		const char* work_path, const char* php_mode, const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path, const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme = asNone,
+		const char* work_path, const char* php_mode, 
+        const char* fpm_socktype, const char* fpm_sockfile, 
+        const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
+        const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme = asNone,
 		BOOL isSSL = FALSE, const char* ca_crt_root = NULL, const char* ca_crt_server = NULL, const char* ca_password = NULL, const char* ca_key_server = NULL, BOOL enableclientcacheck = FALSE);
 	virtual ~CHttp();
 
@@ -138,6 +141,9 @@ protected:
     
     string m_work_path;
 	string m_php_mode;
+    string m_fpm_socktype;
+    string m_fpm_sockfile;
+
 	string m_fpm_addr;
 	unsigned short m_fpm_port;
     string m_phpcgi_path;

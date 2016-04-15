@@ -442,26 +442,30 @@ void Htdoc::Response()
 				phpfile += m_session->GetResource();
 				m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
 				m_session->SetMetaVar("REDIRECT_STATUS", "200");
-					
-				FastCGI fcgi(m_fpm_addr.c_str(), m_fpm_port);
-				if(fcgi.Connect() == 0 && fcgi.BeginRequest(1) == 0)
+				
+                FastCGI* fcgi = NULL;
+                if(strcasecmp(m_fpm_socktype.c_str(), "UNIX") == 0)
+                    fcgi = new FastCGI(m_fpm_sockfile.c_str());
+                else
+    				fcgi = new FastCGI(m_fpm_addr.c_str(), m_fpm_port);
+				if(fcgi && fcgi->Connect() == 0 && fcgi->BeginRequest(1) == 0)
 				{	
 					//printf("BeginRequest end\n");
 					if(m_session->m_cgi.m_meta_var.size() > 0)
-						fcgi.SendParams(m_session->m_cgi.m_meta_var);
-					fcgi.SendEmptyParams();
+						fcgi->SendParams(m_session->m_cgi.m_meta_var);
+					fcgi->SendEmptyParams();
 					if(m_session->m_cgi.GetDataLen() > 0)
 					{
-						fcgi.Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
+						fcgi->Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
 					}
-					fcgi.SendEmpty_STDIN();
+					fcgi->SendEmpty_STDIN();
 					
 					string strResponse, strHeader, strBody;
 					string strerr;
 					unsigned int appstatus;
 					unsigned char protocolstatus;
 					
-					int t = fcgi.RecvAppData(strResponse, strerr, appstatus, protocolstatus);
+					int t = fcgi->RecvAppData(strResponse, strerr, appstatus, protocolstatus);
 					//printf("%d [%s]\n", t, strResponse.c_str());
 					if(strResponse != "")
 					{
@@ -524,6 +528,8 @@ void Htdoc::Response()
 					m_session->HttpSend(header.Text(), header.Length());
 					m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 				}
+                if(fcgi)
+                    delete fcgi;
 			
 			}
 			else

@@ -28,7 +28,9 @@
 const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" };
 
 CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport, const char* clientip, memory_cache* ch,
-	const char* work_path, const char* php_mode, const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path, 
+	const char* work_path, const char* php_mode, 
+    const char* fpm_socktype, const char* fpm_sockfile,
+    const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path, 
 	const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme, 
 	BOOL isSSL, const char* ca_crt_root, const char* ca_crt_server, const char* ca_password, const char* ca_key_server, BOOL enableclientcacheck)
 {
@@ -67,6 +69,9 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
     
     m_work_path = work_path;
 	m_php_mode = php_mode;
+    m_fpm_socktype = fpm_socktype;
+    m_fpm_sockfile = fpm_sockfile;
+
 	m_fpm_addr = fpm_addr;
 	m_fpm_port = fpm_port;
     m_phpcgi_path = phpcgi_path;
@@ -526,7 +531,9 @@ Http_Connection CHttp::LineParse(char* text)
             m_cgi.SetData(m_postdata.c_str(), m_postdata.length());
         }
         
-        Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str());
+        Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), 
+            m_fpm_socktype.c_str(), m_fpm_sockfile.c_str(), 
+            m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str());
         doc->Response();
             
         delete doc;
