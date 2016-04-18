@@ -497,7 +497,7 @@ public:
 	static BOOL		m_enablehttps;
 	static unsigned short	m_httpsport;
 	static string 	m_www_authenticate;
-	static BOOL 	m_enableclientcacheck;
+	static BOOL 	m_client_cer_check;
 	static string	m_ca_crt_root;
 	static string	m_ca_crt_server;
 	static string	m_ca_key_server;

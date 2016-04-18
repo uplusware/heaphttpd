@@ -5,10 +5,11 @@
 
 #include "session.h"
 
-Session::Session(ServiceObjMap* srvobj, int sockfd, const char* clientip, Service_Type st, memory_cache* ch)
+Session::Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, Service_Type st, memory_cache* ch)
 {
     m_srvobj = srvobj;
 	m_sockfd = sockfd;
+    m_ssl = ssl;
 	m_clientip = clientip;
 	m_st = st;
 
@@ -38,10 +39,12 @@ void Session::Process()
     while(httpConn != httpClose)
     {
         CHttp * pProtocol;
-        try{
+        try
+        {
             if(m_st == stHTTP)
             {
-                pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport, m_clientip.c_str(), m_cache,
+                pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
+                    m_clientip.c_str(), m_cache,
 					CHttpBase::m_work_path.c_str(), CHttpBase::m_php_mode.c_str(),
                     CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
                     CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
@@ -50,13 +53,12 @@ void Session::Process()
             }
             else if(m_st == stHTTPS)
             {
-                pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport, m_clientip.c_str(), m_cache,
+                pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
+                    m_clientip.c_str(), m_cache,
 					CHttpBase::m_work_path.c_str(), CHttpBase::m_php_mode.c_str(), 
                     CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
                     CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(), 
-                    CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme, TRUE,
-                    CHttpBase::m_ca_crt_root.c_str(), CHttpBase::m_ca_crt_server.c_str(),
-                    CHttpBase::m_ca_password.c_str(), CHttpBase::m_ca_key_server.c_str(), CHttpBase::m_enableclientcacheck);
+                    CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme, m_ssl);
                     CHttpBase::m_global_uid++;
             }
             else
@@ -66,7 +68,10 @@ void Session::Process()
         }
         catch(string* e)
         {
-            printf("%s\n", e->c_str());
+            //printf("catched exception: %s\n", e->c_str());
+            delete e;
+            close(m_sockfd);
+            m_sockfd = -1;
             return;
         }
         char szmsg[4096];

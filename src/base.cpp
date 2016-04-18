@@ -29,7 +29,7 @@ BOOL		CHttpBase::m_enablehttps = TRUE;
 unsigned short	CHttpBase::m_httpsport = 443;
 
 string CHttpBase::m_www_authenticate = "";
-BOOL   CHttpBase::m_enableclientcacheck = FALSE;
+BOOL   CHttpBase::m_client_cer_check = FALSE;
 string CHttpBase::m_ca_crt_root   = "/var/niuhttpd/cert/niuhttpd-root.crt";
 string CHttpBase::m_ca_crt_server = "/var/niuhttpd/cert/niuhttpd-server.crt";
 string CHttpBase::m_ca_key_server = "/var/niuhttpd/cert/niuhttpd-server.key";
@@ -179,7 +179,7 @@ BOOL CHttpBase::LoadConfig()
 				string CheckClientCA;
 				strcut(strline.c_str(), "=", NULL, CheckClientCA );
 				strtrim(CheckClientCA);
-				m_enableclientcacheck = (strcasecmp(CheckClientCA.c_str(), "yes")) == 0 ? TRUE : FALSE;
+				m_client_cer_check = (strcasecmp(CheckClientCA.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
 			else if(strncasecmp(strline.c_str(), "CARootCrt", strlen("CARootCrt")) == 0)
 			{

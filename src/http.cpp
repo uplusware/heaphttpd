@@ -32,7 +32,7 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
     const char* fpm_socktype, const char* fpm_sockfile,
     const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path, 
 	const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme, 
-	BOOL isSSL, const char* ca_crt_root, const char* ca_crt_server, const char* ca_password, const char* ca_key_server, BOOL enableclientcacheck)
+	SSL* ssl)
 {
     m_srvobj = srvobj;
     m_web_socket_handshake = Websocket_None;
@@ -57,12 +57,11 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	
 	m_content_length = 0;
 	
-	m_ssl = NULL;
-	m_ssl_ctx = NULL;
+    int ssl_rc = -1;
+	m_ssl = ssl;
 
 	m_postdata_ex = NULL;
 	m_formdata = NULL;
-	m_isSSL = isSSL;
 	m_querystring = "";
 	m_postdata = "";
 	m_http_method = hmGet;
@@ -78,78 +77,8 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
     m_private_path = private_path;
     m_global_uid = global_uid;
     
-	if(isSSL)
-	{	
-		m_ca_crt_root = ca_crt_root;
-		m_ca_crt_server = ca_crt_server;
-		m_ca_password = ca_password;
-		m_ca_key_server = ca_key_server;
-		m_enableclientcacheck = enableclientcacheck;
-
-		X509* client_cert;
-		SSL_METHOD* meth;
-		SSL_load_error_strings();
-		OpenSSL_add_ssl_algorithms();
-		meth = (SSL_METHOD*)TLSv1_server_method();
-		m_ssl_ctx = SSL_CTX_new(meth);
-		if(!m_ssl_ctx)
-		{
-			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl;
-		}
-
-		SSL_CTX_set_verify(m_ssl_ctx, SSL_VERIFY_PEER, NULL);
-		
-		SSL_CTX_load_verify_locations(m_ssl_ctx, m_ca_crt_root.c_str(), NULL);
-		if(SSL_CTX_use_certificate_file(m_ssl_ctx, m_ca_crt_server.c_str(), SSL_FILETYPE_PEM) <= 0)
-		{
-			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl;
-		}
-		//printf("[%s]\n", m_ca_password.c_str());
-		SSL_CTX_set_default_passwd_cb_userdata(m_ssl_ctx, (char*)m_ca_password.c_str());
-		if(SSL_CTX_use_PrivateKey_file(m_ssl_ctx, m_ca_key_server.c_str(), SSL_FILETYPE_PEM) <= 0)
-		{
-			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl;
-
-		}
-		if(!SSL_CTX_check_private_key(m_ssl_ctx))
-		{
-			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl;
-		}
-		
-		SSL_CTX_set_cipher_list(m_ssl_ctx, "ALL:!ADH:RC4+RSA:+HIGH:+MEDIUM:-LOW:-SSLv2:-EXP");
-		SSL_CTX_set_mode(m_ssl_ctx, SSL_MODE_AUTO_RETRY);
-
-		m_ssl = SSL_new(m_ssl_ctx);
-		if(!m_ssl)
-		{
-			printf("SSL_new: %s\n", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl;
-		}
-		SSL_set_fd(m_ssl, m_sockfd);
-		if(SSL_accept(m_ssl) == -1)
-		{
-			printf("SSL_accept: %s\n", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl;
-		}
-		if(m_enableclientcacheck)
-		{
-			X509* client_cert;
-			client_cert = SSL_get_peer_certificate(m_ssl);
-			if (client_cert != NULL)
-			{
-				X509_free (client_cert);
-			}
-			else
-			{
-				printf("SSL_get_peer_certificate: %s\n", ERR_error_string(ERR_get_error(),NULL));
-				goto clean_ssl;
-			}
-		}
-
+	if(m_ssl)
+	{
 		int flags = fcntl(m_sockfd, F_GETFL, 0); 
 		fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK); 
 		
@@ -165,32 +94,16 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 
 	m_content_type = application_x_www_form_urlencoded;
 
-	return;	//DON'T Delete it
-
-clean_ssl:
-	if(m_ssl)
-		SSL_shutdown(m_ssl);
-	if(m_ssl)
-		SSL_free(m_ssl);
-	if(m_ssl_ctx)
-		SSL_CTX_free(m_ssl_ctx);
-	throw new string(ERR_error_string(ERR_get_error(), NULL));
+	return;
 }
 
 CHttp::~CHttp()
 {
+    int flags = fcntl(m_sockfd, F_GETFL, 0); 
+	fcntl(m_sockfd, F_SETFL, flags & ~O_NONBLOCK);
+
 	if(m_keep_alive != TRUE) //close the socket when non-keep-alive or non-websocket
 	{
-		if(m_ssl)
-			SSL_shutdown(m_ssl);
-		if(m_ssl)
-			SSL_free(m_ssl);
-		if(m_ssl_ctx)
-			SSL_CTX_free(m_ssl_ctx);
-
-		m_ssl = NULL;
-		m_ssl_ctx = NULL;
-
 		if(m_sockfd > 0)
 		{
 			close(m_sockfd);
@@ -205,46 +118,34 @@ CHttp::~CHttp()
 		delete m_formdata;
 
 	if(m_lsockfd)
-		delete m_lsockfd;
-
-	if(m_lssl)
-		delete m_lssl;
-	
+		delete m_lsockfd;	
 }
 
 int CHttp::HttpSend(const char* buf, int len)
 {
-	if(m_isSSL)
-		if(m_ssl)
-			return SSLWrite(m_sockfd, m_ssl, buf, len);
-		else
-			return -1;
+    //printf("%s\n", buf);
+	if(m_ssl)
+		return SSLWrite(m_sockfd, m_ssl, buf, len);
 	else
 		return _Send_( m_sockfd, buf, len);
+		
 }
 
 int CHttp::HttpRecv(char* buf, int len)
 {
-	if(m_isSSL)
-		if(m_ssl)
-			return m_lssl->drecv(buf, len);
-		else
-			return -1;
+    //printf("%s\n", buf);
+	if(m_ssl)
+		return m_lssl->drecv(buf, len);
 	else
-		return m_lsockfd->drecv(buf, len);
+		return m_lsockfd->drecv(buf, len);	
 }
 
 int CHttp::ProtRecv(char* buf, int len)
 {
-	if(m_isSSL)
-		if(m_ssl)
-			return m_lssl->lrecv(buf, len);
-		else
-			return -1;
+	if(m_ssl)
+		return m_lssl->lrecv(buf, len);
 	else
-	{
 		return m_lsockfd->lrecv(buf, len);
-	}
 }
 
 Http_Connection CHttp::LineParse(char* text)

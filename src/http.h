@@ -36,7 +36,7 @@ public:
         const char* fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme = asNone,
-		BOOL isSSL = FALSE, const char* ca_crt_root = NULL, const char* ca_crt_server = NULL, const char* ca_password = NULL, const char* ca_key_server = NULL, BOOL enableclientcacheck = FALSE);
+		SSL* ssl = NULL);
 	virtual ~CHttp();
 
 	virtual Http_Connection LineParse(char* text);
@@ -104,14 +104,12 @@ public:
 	void SetWebSocketHandShake(WebSocket_HandShake shake) { m_web_socket_handshake = shake;}
 	
 	int GetSocket() { return m_sockfd; }
-    SSL* GetSSL() { return m_isSSL ? m_ssl : NULL; }
+    SSL* GetSSL() { return m_ssl; }
     void SetServiceObject(const char * objname, SERVICE_OBJECT_HANDLE objptr);
     void* GetServiceObject(const char* objname);
 	WebCGI m_cgi;
 protected:
-	BOOL m_isSSL;
 	SSL* m_ssl;
-	SSL_CTX* m_ssl_ctx;
 	
 	int m_sockfd;
 	linesock* m_lsockfd;
@@ -149,12 +147,6 @@ protected:
     string m_phpcgi_path;
     string m_private_path;
     unsigned int m_global_uid;
-    
-	string m_ca_crt_root;
-	string m_ca_crt_server;
-	string m_ca_password;
-	string m_ca_key_server;
-	BOOL m_enableclientcacheck;
     
     CHttpRequestHdr m_request_hdr;
 	string m_cgi_pgm;

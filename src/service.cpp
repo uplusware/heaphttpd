@@ -26,6 +26,11 @@ typedef struct
 	int sockfd;
 	string client_ip;
 	Service_Type svr_type;
+    string ca_crt_root;
+    string ca_crt_server;
+    string ca_password;
+    string ca_key_server;
+    BOOL client_cer_check;
 	memory_cache* cache;
 	ServiceObjMap* srvobjmap;
 } SESSION_PARAM;
@@ -38,7 +43,13 @@ enum CLIENT_PARAM_CTRL{
 typedef struct {
 	CLIENT_PARAM_CTRL ctrl;
 	char client_ip[128];
-	Service_Type svr_type;
+    Service_Type svr_type;
+
+    char ca_crt_root[256];
+    char ca_crt_server[256];
+    char ca_password[256];
+    char ca_key_server[256];
+    BOOL client_cer_check;
 } CLIENT_PARAM;
 
 int SEND_FD(int sfd, int fd_file, CLIENT_PARAM* param) 
@@ -126,12 +137,130 @@ static volatile unsigned int STATIC_THREAD_POOL_SIZE = 0;
 static void SESSION_HANDLING(SESSION_PARAM* session_param)
 {
 	Session* pSession = NULL;
-	pSession = new Session(session_param->srvobjmap, session_param->sockfd, session_param->client_ip.c_str(), session_param->svr_type, session_param->cache);
+    SSL* ssl = NULL;
+    int ssl_rc = -1;
+    BOOL bSSLAccepted;
+	SSL_CTX* ssl_ctx = NULL;
+    if(session_param->svr_type == stHTTPS)
+	{
+		X509* client_cert;
+		SSL_METHOD* meth;
+		SSL_load_error_strings();
+		OpenSSL_add_ssl_algorithms();
+		meth = (SSL_METHOD*)SSLv23_server_method();
+		ssl_ctx = SSL_CTX_new(meth);
+		if(!ssl_ctx)
+		{
+			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			goto clean_ssl3;
+		}
+
+		SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, NULL);
+		
+		SSL_CTX_load_verify_locations(ssl_ctx, session_param->ca_crt_root.c_str(), NULL);
+		if(SSL_CTX_use_certificate_file(ssl_ctx, session_param->ca_crt_server.c_str(), SSL_FILETYPE_PEM) <= 0)
+		{
+			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			goto clean_ssl3;
+		}
+		//printf("[%s]\n", session_param->ca_password.c_str());
+		SSL_CTX_set_default_passwd_cb_userdata(ssl_ctx, (char*)session_param->ca_password.c_str());
+		if(SSL_CTX_use_PrivateKey_file(ssl_ctx, session_param->ca_key_server.c_str(), SSL_FILETYPE_PEM) <= 0)
+		{
+			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			goto clean_ssl3;
+
+		}
+		if(!SSL_CTX_check_private_key(ssl_ctx))
+		{
+			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			goto clean_ssl3;
+		}
+		
+		ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
+        if(ssl_rc == 0)
+        {
+            printf("SSL_CTX_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            goto clean_ssl3;
+        }
+		SSL_CTX_set_mode(ssl_ctx, SSL_MODE_AUTO_RETRY);
+
+		ssl = SSL_new(ssl_ctx);
+		if(!ssl)
+		{
+			printf("SSL_new: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			goto clean_ssl2;
+		}
+		ssl_rc = SSL_set_fd(ssl, session_param->sockfd);
+        if(ssl_rc == 0)
+        {
+            printf("SSL_set_fd: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            goto clean_ssl2;
+        }
+        ssl_rc = SSL_set_cipher_list(ssl, "ALL");
+        if(ssl_rc == 0)
+        {
+            printf("SSL_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            goto clean_ssl2;
+        }
+        ssl_rc = SSL_accept(ssl);
+		if(ssl_rc < 0)
+		{
+            printf("SSL_accept: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			goto clean_ssl2;
+		}
+        else if(ssl_rc = 0)
+		{
+			goto clean_ssl1;
+		}
+
+        bSSLAccepted = TRUE;
+
+		if(session_param->client_cer_check)
+		{
+			X509* client_cert;
+			client_cert = SSL_get_peer_certificate(ssl);
+			if (client_cert != NULL)
+			{
+				X509_free (client_cert);
+			}
+			else
+			{
+				printf("SSL_get_peer_certificate: %s\n", ERR_error_string(ERR_get_error(),NULL));
+				goto clean_ssl1;
+			}
+		}
+	}
+
+	pSession = new Session(session_param->srvobjmap, session_param->sockfd, ssl,
+        session_param->client_ip.c_str(), session_param->svr_type, session_param->cache);
 	if(pSession != NULL)
 	{
 		pSession->Process();
 		delete pSession;
 	}
+
+clean_ssl1:
+    //printf("clean ssl1\n");
+	if(ssl && bSSLAccepted)
+    {
+		SSL_shutdown(ssl);
+        bSSLAccepted = FALSE;
+    }
+clean_ssl2:
+    //printf("clean ssl2\n");
+	if(ssl)
+    {
+		SSL_free(ssl);
+        ssl = NULL;
+    }
+clean_ssl3:
+    //printf("clean ssl3\n");
+	if(ssl_ctx)
+    {
+		SSL_CTX_free(ssl_ctx);
+        ssl_ctx = NULL;
+    }
 	close(session_param->sockfd);
 }
 
@@ -270,7 +399,12 @@ void Worker::Working()
 			session_param->sockfd = clt_sockfd;
 			session_param->client_ip = client_param.client_ip;
 			session_param->svr_type = client_param.svr_type;
-						
+		    session_param->ca_crt_root = client_param.ca_crt_root;
+       		session_param->ca_crt_server = client_param.ca_crt_server;
+		    session_param->ca_password = client_param.ca_password;
+		    session_param->ca_key_server = client_param.ca_key_server;
+		    session_param->client_cer_check = client_param.client_cer_check;
+
 			pthread_mutex_lock(&STATIC_THREAD_POOL_MUTEX);
 			STATIC_THREAD_POOL_ARG_QUEUE.push(session_param);
 			pthread_mutex_unlock(&STATIC_THREAD_POOL_MUTEX);
@@ -608,6 +742,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 					{
 						continue;
 					}
+                    //printf("clt_sockfd: %d\n", clt_sockfd);
 					string client_ip = inet_ntoa(clt_addr.sin_addr);
 					int access_result;
 					if(CHttpBase::m_permit_list.size() > 0)
@@ -652,12 +787,18 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 					{
 #ifdef CYGWIN						
 						SESSION_PARAM* session_param = new SESSION_PARAM;
-                				session_param->srvobjmap = &m_srvobjmap;
+                	    session_param->srvobjmap = &m_srvobjmap;
 						session_param->sockfd = clt_sockfd;
 						
 						session_param->client_ip = client_ip;
 						session_param->svr_type = m_st;
 						session_param->cache = m_cache;
+
+                        session_param->ca_crt_root = CHttpBase::m_ca_crt_root;
+                   		session_param->ca_crt_server = CHttpBase::m_ca_crt_server;
+            		    session_param->ca_password = CHttpBase::m_ca_password;
+		                session_param->ca_key_server = CHttpBase::m_ca_key_server;
+		                session_param->client_cer_check = CHttpBase::m_client_cer_check;
 
 						pthread_mutex_lock(&STATIC_THREAD_POOL_MUTEX);
 						STATIC_THREAD_POOL_ARG_QUEUE.push(session_param);
@@ -701,6 +842,17 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 						strncpy(client_param.client_ip, client_ip.c_str(), 127);
 						client_param.client_ip[127] = '\0';
 						client_param.svr_type = m_st;
+
+                        strncpy(client_param.ca_crt_root, CHttpBase::m_ca_crt_root.c_str(), 255);
+                        client_param.ca_crt_root[255] = '\0';
+                   		strncpy(client_param.ca_crt_server, CHttpBase::m_ca_crt_server.c_str(), 255);
+                        client_param.ca_crt_server[255] = '\0';
+            		    strncpy(client_param.ca_password, CHttpBase::m_ca_password.c_str(), 255);
+                        client_param.ca_password[255] = '\0';
+            		    strncpy(client_param.ca_key_server, CHttpBase::m_ca_key_server.c_str(), 255);
+                        client_param.ca_key_server[255] = '\0';
+            		    client_param.client_cer_check = CHttpBase::m_client_cer_check;
+
 						client_param.ctrl = SessionParamData;
 						SEND_FD(m_work_processes[next_process_index].sockfds[0], clt_sockfd, &client_param);
 						m_next_process++;

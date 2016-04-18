@@ -27,11 +27,12 @@ class Session
 {
 protected:
 	int m_sockfd;
+    SSL * m_ssl;
 	string m_clientip;
 	Service_Type m_st;
     ServiceObjMap * m_srvobj;
 public:
-	Session(ServiceObjMap* srvobj, int sockfd, const char* clientip, Service_Type st, memory_cache* ch);
+	Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, Service_Type st, memory_cache* ch);
 	virtual ~Session();
 	
 	void Process();

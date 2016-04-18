@@ -74,7 +74,21 @@ void doc::Response()
     strResourceFullPath += "/html/";
     strResourceFullPath += m_session->GetResource();
     
-    
+
+    struct stat info;
+    stat(strResourceFullPath.c_str(), &info);
+    if(S_ISDIR(info.st_mode))
+    {
+        CHttpResponseHdr header;
+        header.SetStatusCode(SC404);
+        header.SetField("Content-Type", "text/html");
+        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+        
+        m_session->HttpSend(header.Text(), header.Length());
+        m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+        return;
+    }
+
     
     long long nResourceLength, nRangeLength = 0;
     unsigned char szEtag[33];
