@@ -1,7 +1,7 @@
 # niuhttpd
 C++ web server framework
 
-Support API, CGI/FastCGI, PHP/PHP-FPM and WebSocket
+Support API, CGI/FastCGI, PHP/PHP-FPM, WebSocket and MySQL and MongoDB
 
 Please refer the code sample in api, cgi and ws direcory for the 2ndary development.
 * Run release.sh to generate the intsallation files package
