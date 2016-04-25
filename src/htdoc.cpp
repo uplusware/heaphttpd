@@ -131,6 +131,14 @@ void Htdoc::Response()
                 if(!lhandle)
                 {
                     printf("dlopen %s\n", dlerror());
+                    CHttpResponseHdr header;
+		            header.SetStatusCode(SC404);
+		
+                    header.SetField("Content-Type", "text/html");
+            		header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    m_session->HttpSend(header.Text(), header.Length());
+            		m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+		
                 }
                 else
                 {
@@ -145,6 +153,15 @@ void Htdoc::Response()
                     else
                     {
                         printf("dlsym %s\n", errmsg);
+                        
+                        CHttpResponseHdr header;
+	                    header.SetStatusCode(SC500);
+	
+                        header.SetField("Content-Type", "text/html");
+                		header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                        m_session->HttpSend(header.Text(), header.Length());
+                		m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                		
                     }
                 }
             }          

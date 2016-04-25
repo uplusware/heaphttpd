@@ -1,7 +1,12 @@
 #ifndef _STORAGE_H_
 #define _STORAGE_H_
 
-#include <mysql.h>
+#ifdef _MONGODB_
+    #include <mongoc.h>
+#else
+    #include <mysql.h>
+#endif /* _MONGODB_ */
+
 #include <pthread.h>
 #include <string>
 
@@ -18,7 +23,7 @@ public:
 	virtual ~DBStorage();
 
 	//system
-	int Connect(const char * host, const char* username, const char* password, const char* database);
+	int Connect(const char * host, const char* username, const char* password, const char* database, unsigned short port = 0);
 	void Close();
 	int Ping();
 	
@@ -31,22 +36,29 @@ public:
 	int ShowDatabases(string& databases);
 	
 protected:
+#ifdef _MONGODB_
+    mongoc_client_t *m_hMongoDB;
+    mongoc_database_t *m_hDatabase;
+#else
 	MYSQL* m_hMySQL;
+#endif /* _MONGODB_ */
 
 	BOOL m_bOpened;
+#ifndef _MONGODB_
 	void SqlSafetyString(string& strInOut);
-
+#endif /* _MONGODB_ */
 	string m_host;
 	string m_username;
 	string m_password;
 	string m_database;
-    
+    unsigned short m_port;
     string m_encoding;
     string m_private_path;
     
     pthread_mutex_t m_thread_pool_mutex;
     
 private:
+#ifndef _MONGODB_
     int mysql_thread_real_query(MYSQL *mysql, const char *stmt_str, unsigned long length)
     {
         pthread_mutex_lock(&m_thread_pool_mutex);
@@ -54,7 +66,8 @@ private:
         pthread_mutex_unlock(&m_thread_pool_mutex);
         return ret;
     }
+#endif /* _MONGODB_*/
 };
-	
+
 #endif /* _STORAGE_H_ */
 
