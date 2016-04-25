@@ -168,9 +168,29 @@ int DBStorage::Ping()
         ret_val = mongoc_client_command_simple (m_hMongoDB, m_database.c_str(), &ping, NULL, &reply, &error);
         if (ret_val)
         {
+            bson_iter_t iter;
+            const bson_value_t * ok_value;
+            if(bson_iter_init (&iter, &reply) && bson_iter_find (&iter, "ok"))
+            {
+#if 0
+                ok_value = bson_iter_value (&iter);
+                printf("ok_value->value_type: %d\n", ok_value->value_type);
+
+                if(ok_value && ok_value->value_type == BSON_TYPE_DOUBLE)
+                    printf ("OK: %f\n", ok_value->value.v_double);
+#endif /* 0 */
+                ret_val = true;
+            }
+            else
+            {
+                ret_val = false;
+            }
+
+#if 0
             char* str = bson_as_json(&reply, NULL);
             fprintf(stdout, "%s\n", str);
             bson_free(str);
+#endif /* 0 */
         }
         else
         {
