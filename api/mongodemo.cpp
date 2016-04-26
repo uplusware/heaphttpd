@@ -6,13 +6,14 @@
 #include "mongodemo.h"
 
 //API sample
+#define MONGO_SERVICE_OBJ_NAME  "mongo#root@localhost"
 void ApiMongoDemo::Response()
 {
-	StorageEngine* stg_engine = (StorageEngine*)m_session->GetServiceObject("root@mysql_database_connection");
+	StorageEngine* stg_engine = (StorageEngine*)m_session->GetServiceObject(MONGO_SERVICE_OBJ_NAME);
 	if(stg_engine == NULL)
 	{
 		stg_engine = new StorageEngine("localhost", "", "", "test", "UTF-8", "/var/niuhttpd/private", 8);
-		m_session->SetServiceObject("root@mongo_database_connection", stg_engine);		
+		m_session->SetServiceObject(MONGO_SERVICE_OBJ_NAME, stg_engine);		
 	}
     
     CHttpResponseHdr header;

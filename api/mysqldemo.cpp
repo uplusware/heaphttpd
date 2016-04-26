@@ -6,13 +6,14 @@
 #include "mysqldemo.h"
 
 //API sample
+#define MYSQL_SERVICE_OBJ_NAME  "mysql#root@localhost"
 void ApiMySQLDemo::Response()
 {
-	StorageEngine* stg_engine = (StorageEngine*)m_session->GetServiceObject("root@mysql_database_connection");
+	StorageEngine* stg_engine = (StorageEngine*)m_session->GetServiceObject(MYSQL_SERVICE_OBJ_NAME);
 	if(stg_engine == NULL)
 	{
 		stg_engine = new StorageEngine("localhost", "root", "123456", "", "UTF-8", "/var/niuhttpd/private", 8);
-		m_session->SetServiceObject("root@mysql_database_connection", stg_engine);		
+		m_session->SetServiceObject(MYSQL_SERVICE_OBJ_NAME, stg_engine);		
 	}
     
     CHttpResponseHdr header;
