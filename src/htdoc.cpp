@@ -130,9 +130,9 @@ void Htdoc::Response()
                 void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
                 if(!lhandle)
                 {
-                    printf("dlopen %s\n", dlerror());
+                    fprintf(stderr, "dlopen %s\n", dlerror());
                     CHttpResponseHdr header;
-		            header.SetStatusCode(SC404);
+		            header.SetStatusCode(SC500);
 		
                     header.SetField("Content-Type", "text/html");
             		header.SetField("Content-Length", header.GetDefaultHTMLLength());
@@ -152,7 +152,7 @@ void Htdoc::Response()
                     }
                     else
                     {
-                        printf("dlsym %s\n", errmsg);
+                        fprintf(stderr, "dlsym %s\n", errmsg);
                         
                         CHttpResponseHdr header;
 	                    header.SetStatusCode(SC500);
@@ -234,14 +234,14 @@ void Htdoc::Response()
 		if(!lhandle)
 		{
             CHttpResponseHdr header;
-			header.SetStatusCode(SC400);
+			header.SetStatusCode(SC500);
 			
             header.SetField("Content-Type", "text/html");
 			header.SetField("Content-Length", header.GetDefaultHTMLLength());
 			
 			m_session->HttpSend(header.Text(), header.Length());
 			m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-			printf("dlopen %s\n", dlerror());
+			fprintf(stderr, "dlopen %s\n", dlerror());
 		}
 		else
 		{
@@ -266,7 +266,7 @@ void Htdoc::Response()
 		
 				m_session->HttpSend(header.Text(), header.Length());
 				m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-				printf("dlsym %s\n", errmsg);
+				fprintf(stderr, "dlsym %s\n", errmsg);
 			}
 		}
 	
