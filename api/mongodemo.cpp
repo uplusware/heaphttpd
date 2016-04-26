@@ -18,7 +18,7 @@ void ApiMongoDemo::Response()
     CHttpResponseHdr header;
 	database db_conn(stg_engine);
 	string strDatabases;
-    if(db_conn.m_mailStg && db_conn.m_mailStg->ShowDatabases(strDatabases) == 0)
+    if(db_conn.storage() && db_conn.storage()->ShowDatabases(strDatabases) == 0)
     {
         strDatabases = "<html><head><title>CGI sample</title></head><h1>niuhttpd web server/0.3</h1>Show databases: " + strDatabases;
         strDatabases += "</body></html>";

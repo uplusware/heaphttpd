@@ -8,10 +8,10 @@ class database
 public:
 	database(StorageEngine* stgEngine)
 	{	
-		m_stgengine_instance = new StorageEngineInstance(stgEngine, &m_mailStg);
+		m_stgengine_instance = new StorageEngineInstance(stgEngine, &m_stg);
 		if(!m_stgengine_instance)
 		{
-			m_mailStg = NULL;
+			m_stg = NULL;
 		}
 	}
 	virtual ~database()
@@ -20,10 +20,10 @@ public:
 			delete m_stgengine_instance;
 	}
 	
-	DBStorage* m_mailStg;
+	DBStorage* storage() { return m_stg; }
 protected:
 	StorageEngineInstance* m_stgengine_instance;
-
+    DBStorage* m_stg;
 };
 
 #endif /* _DATABASE_H_ */

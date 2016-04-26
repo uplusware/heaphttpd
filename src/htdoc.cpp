@@ -127,7 +127,7 @@ void Htdoc::Response()
                 strLibName += strResource.c_str();
                 strLibName += ".so";
                 
-                void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_LAZY);
+                void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
                 if(!lhandle)
                 {
                     printf("dlopen %s\n", dlerror());
@@ -230,7 +230,7 @@ void Htdoc::Response()
 		strLibName += ".so";
 		
 		//printf("%s\n", strLibName.c_str());
-		void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_LAZY);
+		void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
 		if(!lhandle)
 		{
             CHttpResponseHdr header;
