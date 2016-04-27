@@ -11,12 +11,101 @@
 
 memory_cache::memory_cache()
 {
-	m_htdoc.clear();
+    pthread_rwlock_init(&m_cookie_rwlock, NULL);
+	m_filedata.clear();
+	m_cookies.clear();
+	m_type_table.clear();
+	m_filedata_size = 0;
 }
 
 memory_cache::~memory_cache()
 {
 	unload();
+	pthread_rwlock_destroy(&m_cookie_rwlock);
+}
+
+void memory_cache::push_cookie(const char * name, Cookie & ck)
+{
+    pthread_rwlock_wrlock(&m_cookie_rwlock);
+    map<string, Cookie>::iterator iter = m_cookies.find(name);
+    if(iter != m_cookies.end())
+        m_cookies.erase(iter);
+    m_cookies.insert(map<string, Cookie>::value_type(name, ck));
+    pthread_rwlock_unlock(&m_cookie_rwlock);
+}
+
+void memory_cache::pop_cookie(const char * name)
+{
+    pthread_rwlock_wrlock(&m_cookie_rwlock);
+    map<string, Cookie>::iterator iter = m_cookies.find(name);
+    if(iter != m_cookies.end())
+        m_cookies.erase(iter);
+    pthread_rwlock_unlock(&m_cookie_rwlock);
+}
+
+int memory_cache::get_cookie(const char * name, Cookie & ck)
+{
+    int ret = -1;
+    pthread_rwlock_rdlock(&m_cookie_rwlock);  
+    map<string, Cookie>::iterator iter = m_cookies.find(name);
+    if(iter != m_cookies.end())
+    {
+        ck = iter->second;
+        ret = 0;
+    }
+    pthread_rwlock_unlock(&m_cookie_rwlock);
+    return ret;
+}
+
+void memory_cache::push_file(const char * name, filedata& fd)
+{
+    pthread_rwlock_wrlock(&m_file_rwlock);
+    fd.pushtime = time(NULL);
+    if(m_filedata_size < 1024*1024*512)
+    {
+        //erase duplciated one.
+        map<string, filedata>::iterator iter = m_filedata.find(name);
+        if(iter != m_filedata.end())
+            m_filedata.erase(iter);
+    }
+    else
+    {
+        //erase earliest one.
+        map<string, filedata>::iterator earliest_it = m_filedata.end();
+        map<string, filedata>::iterator it;
+        for(it = m_filedata.begin(); it != m_filedata.end(); ++it)
+        {
+            if(earliest_it == m_filedata.end() || it->second.pushtime < earliest_it->second.pushtime)
+                earliest_it = it;
+        }
+        m_filedata.erase(earliest_it);
+    }
+    m_filedata.insert(map<string, filedata>::value_type(name, fd));
+    pthread_rwlock_unlock(&m_file_rwlock);
+}
+
+void memory_cache::pop_file(const char * name)
+{
+    pthread_rwlock_wrlock(&m_file_rwlock);
+    map<string, filedata>::iterator iter = m_filedata.find(name);
+    if(iter != m_filedata.end())
+        m_filedata.erase(iter);
+    pthread_rwlock_unlock(&m_file_rwlock);
+}
+
+int memory_cache::get_file(const char * name, filedata & fd)
+{
+    int ret = -1;
+    pthread_rwlock_rdlock(&m_file_rwlock);  
+    map<string, filedata>::iterator iter = m_filedata.find(name);
+    if(iter != m_filedata.end())
+    {
+        iter->second.pushtime = time(NULL);
+        memcpy(&fd, &iter->second, sizeof(filedata));
+        ret = 0;
+    }
+    pthread_rwlock_unlock(&m_file_rwlock);
+    return ret;
 }
 
 void memory_cache::load(const char* szdir)
@@ -219,10 +308,10 @@ void memory_cache::load(const char* szdir)
 void memory_cache::unload()
 {
 	map<string, filedata>::iterator iter;
-	for(iter = m_htdoc.begin(); iter != m_htdoc.end(); iter++)
+	for(iter = m_filedata.begin(); iter != m_filedata.end(); iter++)
 	{
 		free(iter->second.pbuf);
 	}
-	m_htdoc.clear();
+	m_filedata.clear();
 }
 

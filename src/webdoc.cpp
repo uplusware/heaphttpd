@@ -132,9 +132,7 @@ void doc::Response()
             header.SetStatusCode(SC304);
             unsigned int zero = 0;
             header.SetField("Content-Length", zero);    
-            m_session->HttpSend(header.Text(), header.Length());
-            
-            
+            m_session->HttpSend(header.Text(), header.Length());                      
         }
         else
         {

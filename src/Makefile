@@ -12,7 +12,7 @@ WSLIB = libniuwebsocket.so
 WSLIBOBJS = websocket.o
 
 HTTPLIB = libniuhttp.so
-HTTPLIBOBJS =   http.o httpcomm.o cache.o htdoc.o fstring.o webdoc.o webcgi.o niuapi.o wwwauth.o fastcgi.o	\
+HTTPLIBOBJS =   cookie.o http.o httpcomm.o cache.o htdoc.o fstring.o webdoc.o webcgi.o niuapi.o wwwauth.o fastcgi.o	\
                 util/digcalc.o	            \
                 util/sha1.o                 \
                 util/md5.o	                \

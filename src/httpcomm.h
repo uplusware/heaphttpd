@@ -7,6 +7,10 @@
 #define _HTTPCOMM_H_
 #include <string>
 #include <map>
+#include "cache.h"
+#include "util/general.h"
+#include "cookie.h"
+
 using namespace std;
 
 /* 
@@ -279,9 +283,12 @@ public:
     void SetField(const char* name, long long value);
     
 	void SetFields(const char* fields);
-	
-	void SetCookie(const char* szName, const char* szValue, const char* szPath);
-	
+	    
+    void SetCookie(string & strCookie, memory_cache * pCache, const char* szName, const char* szValue,
+        int nMaxAge = -1, const char* szExpires = NULL,
+        const char* szPath = NULL, const char* szDomain = NULL, 
+        BOOL bSecure = FALSE, BOOL bHttpOnly = FALSE);
+
 	const char* Text();
 	
 	unsigned int Length();
