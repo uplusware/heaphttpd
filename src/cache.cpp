@@ -6,24 +6,27 @@
 #include "cache.h"
 #include "util/general.h"
 
-#define FILE_MAX_SIZE 	(1024*512)
-#define MAX_CACHE_SIZE	(1024*1024*2)
-
 memory_cache::memory_cache()
 {
     pthread_rwlock_init(&m_cookie_rwlock, NULL);
-	m_filedata.clear();
+    pthread_rwlock_init(&m_file_rwlock, NULL);
+    
+	m_file_cache.clear();
 	m_cookies.clear();
+	
 	m_type_table.clear();
-	m_filedata_size = 0;
+	m_file_cache_size = 0;
 }
 
 memory_cache::~memory_cache()
 {
 	unload();
+	
+	pthread_rwlock_destroy(&m_file_rwlock);
 	pthread_rwlock_destroy(&m_cookie_rwlock);
 }
 
+//Cookie
 void memory_cache::push_cookie(const char * name, Cookie & ck)
 {
     pthread_rwlock_wrlock(&m_cookie_rwlock);
@@ -57,55 +60,123 @@ int memory_cache::get_cookie(const char * name, Cookie & ck)
     return ret;
 }
 
-void memory_cache::push_file(const char * name, filedata& fd)
+
+//File
+void memory_cache::push_file(const char* name, unsigned char* buf, unsigned int len, time_t t_modify, char* etag)
 {
     pthread_rwlock_wrlock(&m_file_rwlock);
-    fd.pushtime = time(NULL);
-    if(m_filedata_size < 1024*1024*512)
+
+    file_cache * fc = new file_cache(buf, len, t_modify, etag);
+   
+    if(m_file_cache_size < MAX_CACHE_SIZE)
     {
-        //erase duplciated one.
-        map<string, filedata>::iterator iter = m_filedata.find(name);
-        if(iter != m_filedata.end())
-            m_filedata.erase(iter);
+        map<string, file_cache *>::iterator iter = m_file_cache.find(name);
+        if(iter != m_file_cache.end())
+        {
+            CACHE_DATA * cache_data = iter->second->cache_lock();
+            m_file_cache_size -= cache_data->len;
+            iter->second->cache_unlock();
+            
+            delete iter->second;
+        }
     }
     else
     {
-        //erase earliest one.
-        map<string, filedata>::iterator earliest_it = m_filedata.end();
-        map<string, filedata>::iterator it;
-        for(it = m_filedata.begin(); it != m_filedata.end(); ++it)
-        {
-            if(earliest_it == m_filedata.end() || it->second.pushtime < earliest_it->second.pushtime)
-                earliest_it = it;
-        }
-        m_filedata.erase(earliest_it);
+        map<string, file_cache *>::iterator oldest_file = _find_oldest_file_();
+        CACHE_DATA * oldest_data = oldest_file->second->cache_lock();
+        m_file_cache_size -= oldest_data->len;
+        oldest_file->second->cache_unlock();
+        delete oldest_file->second;
+        m_file_cache.erase(oldest_file);
     }
-    m_filedata.insert(map<string, filedata>::value_type(name, fd));
+
+    m_file_cache.insert(map<string, file_cache*>::value_type(name, fc));
+    m_file_cache_size += len;
     pthread_rwlock_unlock(&m_file_rwlock);
 }
 
 void memory_cache::pop_file(const char * name)
 {
     pthread_rwlock_wrlock(&m_file_rwlock);
-    map<string, filedata>::iterator iter = m_filedata.find(name);
-    if(iter != m_filedata.end())
-        m_filedata.erase(iter);
+    
+    map<string, file_cache *>::iterator iter = m_file_cache.find(name);
+    if(iter != m_file_cache.end())
+    {
+        CACHE_DATA * cache_data = iter->second->cache_lock();
+        m_file_cache_size -= cache_data->len;
+        iter->second->cache_unlock();
+            
+        delete iter->second;
+        m_file_cache.erase(iter);
+    }
+    
     pthread_rwlock_unlock(&m_file_rwlock);
 }
 
-int memory_cache::get_file(const char * name, filedata & fd)
+file_cache* memory_cache::lock_file(const char * name, CACHE_DATA ** cache_data)
 {
-    int ret = -1;
-    pthread_rwlock_rdlock(&m_file_rwlock);  
-    map<string, filedata>::iterator iter = m_filedata.find(name);
-    if(iter != m_filedata.end())
+    file_cache* ret = NULL;
+    pthread_rwlock_rdlock(&m_file_rwlock);
+      
+    map<string, file_cache*>::iterator iter = m_file_cache.find(name);
+    if(iter != m_file_cache.end())
     {
-        iter->second.pushtime = time(NULL);
-        memcpy(&fd, &iter->second, sizeof(filedata));
-        ret = 0;
+        ret = iter->second;
+        *cache_data = iter->second->cache_lock();
     }
+    
     pthread_rwlock_unlock(&m_file_rwlock);
     return ret;
+}
+
+void memory_cache::unlock_file(file_cache* fc)
+{
+    if(fc)
+        fc->cache_unlock();
+}
+
+map<string, file_cache *>::iterator memory_cache::_find_oldest_file_()
+{
+    map<string, file_cache *>::iterator oldest_it = m_file_cache.end();
+    map<string, file_cache *>::iterator curr_it = m_file_cache.begin();
+    for(curr_it = m_file_cache.begin(); curr_it != m_file_cache.end(); ++curr_it)
+    {
+        if(oldest_it == m_file_cache.end())
+        {
+            oldest_it = curr_it;
+        }
+        else
+        {
+            if(oldest_it != curr_it) //avoid re-entrying the lock
+            {
+            CACHE_DATA* curr_data, * oldest_data;
+            curr_data = curr_it->second->cache_lock();
+            oldest_data = oldest_it->second->cache_lock();
+            
+            if(curr_data->t_access < oldest_data->t_access)
+                oldest_it = curr_it;
+            else if(curr_data->t_access = oldest_data->t_access 
+                && curr_data->len > oldest_data->len)
+                oldest_it = curr_it;
+                
+            curr_it->second->cache_unlock();
+            oldest_it->second->cache_unlock();
+            }
+        }
+    }
+    return oldest_it;
+}
+///////////////////////////////////////////////////////////////////////////////
+void memory_cache::unload()
+{
+    pthread_rwlock_wrlock(&m_file_rwlock);
+	map<string, file_cache *>::iterator iter;
+	for(iter = m_file_cache.begin(); iter != m_file_cache.end(); iter++)
+	{
+		delete iter->second;
+	}
+	m_file_cache.clear();
+	pthread_rwlock_unlock(&m_file_rwlock);
 }
 
 void memory_cache::load(const char* szdir)
@@ -305,13 +376,5 @@ void memory_cache::load(const char* szdir)
 	m_type_table.insert(map<string, string>::value_type("zip", "application/zip"));
 }
 
-void memory_cache::unload()
-{
-	map<string, filedata>::iterator iter;
-	for(iter = m_filedata.begin(); iter != m_filedata.end(); iter++)
-	{
-		free(iter->second.pbuf);
-	}
-	m_filedata.clear();
-}
+
 
