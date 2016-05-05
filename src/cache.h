@@ -22,19 +22,20 @@
 #include <pthread.h>
 #include "cookie.h"
 
-#define FILE_MAX_SIZE 	(1024*1024*4)
-#define MAX_CACHE_SIZE	(1024*1024*512)
+#define FILE_MAX_SIZE 	(1024*1024*4)   /* 4M */
+#define MAX_CACHE_SIZE	(1024*1024*512) /* 512M */
 
 #define FILE_ETAG_LEN 32
 
 using namespace std;
 
 typedef struct {
-    unsigned char* buf;
-    unsigned int len;
+    char* buf;
+    volatile unsigned int len;
     unsigned char etag[FILE_ETAG_LEN + 1];
-    time_t t_modify;
-    time_t t_access;
+    volatile time_t t_modify;
+    volatile time_t t_access;
+    volatile time_t t_create;
 } CACHE_DATA;
 
 class file_cache
@@ -44,43 +45,51 @@ private:
     pthread_rwlock_t m_cache_lock;  
     
 public:   
-    file_cache(unsigned char* buf, unsigned int len, time_t t_modify, char* etag)
+    file_cache(char* buf, unsigned int len, time_t t_modify, unsigned char* etag)
     {
         pthread_rwlock_init(&m_cache_lock, NULL);
         
-        m_cache_data.buf = (unsigned char*)malloc(len);
-        memcpy(buf, m_cache_data.buf, len);
+        m_cache_data.buf = new char[len];
+        memcpy(m_cache_data.buf, buf, len);
         
         m_cache_data.len = len;
         memcpy( m_cache_data.etag, etag, FILE_ETAG_LEN + 1);
         
         m_cache_data.t_modify = t_modify;
         m_cache_data.t_access = time(NULL);
+        m_cache_data.t_create = time(NULL);
     }
     
     virtual ~file_cache()
     {
         pthread_rwlock_wrlock(&m_cache_lock);
+        
         if(m_cache_data.buf)
-            free(m_cache_data.buf);
+            delete[] m_cache_data.buf;
         pthread_rwlock_unlock(&m_cache_lock);   
              
         pthread_rwlock_destroy(&m_cache_lock);
     }
     
-    CACHE_DATA* cache_lock()
+    CACHE_DATA* file_rdlock()
     {
-        pthread_rwlock_rdlock(&m_cache_lock);        
+        pthread_rwlock_rdlock(&m_cache_lock);
+        m_cache_data.t_access = time(NULL);     
+        //fprintf(stderr, "2 %p rdlock\n", &m_cache_data);
         return &m_cache_data;
     }
     
-    void cache_update_access()
+    CACHE_DATA* file_wrlock()
     {
-        m_cache_data.t_access = time(NULL);
+        pthread_rwlock_wrlock(&m_cache_lock);
+        m_cache_data.t_access = time(NULL);     
+        //fprintf(stderr, "2 %p rdlock\n", &m_cache_data);
+        return &m_cache_data;
     }
     
-    void cache_unlock()
+    void file_unlock()
     {
+        //fprintf(stderr, "2 %p unlock\n", &m_cache_data);
         pthread_rwlock_unlock(&m_cache_lock);
     }  
 };
@@ -93,7 +102,7 @@ public:
 	virtual ~memory_cache();
 
 	map<string, file_cache*> m_file_cache;
-	unsigned long long m_file_cache_size;
+	volatile unsigned long long m_file_cache_size;
 	
 	map<string, string> m_type_table;
 	map<string, Cookie> m_cookies;
@@ -105,8 +114,28 @@ public:
 	void pop_cookie(const char * name);
 	int  get_cookie(const char * name, Cookie & ck);
 	
-	void push_file(const char * name, unsigned char* buf, unsigned int len, time_t t_modify, char* etag);
-	void pop_file(const char * name);
+	bool _push_file_(const char * name, 
+	    char* buf, unsigned int len, time_t t_modify, unsigned char* etag,
+	    file_cache** fout);
+	bool _find_file_(const char * name, file_cache** fc);
+	
+	void wrlock_cache()
+	{
+	    pthread_rwlock_wrlock(&m_file_rwlock);
+	    //fprintf(stderr, "1%p wrlock\n", &m_file_cache);
+	}
+	
+	void rdlock_cache()
+	{
+	    //fprintf(stderr, "1%p rdlock\n", &m_file_cache);
+	    pthread_rwlock_wrlock(&m_file_rwlock);
+	}
+	
+	void unlock_cache()
+	{
+	    pthread_rwlock_unlock(&m_file_rwlock);
+	    //fprintf(stderr, "1%p unlock\n", &m_file_cache);
+	}
 	
 	file_cache* lock_file(const char * name, CACHE_DATA ** cache_data);
     void unlock_file(file_cache* fc);
@@ -119,4 +148,26 @@ private:
     pthread_rwlock_t m_file_rwlock;
 };
 
+class cache_instance
+{
+private:
+    memory_cache* m_cache;
+    CACHE_DATA * m_cache_data;
+    file_cache* m_file_cache;
+public:
+    cache_instance(memory_cache* cache, const char * name)
+    {
+        m_cache = cache;
+        m_file_cache = m_cache->lock_file(name, &m_cache_data);
+    }
+    
+    virtual ~cache_instance()
+    {
+        if(m_file_cache)
+            m_cache->unlock_file(m_file_cache);
+    }
+    
+    CACHE_DATA * get_cache_data() { return m_cache_data; }
+};
 #endif /* _CACHE_H_ */
+

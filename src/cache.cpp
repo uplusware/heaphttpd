@@ -62,55 +62,80 @@ int memory_cache::get_cookie(const char * name, Cookie & ck)
 
 
 //File
-void memory_cache::push_file(const char* name, unsigned char* buf, unsigned int len, time_t t_modify, char* etag)
+bool memory_cache::_push_file_(const char* name, 
+    char* buf, unsigned int len, time_t t_modify, unsigned char* etag,
+    file_cache** fout)
 {
-    pthread_rwlock_wrlock(&m_file_rwlock);
-
-    file_cache * fc = new file_cache(buf, len, t_modify, etag);
-   
-    if(m_file_cache_size < MAX_CACHE_SIZE)
-    {
-        map<string, file_cache *>::iterator iter = m_file_cache.find(name);
-        if(iter != m_file_cache.end())
-        {
-            CACHE_DATA * cache_data = iter->second->cache_lock();
-            m_file_cache_size -= cache_data->len;
-            iter->second->cache_unlock();
-            
-            delete iter->second;
-        }
-    }
-    else
-    {
-        map<string, file_cache *>::iterator oldest_file = _find_oldest_file_();
-        CACHE_DATA * oldest_data = oldest_file->second->cache_lock();
-        m_file_cache_size -= oldest_data->len;
-        oldest_file->second->cache_unlock();
-        delete oldest_file->second;
-        m_file_cache.erase(oldest_file);
-    }
-
-    m_file_cache.insert(map<string, file_cache*>::value_type(name, fc));
-    m_file_cache_size += len;
-    pthread_rwlock_unlock(&m_file_rwlock);
-}
-
-void memory_cache::pop_file(const char * name)
-{
-    pthread_rwlock_wrlock(&m_file_rwlock);
+    bool ret = false;
     
     map<string, file_cache *>::iterator iter = m_file_cache.find(name);
     if(iter != m_file_cache.end())
     {
-        CACHE_DATA * cache_data = iter->second->cache_lock();
-        m_file_cache_size -= cache_data->len;
-        iter->second->cache_unlock();
-            
-        delete iter->second;
-        m_file_cache.erase(iter);
+        if(iter->second)
+        {
+            CACHE_DATA * cache_data = iter->second->file_rdlock();
+            m_file_cache_size -= cache_data->len;
+            iter->second->file_unlock();
+            delete iter->second;
+        }   
+        iter->second = new file_cache(buf, len, t_modify, etag);
+        m_file_cache_size += len;
+        
+        *fout = iter->second;
+        ret = true;
+    }
+    else
+    {
+        file_cache * fc = new file_cache(buf, len, t_modify, etag);
+       
+        if(m_file_cache_size < MAX_CACHE_SIZE)
+        {
+            map<string, file_cache *>::iterator iter = m_file_cache.find(name);
+            if(iter != m_file_cache.end())
+            {
+                CACHE_DATA * cache_data = iter->second->file_rdlock();
+                m_file_cache_size -= cache_data->len;
+                iter->second->file_unlock();
+                
+                delete iter->second;
+            }
+        }
+        else
+        {
+            map<string, file_cache *>::iterator oldest_file = _find_oldest_file_();
+            CACHE_DATA * oldest_data = oldest_file->second->file_rdlock();
+            m_file_cache_size -= oldest_data->len;
+            oldest_file->second->file_unlock();
+            delete oldest_file->second;
+            m_file_cache.erase(oldest_file);
+        }
+        
+        pair<map<string, file_cache *>::iterator, bool> inspos;
+        
+        inspos = m_file_cache.insert(map<string, file_cache*>::value_type(name, fc));
+        if(inspos.second == true)
+        {
+            *fout = inspos.first->second;
+            m_file_cache_size += len;
+            ret = true;
+        }
     }
     
-    pthread_rwlock_unlock(&m_file_rwlock);
+    return ret;
+}
+
+bool memory_cache::_find_file_(const char * name, file_cache** fc)
+{
+    bool ret = false;
+    *fc = NULL;
+    map<string, file_cache *>::iterator iter = m_file_cache.find(name);
+    if(iter != m_file_cache.end())
+    {
+        *fc = iter->second;
+        ret = true;
+    }
+    
+    return ret;
 }
 
 file_cache* memory_cache::lock_file(const char * name, CACHE_DATA ** cache_data)
@@ -122,7 +147,7 @@ file_cache* memory_cache::lock_file(const char * name, CACHE_DATA ** cache_data)
     if(iter != m_file_cache.end())
     {
         ret = iter->second;
-        *cache_data = iter->second->cache_lock();
+        *cache_data = iter->second->file_rdlock();
     }
     
     pthread_rwlock_unlock(&m_file_rwlock);
@@ -132,7 +157,7 @@ file_cache* memory_cache::lock_file(const char * name, CACHE_DATA ** cache_data)
 void memory_cache::unlock_file(file_cache* fc)
 {
     if(fc)
-        fc->cache_unlock();
+        fc->file_unlock();
 }
 
 map<string, file_cache *>::iterator memory_cache::_find_oldest_file_()
@@ -150,8 +175,8 @@ map<string, file_cache *>::iterator memory_cache::_find_oldest_file_()
             if(oldest_it != curr_it) //avoid re-entrying the lock
             {
             CACHE_DATA* curr_data, * oldest_data;
-            curr_data = curr_it->second->cache_lock();
-            oldest_data = oldest_it->second->cache_lock();
+            curr_data = curr_it->second->file_rdlock();
+            oldest_data = oldest_it->second->file_rdlock();
             
             if(curr_data->t_access < oldest_data->t_access)
                 oldest_it = curr_it;
@@ -159,8 +184,8 @@ map<string, file_cache *>::iterator memory_cache::_find_oldest_file_()
                 && curr_data->len > oldest_data->len)
                 oldest_it = curr_it;
                 
-            curr_it->second->cache_unlock();
-            oldest_it->second->cache_unlock();
+            curr_it->second->file_unlock();
+            oldest_it->second->file_unlock();
             }
         }
     }
