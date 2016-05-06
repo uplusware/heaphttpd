@@ -167,15 +167,16 @@ void CHttpResponseHdr::SetFields(const char* fields)
 	m_isHdrUpdated = true;
 }
 
-void CHttpResponseHdr::SetCookie(string & strCookie, memory_cache * pCache, const char* szName, const char* szValue,
+void CHttpResponseHdr::SetCookie(/* string & strCookie, */ memory_cache * pCache, const char* szName, const char* szValue,
         int nMaxAge, const char* szExpires,
         const char* szPath, const char* szDomain, 
         BOOL bSecure, BOOL bHttpOnly)
 {
-    Cookie ck(szName, szValue, nMaxAge, szExpires, szPath, szDomain, bSecure, bHttpOnly);
-    ck.toString(strCookie);
+    string strCookie;
+    Cookie ck(szName, szValue, nMaxAge, szExpires, szPath, szDomain, bSecure, bHttpOnly);   
+    ck.toString(strCookie);  
 	SetField("Set-Cookie", strCookie.c_str());
-	pCache->push_cookie(szName, ck);
+	pCache->push_cookie(szName, ck);	
 }
 
 CHttpResponseHdr::~CHttpResponseHdr()

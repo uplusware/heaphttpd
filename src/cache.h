@@ -114,6 +114,7 @@ public:
 	bool _push_file_(const char * name, 
 	    char* buf, unsigned int len, time_t t_modify, unsigned char* etag,
 	    file_cache** fout);
+	    
 	bool _find_file_(const char * name, file_cache** fc);
 	
 	void wrlock_cache()

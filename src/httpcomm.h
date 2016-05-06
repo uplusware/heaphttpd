@@ -284,7 +284,7 @@ public:
     
 	void SetFields(const char* fields);
 	    
-    void SetCookie(string & strCookie, memory_cache * pCache, const char* szName, const char* szValue,
+    void SetCookie(/* string & strCookie, */ memory_cache * pCache, const char* szName, const char* szValue,
         int nMaxAge = -1, const char* szExpires = NULL,
         const char* szPath = NULL, const char* szDomain = NULL, 
         BOOL bSecure = FALSE, BOOL bHttpOnly = FALSE);

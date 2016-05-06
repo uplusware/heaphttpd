@@ -30,10 +30,12 @@ memory_cache::~memory_cache()
 void memory_cache::push_cookie(const char * name, Cookie & ck)
 {
     pthread_rwlock_wrlock(&m_cookie_rwlock);
+    
     map<string, Cookie>::iterator iter = m_cookies.find(name);
     if(iter != m_cookies.end())
         m_cookies.erase(iter);
     m_cookies.insert(map<string, Cookie>::value_type(name, ck));
+    fprintf(stderr, "%s %d\n", name, m_cookies.size());
     pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 
@@ -195,21 +197,99 @@ map<string, file_cache *>::iterator memory_cache::_find_oldest_file_()
 void memory_cache::unload()
 {
     pthread_rwlock_wrlock(&m_file_rwlock);
-	map<string, file_cache *>::iterator iter;
-	for(iter = m_file_cache.begin(); iter != m_file_cache.end(); iter++)
+	map<string, file_cache *>::iterator iter_f;
+	for(iter_f = m_file_cache.begin(); iter_f != m_file_cache.end(); iter_f++)
 	{
-		delete iter->second;
+		delete iter_f->second;
 	}
 	m_file_cache.clear();
+	fprintf(stderr, "unload %d\n", m_cookies.size());
+	if(m_cookies.size() > 0)
+	{
+	    char szCookieFile[256];
+	    sprintf(szCookieFile, "%s/cookie/%08x-%08x.cookie", m_dirpath.c_str(), time(NULL), getpid());
+	    fprintf(stderr, "unload %s\n", szCookieFile);
+	    ofstream* cookie_stream = NULL;
+	                      
+	    map<string, Cookie>::iterator iter_c;
+	    for(iter_c = m_cookies.begin(); iter_c != m_cookies.end(); iter_c++)
+	    {
+	        const char* szExpires = iter_c->second.getExpires();
+	        if(szExpires[0] != '\0' && iter_c->second.getMaxAge() != -1)
+	        {
+	            if(!cookie_stream)
+	            {
+	                cookie_stream = new ofstream(szCookieFile, ios::out | ios::binary | ios::trunc);
+	            }
+	            if(!cookie_stream->is_open())
+	                break;
+	            string strCookie;
+	            iter_c->second.toString(strCookie);
+	            
+	            char szCreateTime[256];
+	            sprintf(szCreateTime, "%d", iter_c->second.getCreateTime());
+	            
+	            cookie_stream->write(szCreateTime, strlen(szCreateTime));
+	            cookie_stream->write(";", 1);
+	            
+	            cookie_stream->write(strCookie.c_str(), strCookie.length());
+	            cookie_stream->write("\n", 1);
+            }
+	    }
+	    if(cookie_stream && cookie_stream->is_open())
+	    {
+	        cookie_stream->close();
+	    }
+	    m_cookies.clear();
+	}
+	
 	pthread_rwlock_unlock(&m_file_rwlock);
 }
 
 void memory_cache::load(const char* szdir)
 {
 	unload();
+	m_dirpath = szdir;
+	char szCookieFolder[256];
+	sprintf(szCookieFolder, "%s/cookie", m_dirpath.c_str());
+	fprintf(stderr, "load %s\n", szCookieFolder);
+	struct dirent * dirp;
+    DIR *dp = opendir(szCookieFolder);
+    if(dp)
+    {
+	    while( (dirp = readdir(dp)) != NULL)
+	    {
+		    if((strcmp(dirp->d_name, "..") == 0) || (strcmp(dirp->d_name, ".") == 0))
+		    {
+			    continue;
+		    }
+		    else
+		    {
+			    string strFileName = dirp->d_name;
+			    string strFilePath = m_dirpath.c_str();
+			    strFilePath += "/";
+			    strFilePath += strFileName;
+			
+			    ifstream* cookie_stream = new ifstream(strFilePath.c_str(), ios_base::binary);;
+			    string strline;
+			    if(cookie_stream && !cookie_stream->is_open())
+			    {
+				    delete cookie_stream;
+				    continue;
+			    }
+			    while(cookie_stream && getline(*cookie_stream, strline))
+			    {
+				    strtrim(strline);
+				    if(strline == "")
+					    continue;
+					Cookie cookie_instance(strline.c_str());
+					m_cookies.insert(map<string, Cookie>::value_type(cookie_instance.getName(), cookie_instance));
+			    }
+		    }
+	    }
+	    closedir(dp);
+    }
 
-	int cache_size = 0;
-	
 	//create the multitype list
 	m_type_table.insert(map<string, string>::value_type("323", "text/h323"));
 	m_type_table.insert(map<string, string>::value_type("acx", "application/internet-property-stream"));

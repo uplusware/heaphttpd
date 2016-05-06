@@ -3,6 +3,7 @@
 
 #include <time.h>
 #include <string>
+#include <fstream>
 #include "util/general.h"
 
 using namespace std;
@@ -14,11 +15,14 @@ public:
     Cookie(const char* szName, const char* szValue,
         int nMaxAge, const char* szExpires, const char* szPath, const char* szDomain, 
         BOOL bSecure, BOOL bHttpOnly);
+    Cookie(const char* szSetCookie);
     virtual ~Cookie();
     
     time_t getCreateTime();
     void toString(string & strCookie);
     const char* getName();
+    const char* getExpires() { return m_Expires.c_str(); }
+    int getMaxAge() { return m_MaxAge; }
 private:
     time_t m_CreateTime;
     

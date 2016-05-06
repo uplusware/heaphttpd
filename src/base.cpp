@@ -95,7 +95,7 @@ BOOL CHttpBase::LoadConfig()
 		
 		if(strline == "")
 			continue;
-		strtrim(strline);
+			
 		if(strncasecmp(strline.c_str(), "#", strlen("#")) != 0)
 		{	
 			if(strncasecmp(strline.c_str(), "PrivatePath", strlen("PrivatePath")) == 0)

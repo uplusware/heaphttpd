@@ -355,9 +355,7 @@ Worker::Worker(int thread_num, int sockfd)
 	m_sockfd = sockfd;
 	m_thread_num = thread_num;
 	m_cache = new memory_cache();
-	string strHtml = CHttpBase::m_work_path;
-	strHtml += "/html";
-	m_cache->load(strHtml.c_str());
+	m_cache->load(CHttpBase::m_work_path.c_str());
 }
 
 Worker::~Worker()
@@ -426,9 +424,7 @@ Service::Service(Service_Type st)
 	if((m_st == stHTTP) || (m_st == stHTTPS))
 	{
 		m_cache = new memory_cache();
-		string strHtml = CHttpBase::m_work_path;
-		strHtml += "/html";
-		m_cache->load(strHtml.c_str());
+		m_cache->load(CHttpBase::m_work_path.c_str());
 	}
 #endif /* CYGWIN */
 }

@@ -32,8 +32,16 @@ void ApiSample::Response()
         
 		header.SetStatusCode(SC200);
 		header.SetField("Content-Type", "text/html");
-		header.SetField("Set-Cookie", m_session->m_clientip.c_str());
-	
+		fprintf(stderr, "111\n");
+		header.SetCookie(m_session->m_cache, "test1", "value1",
+            90, NULL, "/", NULL, FALSE, FALSE);
+        fprintf(stderr, "222\n");
+        header.SetCookie(m_session->m_cache, "test2", "value2",
+            100, NULL, "/", NULL, TRUE, TRUE);
+        header.SetCookie(m_session->m_cache, "test3", "value3",
+            120, NULL, "/", ".uplusware.com", TRUE, TRUE);
+		//header.SetField("Set-Cookie", m_session->m_clientip.c_str());
+	    fprintf(stderr, "222\n");
 		header.Text();
         
 		strResp = "<html></head><title>API Sample</title></head><body><h1>niuhttpd web server/0.3</h1>API Sample: ";
