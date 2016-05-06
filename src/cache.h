@@ -75,7 +75,6 @@ public:
     {
         pthread_rwlock_rdlock(&m_cache_lock);
         m_cache_data.t_access = time(NULL);     
-        //fprintf(stderr, "2 %p rdlock\n", &m_cache_data);
         return &m_cache_data;
     }
     
@@ -83,13 +82,11 @@ public:
     {
         pthread_rwlock_wrlock(&m_cache_lock);
         m_cache_data.t_access = time(NULL);     
-        //fprintf(stderr, "2 %p rdlock\n", &m_cache_data);
         return &m_cache_data;
     }
     
     void file_unlock()
     {
-        //fprintf(stderr, "2 %p unlock\n", &m_cache_data);
         pthread_rwlock_unlock(&m_cache_lock);
     }  
 };
@@ -122,19 +119,16 @@ public:
 	void wrlock_cache()
 	{
 	    pthread_rwlock_wrlock(&m_file_rwlock);
-	    //fprintf(stderr, "1%p wrlock\n", &m_file_cache);
 	}
 	
 	void rdlock_cache()
 	{
-	    //fprintf(stderr, "1%p rdlock\n", &m_file_cache);
 	    pthread_rwlock_wrlock(&m_file_rwlock);
 	}
 	
 	void unlock_cache()
 	{
 	    pthread_rwlock_unlock(&m_file_rwlock);
-	    //fprintf(stderr, "1%p unlock\n", &m_file_cache);
 	}
 	
 	file_cache* lock_file(const char * name, CACHE_DATA ** cache_data);

@@ -116,17 +116,26 @@ void doc::Response()
     if(file_cache_instance && file_cache_data)
     {
         time_t cache_time_out = time(NULL) - file_cache_data->t_create;
-        //fprintf(stderr, "%d\n", cache_time_out);
+        //10s timeout
         if(cache_time_out < 10 && cache_time_out > 0)
         {
             file_cache_available = true;
         }
         else
         {
-            file_cache_instance->file_unlock();
-            file_cache_data = NULL;
-            file_cache_instance = NULL;
-            file_cache_available = false;
+            //90s timeout
+            if(get_file_length_lastmidifytime(strResourceFullPath.c_str(), nResourceLength, tLastModifyTime) == true
+                && tLastModifyTime == file_cache_data->t_modify && cache_time_out < 90 && cache_time_out > 0)
+            {
+                file_cache_available = true;
+            }
+            else
+            {
+                file_cache_instance->file_unlock();
+                file_cache_data = NULL;
+                file_cache_instance = NULL;
+                file_cache_available = false;
+            }
         }
     }
     
@@ -163,7 +172,6 @@ void doc::Response()
     {
         nResourceLength = file_cache_data->len;
         tLastModifyTime = file_cache_data->t_modify;
-        //fprintf(stderr, "%d %d\n", nResourceLength, tLastModifyTime);
     }
 
     OutHTTPDateString(tLastModifyTime, strDateTime);
@@ -223,7 +231,6 @@ void doc::Response()
                     
                     file_cache_buf = file_cache_data->buf;
                     file_cache_available = true;
-                    //fprintf(stderr, "%s %p, %d\n", strResourceFullPath.c_str(), file_cache_buf, file_cache_data->len);
                 }
                                  
                 delete[] file_buf;
