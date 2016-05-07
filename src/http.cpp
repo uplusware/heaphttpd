@@ -415,6 +415,16 @@ Http_Connection CHttp::LineParse(char* text)
         NIU_POST_GET_VARS(m_postdata.c_str(), _POST_VARS_);
         NIU_COOKIE_VARS(m_cookie.c_str(), _COOKIE_VARS_);
         
+        if(_COOKIE_VARS_.size() > 0)
+        {
+            m_cache->load_cookies();
+            map<string, string>::iterator iter_c;
+	        for(iter_c = _COOKIE_VARS_.begin(); iter_c != _COOKIE_VARS_.end(); iter_c++)
+	        {
+	            m_cache->access_cookie(iter_c->first.c_str());
+	        }
+	    }
+	    
         if(m_content_type == multipart_form_data)
         {
             m_cgi.SetData(m_postdata_ex->c_buffer(), m_postdata_ex->length());

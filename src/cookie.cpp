@@ -21,6 +21,7 @@ Cookie::Cookie(const char* szName, const char* szValue,
     m_HttpOnly = bHttpOnly;
     
     m_CreateTime = time(NULL);
+    m_AccessTime = time(NULL);
 }
 
 Cookie::Cookie(const char* szSetCookie)
@@ -33,24 +34,29 @@ Cookie::Cookie(const char* szSetCookie)
     vSplitString(szSetCookie, vCookie, ";", TRUE);
     vector<string>::iterator iter_c;
     
-    bool isNameValue = false;
+    CookieParsePhase phase = COOKIE_CREATE;
     for(iter_c = vCookie.begin(); iter_c != vCookie.end(); iter_c++)
     {
         string strField(*iter_c);
         strtrim(strField);
         
-        if(iter_c == vCookie.begin())
+        if(phase == COOKIE_CREATE)
         {
             m_CreateTime = atoi(strField.c_str());
-            isNameValue = true;
+            phase == COOKIE_ACCESS;
         }
-        else if(isNameValue)
+        else if(phase == COOKIE_ACCESS)
+        {
+            m_CreateTime = atoi(strField.c_str());
+            phase == COOKIE_KEYVAL;
+        }
+        else if(COOKIE_KEYVAL)
         {
             strcut(strField.c_str(), NULL, "=", m_Name);
             strcut(strField.c_str(), "=", NULL, m_Value);
             strtrim(m_Name);
             strtrim(m_Value);
-            isNameValue = false;
+            phase == COOKIE_OPTION;
         }
         else
         {
@@ -96,6 +102,16 @@ Cookie::~Cookie()
 time_t Cookie::getCreateTime()
 {
     return m_CreateTime;
+}
+
+time_t Cookie::getAccessTime()
+{
+    return m_AccessTime;
+}
+
+void Cookie::setAccessTime(time_t t_access)
+{
+    m_AccessTime = t_access;
 }
 
 const char* Cookie::getName()

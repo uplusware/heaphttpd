@@ -95,7 +95,7 @@ class memory_cache
 {
 public:
 	
-	memory_cache(const char* service_name, int process_seq);
+	memory_cache(const char* service_name, int process_seq, const char* dirpath);
 	virtual ~memory_cache();
 
 	map<string, file_cache*> m_file_cache;
@@ -104,16 +104,23 @@ public:
 	map<string, string> m_type_table;
 	map<string, Cookie> m_cookies;
 	
-	void load(const char* dirpath);
+	void load();
 	void unload();
+	
+	void load_cookies();
+	void save_cookies();
+	void access_cookie(const char* name);
 	
 	void push_cookie(const char * name, Cookie & ck);
 	void pop_cookie(const char * name);
 	int  get_cookie(const char * name, Cookie & ck);
 	
-	bool _push_file_(const char * name, 
-	    char* buf, unsigned int len, time_t t_modify, unsigned char* etag,
-	    file_cache** fout);
+	file_cache* lock_file(const char * name, CACHE_DATA ** cache_data);
+    void unlock_file(file_cache* fc);
+    void clear_files();
+    
+	bool _push_file_(const char * name, char* buf, unsigned int len,
+	    time_t t_modify, unsigned char* etag, file_cache** fout);
 	    
 	bool _find_file_(const char * name, file_cache** fc);
 	
@@ -131,9 +138,6 @@ public:
 	{
 	    pthread_rwlock_unlock(&m_file_rwlock);
 	}
-	
-	file_cache* lock_file(const char * name, CACHE_DATA ** cache_data);
-    void unlock_file(file_cache* fc);
 private:
     int m_process_seq;
     string m_service_name;

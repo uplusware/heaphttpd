@@ -8,6 +8,14 @@
 
 using namespace std;
 
+typedef enum
+{
+    COOKIE_CREATE = 0,
+    COOKIE_ACCESS,
+    COOKIE_KEYVAL,
+    COOKIE_OPTION
+} CookieParsePhase;
+
 class Cookie
 {
 public:
@@ -19,12 +27,16 @@ public:
     virtual ~Cookie();
     
     time_t getCreateTime();
+    time_t getAccessTime();
+    void setAccessTime(time_t t_access);
+    
     void toString(string & strCookie);
     const char* getName();
     const char* getExpires() { return m_Expires.c_str(); }
     int getMaxAge() { return m_MaxAge; }
 private:
     time_t m_CreateTime;
+    time_t m_AccessTime;
     
     string m_Name;
     string m_Value;

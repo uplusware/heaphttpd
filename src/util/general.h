@@ -1397,6 +1397,30 @@ unsigned long long __inline__ atollu(const char* str)
 	return num;
 }
 
+/* Wed, 09 Jun 2021 10:18:14 GMT */
+time_t __inline__ ParseCookieDateTimeString(const char* szDateTime)
+{
+    if(strlen(szDateTime) < 29)
+        return 0;
+    struct tm tm1;
+    unsigned year , day, hour, min, sec, zone;
+	char sz_mon[32];
+	char sz_zone[32];
+	sscanf(szDateTime, "%*[^,], %d %[^ ] %d %d:%d:%d %[^ ]", &day, sz_mon, &year, &hour, &min, &sec, sz_zone);
+	
+	if(strcmp(sz_zone, "GMT") != 0 && strcmp(sz_zone, "UTC") != 0)
+	    return 0;
+	
+	tm1.tm_year = year - 1900;
+	tm1.tm_mon = getmonthnumber(sz_mon);
+	tm1.tm_mday = day;
+	tm1.tm_hour = hour;
+	tm1.tm_min = min;
+	tm1.tm_sec = sec;
+	tm1.tm_isdst = -1;
+	
+	return mktime(&tm1);
+}
 #endif /* _ERISE_GENERAL_H_ */
 
 

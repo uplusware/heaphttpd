@@ -6,10 +6,11 @@
 #include "cache.h"
 #include "util/general.h"
 
-memory_cache::memory_cache(const char* service_name, int process_seq)
+memory_cache::memory_cache(const char* service_name, int process_seq, const char* dirpath)
 {
     m_process_seq = process_seq;
     m_service_name = service_name;
+    m_dirpath = dirpath;
     pthread_rwlock_init(&m_cookie_rwlock, NULL);
     pthread_rwlock_init(&m_file_rwlock, NULL);
     
@@ -37,6 +38,10 @@ void memory_cache::push_cookie(const char * name, Cookie & ck)
     if(iter != m_cookies.end())
         m_cookies.erase(iter);
     m_cookies.insert(map<string, Cookie>::value_type(name, ck));
+    
+    //Save cookie for other process for synchronization
+    save_cookies();
+    
     pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 
@@ -63,8 +68,53 @@ int memory_cache::get_cookie(const char * name, Cookie & ck)
     return ret;
 }
 
-
 //File
+map<string, file_cache *>::iterator memory_cache::_find_oldest_file_()
+{
+    map<string, file_cache *>::iterator o_it = m_file_cache.end();
+    map<string, file_cache *>::iterator c_it = m_file_cache.begin();
+    for(c_it = m_file_cache.begin(); c_it != m_file_cache.end(); ++c_it)
+    {
+        if(o_it == m_file_cache.end())
+        {
+            o_it = c_it;
+        }
+        else
+        {
+            if(o_it != c_it) //avoid re-entrying the lock
+            {
+                CACHE_DATA* curr_data, * oldest_data;
+                curr_data = c_it->second->file_rdlock();
+                oldest_data = o_it->second->file_rdlock();
+                
+                if(curr_data->t_access < oldest_data->t_access)
+                    o_it = c_it;
+                else if(curr_data->t_access = oldest_data->t_access 
+                    && curr_data->len < oldest_data->len)
+                    o_it = c_it;
+                    
+                c_it->second->file_unlock();
+                o_it->second->file_unlock();
+            }
+        }
+    }
+    return o_it;
+}
+
+bool memory_cache::_find_file_(const char * name, file_cache** fc)
+{
+    bool ret = false;
+    *fc = NULL;
+    map<string, file_cache *>::iterator iter = m_file_cache.find(name);
+    if(iter != m_file_cache.end())
+    {
+        *fc = iter->second;
+        ret = true;
+    }
+    
+    return ret;
+}
+
 bool memory_cache::_push_file_(const char* name, 
     char* buf, unsigned int len, time_t t_modify, unsigned char* etag,
     file_cache** fout)
@@ -127,20 +177,6 @@ bool memory_cache::_push_file_(const char* name,
     return ret;
 }
 
-bool memory_cache::_find_file_(const char * name, file_cache** fc)
-{
-    bool ret = false;
-    *fc = NULL;
-    map<string, file_cache *>::iterator iter = m_file_cache.find(name);
-    if(iter != m_file_cache.end())
-    {
-        *fc = iter->second;
-        ret = true;
-    }
-    
-    return ret;
-}
-
 file_cache* memory_cache::lock_file(const char * name, CACHE_DATA ** cache_data)
 {
     file_cache* ret = NULL;
@@ -163,39 +199,7 @@ void memory_cache::unlock_file(file_cache* fc)
         fc->file_unlock();
 }
 
-map<string, file_cache *>::iterator memory_cache::_find_oldest_file_()
-{
-    map<string, file_cache *>::iterator oldest_it = m_file_cache.end();
-    map<string, file_cache *>::iterator curr_it = m_file_cache.begin();
-    for(curr_it = m_file_cache.begin(); curr_it != m_file_cache.end(); ++curr_it)
-    {
-        if(oldest_it == m_file_cache.end())
-        {
-            oldest_it = curr_it;
-        }
-        else
-        {
-            if(oldest_it != curr_it) //avoid re-entrying the lock
-            {
-            CACHE_DATA* curr_data, * oldest_data;
-            curr_data = curr_it->second->file_rdlock();
-            oldest_data = oldest_it->second->file_rdlock();
-            
-            if(curr_data->t_access < oldest_data->t_access)
-                oldest_it = curr_it;
-            else if(curr_data->t_access = oldest_data->t_access 
-                && curr_data->len > oldest_data->len)
-                oldest_it = curr_it;
-                
-            curr_it->second->file_unlock();
-            oldest_it->second->file_unlock();
-            }
-        }
-    }
-    return oldest_it;
-}
-///////////////////////////////////////////////////////////////////////////////
-void memory_cache::unload()
+void memory_cache::clear_files()
 {
     pthread_rwlock_wrlock(&m_file_rwlock);
 	map<string, file_cache *>::iterator iter_f;
@@ -204,7 +208,68 @@ void memory_cache::unload()
 		delete iter_f->second;
 	}
 	m_file_cache.clear();
-	if(m_cookies.size() > 0)
+	pthread_rwlock_unlock(&m_file_rwlock);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void memory_cache::load_cookies()
+{
+    pthread_rwlock_wrlock(&m_cookie_rwlock);
+    char szCookieFolder[256];
+	sprintf(szCookieFolder, "%s/cookie", m_dirpath.c_str());
+	
+	struct dirent * dirp;
+    DIR *dp = opendir(szCookieFolder);
+    if(dp)
+    {
+	    while( (dirp = readdir(dp)) != NULL)
+	    {
+	        /* cookie file name should have postfix as ".cookie" */
+		    if(dirp->d_type == DT_REG)
+		    {
+		    	int name_len = strlen(dirp->d_name);
+	            int exte_len = strlen(".cookie");
+	            
+	            if(name_len > exte_len 
+	                && dirp->d_name[name_len - 1] == 'e'
+	                && dirp->d_name[name_len - 2] == 'i'
+	                && dirp->d_name[name_len - 3] == 'k'
+	                && dirp->d_name[name_len - 4] == 'o'
+	                && dirp->d_name[name_len - 5] == 'o'
+	                && dirp->d_name[name_len - 6] == 'c'
+	                && dirp->d_name[name_len - 7] == '.')
+	            {
+			        string strFileName = dirp->d_name;
+			        string strFilePath = m_dirpath.c_str();
+			        strFilePath += "/cookie/";
+			        strFilePath += strFileName;
+			        ifstream* cookie_stream = new ifstream(strFilePath.c_str(), ios_base::binary);;
+			        string strline;
+			        if(cookie_stream && !cookie_stream->is_open())
+			        {
+				        delete cookie_stream;
+				        continue;
+			        }
+			        while(cookie_stream && getline(*cookie_stream, strline))
+			        {
+				        strtrim(strline);
+				        if(strline == "")
+					        continue;
+					    Cookie cookie_instance(strline.c_str());
+					    m_cookies.insert(map<string, Cookie>::value_type(cookie_instance.getName(), cookie_instance));
+			        }
+			    }
+		    }
+	    }
+	    closedir(dp);
+    }
+    pthread_rwlock_unlock(&m_cookie_rwlock);
+}
+
+void memory_cache::save_cookies()
+{
+    pthread_rwlock_wrlock(&m_cookie_rwlock);
+    if(m_cookies.size() > 0)
 	{
 	    char szCookieFile[256];
 	    char szCookieFilePrefix[256];
@@ -215,10 +280,31 @@ void memory_cache::unload()
 	    ofstream* cookie_stream = NULL;
 	                      
 	    map<string, Cookie>::iterator iter_c;
+	    bool bSave = true;
 	    for(iter_c = m_cookies.begin(); iter_c != m_cookies.end(); iter_c++)
 	    {
+	        bSave = true;
 	        const char* szExpires = iter_c->second.getExpires();
-	        if(szExpires[0] != '\0' || iter_c->second.getMaxAge() != -1)
+	        
+	        if(szExpires[0] != '\0' && time(NULL) > ParseCookieDateTimeString(szExpires))
+	        {
+	            bSave = false;
+	        }
+	        if(iter_c->second.getMaxAge() == -1 
+	            && (time(NULL) - iter_c->second.getAccessTime() > 90)) /* No-inactive http request, 90s for timeout*/
+	        {
+	            bSave = false;
+	        }
+	        else if(iter_c->second.getMaxAge() == 0)
+	        {
+	            bSave = false;
+	        }
+	        else if(iter_c->second.getMaxAge() > 0 
+	            && (time(NULL) - iter_c->second.getCreateTime() > iter_c->second.getMaxAge()))
+	        {
+	            bSave = false;    
+	        }
+	        if(bSave)
 	        {
 	            if(!cookie_stream)
 	            {
@@ -229,10 +315,13 @@ void memory_cache::unload()
 	            string strCookie;
 	            iter_c->second.toString(strCookie);
 	            
-	            char szCreateTime[256];
-	            sprintf(szCreateTime, "%d", iter_c->second.getCreateTime());
+	            char szTime[256];
+	            sprintf(szTime, "%d", iter_c->second.getCreateTime());
+	            cookie_stream->write(szTime, strlen(szTime));
+	            cookie_stream->write(";", 1);
 	            
-	            cookie_stream->write(szCreateTime, strlen(szCreateTime));
+    	        sprintf(szTime, "%d", iter_c->second.getAccessTime());
+	            cookie_stream->write(szTime, strlen(szTime));
 	            cookie_stream->write(";", 1);
 	            
 	            cookie_stream->write(strCookie.c_str(), strCookie.length());
@@ -245,58 +334,31 @@ void memory_cache::unload()
 	    }
 	    m_cookies.clear();
 	}
-	
-	pthread_rwlock_unlock(&m_file_rwlock);
+	pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 
-void memory_cache::load(const char* szdir)
+void memory_cache::access_cookie(const char* name)
+{
+    pthread_rwlock_wrlock(&m_cookie_rwlock);
+    map<string, Cookie>::iterator iter = m_cookies.find(name);
+    if(iter != m_cookies.end())
+        iter->second.setAccessTime(time(NULL));
+    pthread_rwlock_unlock(&m_cookie_rwlock);
+}
+
+void memory_cache::unload()
+{
+    save_cookies();
+    
+    clear_files();
+}
+
+void memory_cache::load()
 {
 	unload();
-
-	m_dirpath = szdir;
-	char szCookieFolder[256];
-	sprintf(szCookieFolder, "%s/cookie", m_dirpath.c_str());
 	
-	char szCookieFilePrefix[256];
-	sprintf(szCookieFilePrefix, "%s-%d-", m_service_name.c_str(), m_process_seq);
-	struct dirent * dirp;
-    DIR *dp = opendir(szCookieFolder);
-    if(dp)
-    {
-	    while( (dirp = readdir(dp)) != NULL)
-	    {
-	        
-		    if((strcmp(dirp->d_name, "..") == 0) || (strcmp(dirp->d_name, ".") == 0) 
-		        || strncmp(szCookieFilePrefix, dirp->d_name, strlen(szCookieFilePrefix)) != 0)
-		    {
-			    continue;
-		    }
-		    else
-		    {
-			    string strFileName = dirp->d_name;
-			    string strFilePath = m_dirpath.c_str();
-			    strFilePath += "/cookie/";
-			    strFilePath += strFileName;
-			    ifstream* cookie_stream = new ifstream(strFilePath.c_str(), ios_base::binary);;
-			    string strline;
-			    if(cookie_stream && !cookie_stream->is_open())
-			    {
-				    delete cookie_stream;
-				    continue;
-			    }
-			    while(cookie_stream && getline(*cookie_stream, strline))
-			    {
-				    strtrim(strline);
-				    if(strline == "")
-					    continue;
-					Cookie cookie_instance(strline.c_str());
-					m_cookies.insert(map<string, Cookie>::value_type(cookie_instance.getName(), cookie_instance));
-			    }
-		    }
-	    }
-	    closedir(dp);
-    }
-
+	load_cookies();
+	
 	//create the multitype list
 	m_type_table.insert(map<string, string>::value_type("323", "text/h323"));
 	m_type_table.insert(map<string, string>::value_type("acx", "application/internet-property-stream"));
