@@ -102,7 +102,7 @@ static int check_single_on(const char* pflag)
 class Worker
 {
 public:
-	Worker(int thread_num, int sockfd);
+	Worker(const char* service_name, int process_seq, int thread_num, int sockfd);
 	virtual ~Worker();
 
 	void Working();
@@ -112,6 +112,8 @@ private:
 	
 	int m_sockfd;
 	int m_thread_num;
+	int m_process_seq;
+	string m_service_name;
 };
 
 typedef struct {
