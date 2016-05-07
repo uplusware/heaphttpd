@@ -95,7 +95,7 @@ class memory_cache
 {
 public:
 	
-	memory_cache();
+	memory_cache(const char* service_name, int process_seq);
 	virtual ~memory_cache();
 
 	map<string, file_cache*> m_file_cache;
@@ -134,9 +134,10 @@ public:
 	
 	file_cache* lock_file(const char * name, CACHE_DATA ** cache_data);
     void unlock_file(file_cache* fc);
-	
-	string m_dirpath;
 private:
+    int m_process_seq;
+    string m_service_name;
+    string m_dirpath;
     map<string, file_cache *>::iterator _find_oldest_file_();
     
     pthread_rwlock_t m_cookie_rwlock;
