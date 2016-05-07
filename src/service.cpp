@@ -241,21 +241,18 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 	}
 
 clean_ssl1:
-    //printf("clean ssl1\n");
 	if(ssl && bSSLAccepted)
     {
 		SSL_shutdown(ssl);
         bSSLAccepted = FALSE;
     }
 clean_ssl2:
-    //printf("clean ssl2\n");
 	if(ssl)
     {
 		SSL_free(ssl);
         ssl = NULL;
     }
 clean_ssl3:
-    //printf("clean ssl3\n");
 	if(ssl_ctx)
     {
 		SSL_CTX_free(ssl_ctx);
@@ -320,7 +317,6 @@ static void LEAVE_THREAD_POOL_HANDLER()
     char local_sockfile[256];
     sprintf(local_sockfile, "/tmp/niuhttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
 
-    //printf("remove sock file: %s\n", local_sockfile);
     unlink(local_sockfile);
 
 	unsigned long timeout = 200;
@@ -350,11 +346,13 @@ static void CLEAR_QUEUE(mqd_t qid)
 
 //////////////////////////////////////////////////////////////////////////////////
 //Worker
-Worker::Worker(int thread_num, int sockfd)
+Worker::Worker(const char* service_name, int process_seq, int thread_num, int sockfd)
 {
 	m_sockfd = sockfd;
 	m_thread_num = thread_num;
-	m_cache = new memory_cache();
+	m_process_seq = process_seq;
+	m_service_name = service_name;
+	m_cache = new memory_cache(m_service_name.c_str(), m_process_seq);
 	m_cache->load(CHttpBase::m_work_path.c_str());
 }
 
@@ -367,7 +365,8 @@ Worker::~Worker()
 
 void Worker::Working()
 {
-	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, LEAVE_THREAD_POOL_HANDLER);
+	ThreadPool WorkerPool(m_thread_num, 
+	    INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, LEAVE_THREAD_POOL_HANDLER);
 	
 	bool bQuit = false;
 	while(!bQuit)
@@ -381,7 +380,7 @@ void Worker::Working()
 		}
 		if(clt_sockfd < 0)
 		{
-			perror("");
+			fprintf(stderr, "RECV_FD error, clt_sockfd = %d %s %d\n", clt_sockfd, __FILE__, __LINE__);
 			bQuit = true;
 		}
 		if(client_param.ctrl == SessionParamQuit)
@@ -574,7 +573,8 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 	char* qBufPtr = (char*)malloc(qBufLen);
 
 #ifdef CYGWIN
-	ThreadPool WorkerPool(CHttpBase::m_max_instance_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, LEAVE_THREAD_POOL_HANDLER);
+	ThreadPool WorkerPool(CHttpBase::m_max_instance_thread_num, 
+	    INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, LEAVE_THREAD_POOL_HANDLER);
 #else
 	m_next_process = 0;
 	for(int i = 0; i < CHttpBase::m_max_instance_num; i++)
@@ -583,15 +583,19 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 		sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid", m_service_name.c_str(), i);
 		WORK_PROCESS_INFO  wpinfo;
 		if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
-			perror("socketpair");
+			fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
 		int work_pid = fork();
 		if(work_pid == 0)
 		{
 			if(check_single_on(pid_file))
 				exit(-1);
 			close(wpinfo.sockfds[0]);
-			Worker worker(CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
-			worker.Working();
+			Worker* pWorker = new Worker(m_service_name.c_str(), i, CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
+			if(pWorker)
+			{
+				pWorker->Working();
+				delete pWorker;
+			}
 			close(wpinfo.sockfds[1]);
 			exit(0);
 		}
@@ -603,7 +607,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 		}
 		else
 		{
-			perror("fork:");
+			fprintf(stderr, "fork error, work_pid = %d, %S %d\n", work_pid, __FILE__, __LINE__);
 		}
 	}
 #endif /* CYGWIN */
@@ -706,7 +710,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 			{
 				if((errno != ETIMEDOUT)&&(errno != EINTR)&&(errno != EMSGSIZE))
 				{
-					perror("");
+					fprintf(stderr, "mq_timedreceive error, errno = %d, %S %d\n", errno, __FILE__, __LINE__);
 					svr_exit = TRUE;
 					break;
 				}
@@ -755,7 +759,8 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 						
 						for(int x = 0; x < CHttpBase::m_reject_list.size(); x++)
 						{
-							if( (strlike(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE) && (time(NULL) < CHttpBase::m_reject_list[x].expire) )
+							if( (strlike(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE)
+							    && (time(NULL) < CHttpBase::m_reject_list[x].expire) )
 							{
 								access_result = FALSE;
 								break;
@@ -767,7 +772,8 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 						access_result = TRUE;
 						for(int x = 0; x < CHttpBase::m_reject_list.size(); x++)
 						{
-							if( (strlike(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE) && (time(NULL) < CHttpBase::m_reject_list[x].expire) )
+							if( (strlike(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE)
+							    && (time(NULL) < CHttpBase::m_reject_list[x].expire) )
 							{
 								access_result = FALSE;
 								break;
@@ -810,7 +816,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 						{
 							WORK_PROCESS_INFO  wpinfo;
 							if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
-								perror("socketpair");
+								fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
 							
 							int work_pid = fork();
 							if(work_pid == 0)
@@ -818,8 +824,10 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 								if(check_single_on(pid_file))
 									exit(-1);
 								close(wpinfo.sockfds[0]);
-								Worker worker(CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
-								worker.Working();
+								Worker * pWorker = new Worker(m_service_name.c_str(), next_process_index,
+								    CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
+								pWorker->Working();
+								delete pWorker;
 								close(wpinfo.sockfds[1]);
 								exit(0);
 							}
