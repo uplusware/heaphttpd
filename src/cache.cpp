@@ -6,8 +6,10 @@
 #include "cache.h"
 #include "util/general.h"
 
-memory_cache::memory_cache()
+memory_cache::memory_cache(const char* service_name, int process_seq)
 {
+    m_process_seq = process_seq;
+    m_service_name = service_name;
     pthread_rwlock_init(&m_cookie_rwlock, NULL);
     pthread_rwlock_init(&m_file_rwlock, NULL);
     
@@ -207,7 +209,11 @@ void memory_cache::unload()
 	if(m_cookies.size() > 0)
 	{
 	    char szCookieFile[256];
-	    sprintf(szCookieFile, "%s/cookie/%08x-%08x.cookie", m_dirpath.c_str(), time(NULL), getpid());
+	    char szCookieFilePrefix[256];
+	    sprintf(szCookieFilePrefix, "%s-%d-", m_service_name.c_str(), m_process_seq);
+	
+	    sprintf(szCookieFile, "%s/cookie/%s%08x.cookie", m_dirpath.c_str(), 
+	        szCookieFilePrefix, time(NULL)/86400);
 	    fprintf(stderr, "unload %s\n", szCookieFile);
 	    ofstream* cookie_stream = NULL;
 	                      
@@ -215,7 +221,7 @@ void memory_cache::unload()
 	    for(iter_c = m_cookies.begin(); iter_c != m_cookies.end(); iter_c++)
 	    {
 	        const char* szExpires = iter_c->second.getExpires();
-	        if(szExpires[0] != '\0' && iter_c->second.getMaxAge() != -1)
+	        if(szExpires[0] != '\0' || iter_c->second.getMaxAge() != -1)
 	        {
 	            if(!cookie_stream)
 	            {
@@ -249,9 +255,13 @@ void memory_cache::unload()
 void memory_cache::load(const char* szdir)
 {
 	unload();
+
 	m_dirpath = szdir;
 	char szCookieFolder[256];
 	sprintf(szCookieFolder, "%s/cookie", m_dirpath.c_str());
+	
+	char szCookieFilePrefix[256];
+	sprintf(szCookieFilePrefix, "%s-%d-", m_service_name.c_str(), m_process_seq);
 	fprintf(stderr, "load %s\n", szCookieFolder);
 	struct dirent * dirp;
     DIR *dp = opendir(szCookieFolder);
@@ -259,7 +269,9 @@ void memory_cache::load(const char* szdir)
     {
 	    while( (dirp = readdir(dp)) != NULL)
 	    {
-		    if((strcmp(dirp->d_name, "..") == 0) || (strcmp(dirp->d_name, ".") == 0))
+	        
+		    if((strcmp(dirp->d_name, "..") == 0) || (strcmp(dirp->d_name, ".") == 0) 
+		        || strncmp(szCookieFilePrefix, dirp->d_name, strlen(szCookieFilePrefix)) != 0)
 		    {
 			    continue;
 		    }
@@ -267,9 +279,9 @@ void memory_cache::load(const char* szdir)
 		    {
 			    string strFileName = dirp->d_name;
 			    string strFilePath = m_dirpath.c_str();
-			    strFilePath += "/";
+			    strFilePath += "/cookie/";
 			    strFilePath += strFileName;
-			
+			    fprintf(stderr, "load %s\n", strFilePath.c_str());
 			    ifstream* cookie_stream = new ifstream(strFilePath.c_str(), ios_base::binary);;
 			    string strline;
 			    if(cookie_stream && !cookie_stream->is_open())
