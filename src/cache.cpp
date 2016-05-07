@@ -37,7 +37,6 @@ void memory_cache::push_cookie(const char * name, Cookie & ck)
     if(iter != m_cookies.end())
         m_cookies.erase(iter);
     m_cookies.insert(map<string, Cookie>::value_type(name, ck));
-    fprintf(stderr, "%s %d\n", name, m_cookies.size());
     pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 
@@ -205,7 +204,6 @@ void memory_cache::unload()
 		delete iter_f->second;
 	}
 	m_file_cache.clear();
-	fprintf(stderr, "unload %d\n", m_cookies.size());
 	if(m_cookies.size() > 0)
 	{
 	    char szCookieFile[256];
@@ -214,7 +212,6 @@ void memory_cache::unload()
 	
 	    sprintf(szCookieFile, "%s/cookie/%s%08x.cookie", m_dirpath.c_str(), 
 	        szCookieFilePrefix, time(NULL)/86400);
-	    fprintf(stderr, "unload %s\n", szCookieFile);
 	    ofstream* cookie_stream = NULL;
 	                      
 	    map<string, Cookie>::iterator iter_c;
@@ -262,7 +259,6 @@ void memory_cache::load(const char* szdir)
 	
 	char szCookieFilePrefix[256];
 	sprintf(szCookieFilePrefix, "%s-%d-", m_service_name.c_str(), m_process_seq);
-	fprintf(stderr, "load %s\n", szCookieFolder);
 	struct dirent * dirp;
     DIR *dp = opendir(szCookieFolder);
     if(dp)
@@ -281,7 +277,6 @@ void memory_cache::load(const char* szdir)
 			    string strFilePath = m_dirpath.c_str();
 			    strFilePath += "/cookie/";
 			    strFilePath += strFileName;
-			    fprintf(stderr, "load %s\n", strFilePath.c_str());
 			    ifstream* cookie_stream = new ifstream(strFilePath.c_str(), ios_base::binary);;
 			    string strline;
 			    if(cookie_stream && !cookie_stream->is_open())
