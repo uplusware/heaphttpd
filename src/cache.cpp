@@ -33,15 +33,15 @@ memory_cache::~memory_cache()
 void memory_cache::push_cookie(const char * name, Cookie & ck)
 {
     pthread_rwlock_wrlock(&m_cookie_rwlock);
-    
+    printf("push cookie 1\n");
     map<string, Cookie>::iterator iter = m_cookies.find(name);
     if(iter != m_cookies.end())
         m_cookies.erase(iter);
     m_cookies.insert(map<string, Cookie>::value_type(name, ck));
-    
     //Save cookie for other process for synchronization
-    save_cookies();
-    
+    printf("push cookie 2\n");
+    _save_cookies_();
+    printf("push cookie 3\n");
     pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 
@@ -212,9 +212,11 @@ void memory_cache::clear_files()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-void memory_cache::load_cookies()
+void memory_cache::reload_cookies()
 {
     pthread_rwlock_wrlock(&m_cookie_rwlock);
+    m_cookies.clear();
+    
     char szCookieFolder[256];
 	sprintf(szCookieFolder, "%s/cookie", m_dirpath.c_str());
 	
@@ -256,7 +258,13 @@ void memory_cache::load_cookies()
 				        if(strline == "")
 					        continue;
 					    Cookie cookie_instance(strline.c_str());
-					    m_cookies.insert(map<string, Cookie>::value_type(cookie_instance.getName(), cookie_instance));
+					    map<string, Cookie>::iterator iter = m_cookies.find(cookie_instance.getName());
+                        if(iter != m_cookies.end() 
+                            && iter->second.getCreateTime() < cookie_instance.getCreateTime())
+                        {
+                            iter->second.setAccessTime(time(NULL));
+					        m_cookies.insert(map<string, Cookie>::value_type(cookie_instance.getName(), cookie_instance));
+					    }
 			        }
 			    }
 		    }
@@ -266,9 +274,8 @@ void memory_cache::load_cookies()
     pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 
-void memory_cache::save_cookies()
+void memory_cache::_save_cookies_()
 {
-    pthread_rwlock_wrlock(&m_cookie_rwlock);
     if(m_cookies.size() > 0)
 	{
 	    char szCookieFile[256];
@@ -332,9 +339,19 @@ void memory_cache::save_cookies()
 	    {
 	        cookie_stream->close();
 	    }
-	    m_cookies.clear();
 	}
+}
+
+void memory_cache::save_cookies()
+{
+    pthread_rwlock_wrlock(&m_cookie_rwlock);
+    _save_cookies_();
 	pthread_rwlock_unlock(&m_cookie_rwlock);
+}
+
+void memory_cache::clear_cookies()
+{
+    m_cookies.clear();
 }
 
 void memory_cache::access_cookie(const char* name)
@@ -349,7 +366,7 @@ void memory_cache::access_cookie(const char* name)
 void memory_cache::unload()
 {
     save_cookies();
-    
+    clear_cookies();
     clear_files();
 }
 
@@ -357,7 +374,7 @@ void memory_cache::load()
 {
 	unload();
 	
-	load_cookies();
+	reload_cookies();
 	
 	//create the multitype list
 	m_type_table.insert(map<string, string>::value_type("323", "text/h323"));
