@@ -173,7 +173,6 @@ void CHttpResponseHdr::SetCookie(memory_cache * pCache, const char* szName,
     const char* szPath, const char* szDomain, 
     BOOL bSecure, BOOL bHttpOnly)
 {
-    printf("%s %s\n", szName, szValue);
     string strCookie;
     Cookie ck(szName, szValue, nMaxAge, szExpires, szPath, szDomain, bSecure, bHttpOnly);   
     ck.toString(strCookie);

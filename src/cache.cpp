@@ -33,15 +33,12 @@ memory_cache::~memory_cache()
 void memory_cache::push_cookie(const char * name, Cookie & ck)
 {
     pthread_rwlock_wrlock(&m_cookie_rwlock);
-    printf("push cookie 1\n");
     map<string, Cookie>::iterator iter = m_cookies.find(name);
     if(iter != m_cookies.end())
         m_cookies.erase(iter);
     m_cookies.insert(map<string, Cookie>::value_type(name, ck));
     //Save cookie for other process for synchronization
-    printf("push cookie 2\n");
     _save_cookies_();
-    printf("push cookie 3\n");
     pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 

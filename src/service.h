@@ -44,64 +44,113 @@ static int lock_reg(int fd, int cmd, int type, off_t offset, int whence, off_t l
 	return (fcntl(fd,cmd, &lock));   
 }   
 
-static int check_single_on(const char* pflag)   
+static bool lock_pid_file(const char* pflag)   
 {
 	int fd, val;   
 	char buf[12];   
 	
     if((fd = open(pflag, O_WRONLY|O_CREAT, 0644)) < 0)
 	{
-		return 1;  
+		return false;  
 	}
 	/* try and set a write lock on the entire file   */   
 	if(write_lock(fd, 0, SEEK_SET, 0) < 0)
 	{   
 		if((errno == EACCES) || (errno == EAGAIN))
 		{   
-		    printf("1\n");
-			return 1;   
+		    return false;   
 		}
 		else
 		{   
-		    printf("2\n");
-			close(fd);   
-			return 1;
+		    close(fd);   
+			return false;
 		}   
 	}   
 	
 	/* truncate to zero length, now that we have the lock   */   
 	if(ftruncate(fd, 0) < 0)
 	{   
-	    printf("3\n");
-		close(fd);               
-		return 1;
+	    close(fd);               
+		return false;
 	}   
 	
 	/*   write   our   process   id   */   
 	sprintf(buf, "%d\n", ::getpid());   
 	if(write(fd, buf, strlen(buf)) != strlen(buf))
 	{   
-	    printf("4\n");
-		close(fd);               
-		return 1;
+	    close(fd);               
+		return false;
 	}   
 	
 	/*   set close-on-exec flag for descriptor   */   
 	if((val = fcntl(fd, F_GETFD, 0) < 0 ))
 	{   
-		close(fd);   
-		return 1;
+	    close(fd);   
+		return false;
 	}   
 	val |= FD_CLOEXEC;   
 	if(fcntl(fd, F_SETFD, val) <0 )
 	{   
-	    printf("5\n");
-		close(fd);   
-		return 1;
+	    close(fd);   
+		return false;
 	}
 	/* leave file open until we terminate: lock will be held   */  
-	printf("5\n"); 
-	return 0;   
+	return true;   
+} 
+
+static bool check_pid_file(const char* pflag)   
+{
+	int fd, val;   
+	char buf[12];   
+	
+    if((fd = open(pflag, O_WRONLY|O_CREAT, 0644)) < 0)
+	{
+	    return false;  
+	}
+	/* try and set a write lock on the entire file   */   
+	if(write_lock(fd, 0, SEEK_SET, 0) < 0)
+	{   
+		if((errno == EACCES) || (errno == EAGAIN))
+		{   
+		    return false;   
+		}
+		else
+		{   
+		    close(fd);   
+			return false;
+		}   
+	}   
+	
+	/* truncate to zero length, now that we have the lock   */   
+	if(ftruncate(fd, 0) < 0)
+	{   
+	    close(fd);               
+		return false;
+	}   
+	
+	/*   write   our   process   id   */   
+	sprintf(buf, "%d\n", ::getpid());   
+	if(write(fd, buf, strlen(buf)) != strlen(buf))
+	{   
+	    close(fd);               
+		return false;
+	}   
+	
+	/*   set close-on-exec flag for descriptor   */   
+	if((val = fcntl(fd, F_GETFD, 0) < 0 ))
+	{   
+	    close(fd);   
+		return false;
+	}   
+	val |= FD_CLOEXEC;   
+	if(fcntl(fd, F_SETFD, val) <0 )
+	{   
+	    close(fd);   
+		return false;
+	}
+	
+	close(fd);
+	return true;   
 } 
 
 class Worker

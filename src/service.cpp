@@ -151,7 +151,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		ssl_ctx = SSL_CTX_new(meth);
 		if(!ssl_ctx)
 		{
-			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
 
@@ -160,27 +160,27 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		SSL_CTX_load_verify_locations(ssl_ctx, session_param->ca_crt_root.c_str(), NULL);
 		if(SSL_CTX_use_certificate_file(ssl_ctx, session_param->ca_crt_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
-			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
 		//printf("[%s]\n", session_param->ca_password.c_str());
 		SSL_CTX_set_default_passwd_cb_userdata(ssl_ctx, (char*)session_param->ca_password.c_str());
 		if(SSL_CTX_use_PrivateKey_file(ssl_ctx, session_param->ca_key_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
-			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 
 		}
 		if(!SSL_CTX_check_private_key(ssl_ctx))
 		{
-			printf("SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
 		
 		ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
         if(ssl_rc == 0)
         {
-            printf("SSL_CTX_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            fprintf(stderr, "SSL_CTX_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl3;
         }
 		SSL_CTX_set_mode(ssl_ctx, SSL_MODE_AUTO_RETRY);
@@ -188,25 +188,25 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		ssl = SSL_new(ssl_ctx);
 		if(!ssl)
 		{
-			printf("SSL_new: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_new: %s\n", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl2;
 		}
 		ssl_rc = SSL_set_fd(ssl, session_param->sockfd);
         if(ssl_rc == 0)
         {
-            printf("SSL_set_fd: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            fprintf(stderr, "SSL_set_fd: %s\n", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl2;
         }
         ssl_rc = SSL_set_cipher_list(ssl, "ALL");
         if(ssl_rc == 0)
         {
-            printf("SSL_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            fprintf(stderr, "SSL_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl2;
         }
         ssl_rc = SSL_accept(ssl);
 		if(ssl_rc < 0)
 		{
-            printf("SSL_accept: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            fprintf(stderr, "SSL_accept: %s\n", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl2;
 		}
         else if(ssl_rc = 0)
@@ -588,8 +588,10 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 		int work_pid = fork();
 		if(work_pid == 0)
 		{
-			if(check_single_on(pid_file) != 0)
+			if(lock_pid_file(pid_file) == false)
+			{
 				exit(-1);
+			}
 			close(wpinfo.sockfds[0]);
 			Worker* pWorker = new Worker(m_service_name.c_str(), i, CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
 			if(pWorker)
@@ -812,19 +814,19 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 						int next_process_index = m_next_process % m_work_processes.size();
 						char pid_file[1024];
 						sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid", m_service_name.c_str(), next_process_index);
-						printf("a: %s\n", pid_file);
-						if(check_single_on(pid_file) != 0)
+						if(check_pid_file(pid_file) == true) /* The related process had crashed */
 						{
-						    printf("checked %s\n", pid_file);
-							WORK_PROCESS_INFO  wpinfo;
+						    WORK_PROCESS_INFO  wpinfo;
 							if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
 								fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
 							
 							int work_pid = fork();
 							if(work_pid == 0)
 							{
-								if(check_single_on(pid_file) != 0)
+								if(lock_pid_file(pid_file) == false)
+								{
 									exit(-1);
+								}
 								close(wpinfo.sockfds[0]);
 								Worker * pWorker = new Worker(m_service_name.c_str(), next_process_index,
 								    CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);

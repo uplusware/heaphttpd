@@ -76,7 +76,7 @@ static int Run()
 			{
 				char szFlag[128];
 				sprintf(szFlag, "/tmp/niuhttpd/%s.pid", SVR_NAME_TBL[stHTTP]);
-				if(check_single_on(szFlag)  )  
+				if(lock_pid_file(szFlag) == false)  
 				{   
 					printf("%s is aready runing.\n", SVR_DESP_TBL[stHTTP]);   
 					exit(-1);  
@@ -119,7 +119,7 @@ static int Run()
 			{
 				char szFlag[128];
 				sprintf(szFlag, "/tmp/niuhttpd/%s.pid", SVR_NAME_TBL[stHTTPS]);
-				if(check_single_on(szFlag))    
+				if(lock_pid_file(szFlag) == false)    
 				{   
 					printf("%s is aready runing.\n", SVR_DESP_TBL[stHTTPS]);   
 					exit(-1);  
@@ -214,7 +214,7 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 	{
 		char szFlag[128];
 		sprintf(szFlag, "/tmp/niuhttpd/%s.pid", SVR_NAME_TBL[stHTTP]);
-		if(check_single_on(szFlag))    
+		if(check_pid_file(szFlag) == false)    
 		{   
 			printf("%s is runing.\n", SVR_DESP_TBL[stHTTP]);   
 		}
@@ -224,7 +224,7 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 		}
 
 		sprintf(szFlag, "/tmp/niuhttpd/%s.pid", SVR_NAME_TBL[stHTTPS]);
-		if(check_single_on(szFlag))    
+		if(check_pid_file(szFlag) == false)    
 		{   
 			printf("%s is runing.\n", SVR_DESP_TBL[stHTTPS]);   
 		}
