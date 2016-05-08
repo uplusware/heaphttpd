@@ -581,13 +581,14 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 	{
 		char pid_file[1024];
 		sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid", m_service_name.c_str(), i);
+		unlink(pid_file);
 		WORK_PROCESS_INFO  wpinfo;
 		if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
 			fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
 		int work_pid = fork();
 		if(work_pid == 0)
 		{
-			if(check_single_on(pid_file))
+			if(check_single_on(pid_file) != 0)
 				exit(-1);
 			close(wpinfo.sockfds[0]);
 			Worker* pWorker = new Worker(m_service_name.c_str(), i, CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
@@ -811,9 +812,10 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 						int next_process_index = m_next_process % m_work_processes.size();
 						char pid_file[1024];
 						sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid", m_service_name.c_str(), next_process_index);
-						
-						if(!check_single_on(pid_file))
+						printf("a: %s\n", pid_file);
+						if(check_single_on(pid_file) != 0)
 						{
+						    printf("checked %s\n", pid_file);
 							WORK_PROCESS_INFO  wpinfo;
 							if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
 								fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
@@ -821,7 +823,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 							int work_pid = fork();
 							if(work_pid == 0)
 							{
-								if(check_single_on(pid_file))
+								if(check_single_on(pid_file) != 0)
 									exit(-1);
 								close(wpinfo.sockfds[0]);
 								Worker * pWorker = new Worker(m_service_name.c_str(), next_process_index,
@@ -842,6 +844,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 								continue;
 							}
 						}
+						
 						CLIENT_PARAM client_param;
 						strncpy(client_param.client_ip, client_ip.c_str(), 127);
 						client_param.client_ip[127] = '\0';
