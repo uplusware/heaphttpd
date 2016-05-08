@@ -107,8 +107,10 @@ public:
 	void load();
 	void unload();
 	
-	void load_cookies();
+	void _save_cookies_();
+	void reload_cookies();
 	void save_cookies();
+	void clear_cookies();
 	void access_cookie(const char* name);
 	
 	void push_cookie(const char * name, Cookie & ck);
