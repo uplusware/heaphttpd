@@ -417,7 +417,8 @@ Http_Connection CHttp::LineParse(char* text)
         
         if(_COOKIE_VARS_.size() > 0)
         {
-            m_cache->load_cookies();
+            
+            m_cache->reload_cookies();
             map<string, string>::iterator iter_c;
 	        for(iter_c = _COOKIE_VARS_.begin(); iter_c != _COOKIE_VARS_.end(); iter_c++)
 	        {
