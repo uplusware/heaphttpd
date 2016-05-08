@@ -11,11 +11,11 @@ Cookie::Cookie(const char* szName, const char* szValue,
     int nMaxAge, const char* szExpires, const char* szPath, const char* szDomain, 
     BOOL bSecure, BOOL bHttpOnly)
 {
-    m_Name = szName == NULL ? "" : szName;
-    m_Value = szValue == NULL ? "" : szValue;
-    m_Expires = szExpires == NULL ? "" : szExpires;
-    m_Path = szPath == NULL ? "" : szPath;
-    m_Domain = szDomain == NULL ? "" : szDomain;
+    m_Name = (szName == NULL ? "" : szName);
+    m_Value = (szValue == NULL ? "" : szValue);
+    m_Expires = (szExpires == NULL ? "" : szExpires);
+    m_Path = (szPath == NULL ? "/" : szPath);
+    m_Domain = (szDomain == NULL ? "" : szDomain);
     m_MaxAge = nMaxAge;
     m_Secure = bSecure;
     m_HttpOnly = bHttpOnly;
@@ -29,6 +29,7 @@ Cookie::Cookie(const char* szSetCookie)
     m_HttpOnly = FALSE;
     m_Secure = FALSE;
     m_MaxAge = -1;
+    m_Path = "/";
     
     vector<string> vCookie;
     vSplitString(szSetCookie, vCookie, ";", TRUE);
