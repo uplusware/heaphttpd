@@ -127,6 +127,18 @@ void Htdoc::Response()
                 strLibName += strResource.c_str();
                 strLibName += ".so";
                 
+                struct stat statbuf;
+                if(stat(strLibName.c_str(), &statbuf) < 0)
+                {
+                    CHttpResponseHdr header;
+		            header.SetStatusCode(SC404);
+		
+                    header.SetField("Content-Type", "text/html");
+            		header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    m_session->HttpSend(header.Text(), header.Length());
+            		m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    return;
+                }
                 void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
                 if(!lhandle)
                 {
@@ -142,6 +154,7 @@ void Htdoc::Response()
                 }
                 else
                 {
+                    dlerror();
                     void* (*ws_main)(int, SSL*);
                     ws_main = (void*(*)(int, SSL*))dlsym(lhandle, strWSFunctionName.c_str());
                     const char* errmsg;
@@ -229,6 +242,19 @@ void Htdoc::Response()
 		strLibName += strApiName;
 		strLibName += ".so";
 		
+		struct stat statbuf;
+        if(stat(strLibName.c_str(), &statbuf) < 0)
+        {
+            CHttpResponseHdr header;
+            header.SetStatusCode(SC404);
+
+            header.SetField("Content-Type", "text/html");
+    		header.SetField("Content-Length", header.GetDefaultHTMLLength());
+            m_session->HttpSend(header.Text(), header.Length());
+    		m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            return;
+        }
+                
 		//printf("%s\n", strLibName.c_str());
 		void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
 		if(!lhandle)
@@ -245,6 +271,7 @@ void Htdoc::Response()
 		}
 		else
 		{
+		    dlerror();
             string strApiFunctionName = "api_";
             strApiFunctionName += strApiName;
             strApiFunctionName += "_response";
