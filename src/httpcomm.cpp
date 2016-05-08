@@ -167,16 +167,24 @@ void CHttpResponseHdr::SetFields(const char* fields)
 	m_isHdrUpdated = true;
 }
 
-void CHttpResponseHdr::SetCookie(/* string & strCookie, */ memory_cache * pCache, const char* szName, const char* szValue,
-        int nMaxAge, const char* szExpires,
-        const char* szPath, const char* szDomain, 
-        BOOL bSecure, BOOL bHttpOnly)
+void CHttpResponseHdr::SetCookie(memory_cache * pCache, const char* szName,
+    const char* szValue,
+    int nMaxAge, const char* szExpires,
+    const char* szPath, const char* szDomain, 
+    BOOL bSecure, BOOL bHttpOnly)
 {
+    printf("%s %s\n", szName, szValue);
     string strCookie;
     Cookie ck(szName, szValue, nMaxAge, szExpires, szPath, szDomain, bSecure, bHttpOnly);   
-    ck.toString(strCookie);  
-	SetField("Set-Cookie", strCookie.c_str());
-	pCache->push_cookie(szName, ck);	
+    ck.toString(strCookie);
+    
+    map<string, string>::iterator iter = m_cookies.find(szName);
+    if(iter != m_cookies.end())
+        m_cookies.erase(iter);
+    m_cookies.insert(map<string, string>::value_type(szName, strCookie.c_str()));
+    
+	pCache->push_cookie(szName, ck);
+	m_isHdrUpdated = true;
 }
 
 CHttpResponseHdr::~CHttpResponseHdr()
@@ -187,6 +195,7 @@ CHttpResponseHdr::~CHttpResponseHdr()
 const char*CHttpResponseHdr::Text()
 {
 	_update_header_();
+	//printf("%s\n", m_strHeader.c_str());
 	return m_strHeader.c_str();
 }
 
@@ -218,6 +227,16 @@ void CHttpResponseHdr::_update_header_()
 			}
 		}
 		
+		map<string, string>::iterator cookie_it;
+		for(cookie_it = m_cookies.begin(); cookie_it != m_cookies.end(); ++cookie_it)
+		{
+		    if(cookie_it->second != "")
+			{
+				m_strHeader += "Set-Cookie: ";
+				m_strHeader += cookie_it->second;
+				m_strHeader += "\r\n";
+			}
+		}
 		m_strHeader += m_strUserDefined;
 		m_strHeader += "\r\n";
 		m_isHdrUpdated = false;
