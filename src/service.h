@@ -49,20 +49,21 @@ static int check_single_on(const char* pflag)
 	int fd, val;   
 	char buf[12];   
 	
-    if((fd = open(pflag, O_WRONLY|O_CREAT, 0644))   <0   )
+    if((fd = open(pflag, O_WRONLY|O_CREAT, 0644)) < 0)
 	{
 		return 1;  
-	}   
-	
+	}
 	/* try and set a write lock on the entire file   */   
 	if(write_lock(fd, 0, SEEK_SET, 0) < 0)
 	{   
 		if((errno == EACCES) || (errno == EAGAIN))
 		{   
+		    printf("1\n");
 			return 1;   
 		}
 		else
 		{   
+		    printf("2\n");
 			close(fd);   
 			return 1;
 		}   
@@ -71,6 +72,7 @@ static int check_single_on(const char* pflag)
 	/* truncate to zero length, now that we have the lock   */   
 	if(ftruncate(fd, 0) < 0)
 	{   
+	    printf("3\n");
 		close(fd);               
 		return 1;
 	}   
@@ -79,6 +81,7 @@ static int check_single_on(const char* pflag)
 	sprintf(buf, "%d\n", ::getpid());   
 	if(write(fd, buf, strlen(buf)) != strlen(buf))
 	{   
+	    printf("4\n");
 		close(fd);               
 		return 1;
 	}   
@@ -92,10 +95,12 @@ static int check_single_on(const char* pflag)
 	val |= FD_CLOEXEC;   
 	if(fcntl(fd, F_SETFD, val) <0 )
 	{   
+	    printf("5\n");
 		close(fd);   
 		return 1;
 	}
-	/* leave file open until we terminate: lock will be held   */   
+	/* leave file open until we terminate: lock will be held   */  
+	printf("5\n"); 
 	return 0;   
 } 
 
