@@ -32,6 +32,7 @@ test -x /etc/niuhttpd || mkdir /etc/niuhttpd
 test -x /var/niuhttpd || mkdir /var/niuhttpd
 test -x /var/niuhttpd/html || mkdir /var/niuhttpd/html
 test -x /var/niuhttpd/cookie || mkdir /var/niuhttpd/cookie
+test -x /var/niuhttpd/variable || mkdir /var/niuhttpd/variable
 test -x /tmp/niuhttpd/private || mkdir /tmp/niuhttpd/private
 test -x /var/niuhttpd/cert || mkdir /var/niuhttpd/cert
 test -x /var/niuhttpd/api || mkdir /var/niuhttpd/api
