@@ -47,7 +47,12 @@ public:
         int nMaxAge = -1, const char* szExpires = NULL,
         const char* szPath = NULL, const char* szDomain = NULL, 
         BOOL bSecure = FALSE, BOOL bHttpOnly = FALSE);
+        
     void SetSessionVar(const char* szName, const char* szValue);
+	void GetSessionVar(const char* szName, string& strValue);
+	
+	void SetServerVar(const char* szName, const char* szValue);
+	void GetServerVar(const char* szName, string& strValue);
 	
 	int SendHeader(const char* buf, int len);
 	int SendContent(const char* buf, int len);

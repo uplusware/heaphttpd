@@ -22,6 +22,7 @@
 #include <pthread.h>
 #include "cookie.h"
 #include "httpsessionvar.h"
+#include "httpservervar.h"
 
 #define FILE_MAX_SIZE 	(1024*1024*4)   /* 4M */
 #define MAX_CACHE_SIZE	(1024*1024*512) /* 512M */
@@ -114,14 +115,23 @@ public:
 	void clear_cookies();
 	void access_cookie(const char* name);
 	
-	void clear_session_vars();
-	
 	void push_cookie(const char * name, Cookie & ck);
 	void pop_cookie(const char * name);
 	int  get_cookie(const char * name, Cookie & ck);
 	
-	void push_session_var(const char* name, const char* value, const char* uid);
-	int  get_session_var(const char * name, string& value);
+	void _save_session_vars_();
+	void _reload_session_vars_();
+	void reload_session_vars();
+	void push_session_var(const char* uid, const char* name, const char* value);
+	int  get_session_var(const char* uid, const char* name, string& value);
+	void clear_session_vars();
+	
+    void _save_server_vars_();
+    void _reload_server_vars_();
+	void reload_server_vars();
+	void push_server_var(const char* name, const char* value);
+	int  get_server_var(const char* name, string& value);
+	void clear_server_vars();
 	
 	file_cache* lock_file(const char * name, CACHE_DATA ** cache_data);
     void unlock_file(file_cache* fc);
@@ -152,10 +162,12 @@ private:
     string m_dirpath;
     map<string, file_cache *>::iterator _find_oldest_file_();
     map<string, Cookie> m_cookies;
-	map<string, session_var*> m_session_vars;
+	map<session_var_key, session_var*> m_session_vars;
+	map<string, server_var*> m_server_vars;
 	
     pthread_rwlock_t m_cookie_rwlock;
     pthread_rwlock_t m_session_var_rwlock;
+    pthread_rwlock_t m_server_var_rwlock;
     pthread_rwlock_t m_file_rwlock;
 };
 

@@ -186,12 +186,33 @@ void CHttp::SetSessionVar(const char* szName, const char* szValue)
             HA[0], HA[1], HA[2], HA[3], HA[4], HA[5], HA[6], HA[7], 
             HA[8], HA[9], HA[10], HA[11], HA[12], HA[13], HA[14], HA[15]);
         psuid = szuid;
+        
+        m_session_var_uid = szuid;
     }
     else
     {
         psuid = m_session_var_uid.c_str();
     }
-    m_cache->push_session_var(szName, szValue, psuid);
+    m_cache->push_session_var(psuid, szName, szValue);
+}
+
+void CHttp::GetSessionVar(const char* szName, string& strValue)
+{
+    if(m_session_var_uid != "")
+        m_cache->get_session_var(m_session_var_uid.c_str(), szName, strValue);
+    else
+        strValue = "";
+}
+
+void CHttp::SetServerVar(const char* szName, const char* szValue)
+{
+    m_cache->push_server_var(szName, szValue);
+}
+
+void CHttp::GetServerVar(const char* szName, string& strValue)
+{
+    strValue = "";
+    m_cache->get_server_var(szName, strValue);
 }
 
 int CHttp::SendHeader(const char* buf, int len)
@@ -494,7 +515,8 @@ Http_Connection CHttp::LineParse(char* text)
         
         if(_COOKIE_VARS_.size() > 0)
         {
-            m_cache->reload_cookies();
+            /* Wouldn't save cookie in server side */
+            /* m_cache->reload_cookies(); */
             map<string, string>::iterator iter_c;
 	        for(iter_c = _COOKIE_VARS_.begin(); iter_c != _COOKIE_VARS_.end(); iter_c++)
 	        {

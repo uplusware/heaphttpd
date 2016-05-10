@@ -48,10 +48,10 @@ Cookie::Cookie(const char* szSetCookie)
         }
         else if(phase == COOKIE_ACCESS)
         {
-            m_CreateTime = atoi(strField.c_str());
+            m_AccessTime = atoi(strField.c_str());
             phase == COOKIE_KEYVAL;
         }
-        else if(COOKIE_KEYVAL)
+        else if(phase == COOKIE_KEYVAL)
         {
             strcut(strField.c_str(), NULL, "=", m_Name);
             strcut(strField.c_str(), "=", NULL, m_Value);
