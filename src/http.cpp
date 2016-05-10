@@ -148,6 +148,83 @@ int CHttp::ProtRecv(char* buf, int len)
 		return m_lsockfd->lrecv(buf, len);
 }
 
+void CHttp::SetCookie(const char* szName, const char* szValue,
+    int nMaxAge, const char* szExpires,
+    const char* szPath, const char* szDomain, 
+    BOOL bSecure, BOOL bHttpOnly)
+{
+    string strCookie;
+    Cookie ck(szName, szValue, nMaxAge, szExpires, szPath, szDomain, bSecure, bHttpOnly);   
+    ck.toString(strCookie);
+    
+    map<string, string>::iterator iter = m_set_cookies.find(szName);
+    if(iter != m_set_cookies.end())
+        m_set_cookies.erase(iter);
+    m_set_cookies.insert(map<string, string>::value_type(szName, strCookie.c_str()));
+    
+    /* Don't save cookie in ther server side */
+	/* m_cache->push_cookie(szName, ck);*/
+}
+
+void CHttp::SetSessionVar(const char* szName, const char* szValue)
+{
+    const char* psuid;
+    char szuid_seed[1024];
+    char szuid[33];
+    if(m_session_var_uid == "")
+    {
+        
+        srand(time(NULL));
+        sprintf(szuid_seed, "%08x-%08x-%p-%08x", time(NULL), getpid(), this, rand());
+        
+        unsigned char HA[16];
+        MD5_CTX_OBJ Md5Ctx;
+        Md5Ctx.MD5Init();
+        Md5Ctx.MD5Update((unsigned char*) szuid_seed, strlen(szuid_seed));
+        Md5Ctx.MD5Final(HA);
+        sprintf(szuid, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", 
+            HA[0], HA[1], HA[2], HA[3], HA[4], HA[5], HA[6], HA[7], 
+            HA[8], HA[9], HA[10], HA[11], HA[12], HA[13], HA[14], HA[15]);
+        psuid = szuid;
+    }
+    else
+    {
+        psuid = m_session_var_uid.c_str();
+    }
+    m_cache->push_session_var(szName, szValue, psuid);
+}
+
+int CHttp::SendHeader(const char* buf, int len)
+{
+    string strHeader = buf;
+    
+	map<string, string>::iterator cookie_it;
+	for(cookie_it = m_set_cookies.begin(); cookie_it != m_set_cookies.end(); ++cookie_it)
+	{
+	    if(cookie_it->second != "")
+		{
+			strHeader += "Set-Cookie: ";
+			strHeader += cookie_it->second;
+			strHeader += "\r\n";
+		}
+	}
+	
+	if(m_session_var_uid != "")
+	{
+	    strHeader += "Set-Cookie: __niuhttpd_session__=";
+		strHeader += m_session_var_uid;
+		strHeader += "\r\n";
+	}
+	
+    strHeader += "\r\n";
+    return HttpSend(strHeader.c_str(), strHeader.length());
+}
+
+int CHttp::SendContent(const char* buf, int len)
+{
+    return HttpSend(buf, len);
+}
+	
 Http_Connection CHttp::LineParse(char* text)
 {
 	string strtext = text;
@@ -417,12 +494,17 @@ Http_Connection CHttp::LineParse(char* text)
         
         if(_COOKIE_VARS_.size() > 0)
         {
-            
             m_cache->reload_cookies();
             map<string, string>::iterator iter_c;
 	        for(iter_c = _COOKIE_VARS_.begin(); iter_c != _COOKIE_VARS_.end(); iter_c++)
 	        {
-	            m_cache->access_cookie(iter_c->first.c_str());
+	            if(iter_c->first == "__niuhttpd_session__")
+	            {
+	                m_session_var_uid = iter_c->second;
+	                break;
+	            }
+	            /* Wouldn't save cookie in server side */
+	            /* m_cache->access_cookie(iter_c->first.c_str()); */
 	        }
 	    }
 	    

@@ -12,11 +12,12 @@ memory_cache::memory_cache(const char* service_name, int process_seq, const char
     m_service_name = service_name;
     m_dirpath = dirpath;
     pthread_rwlock_init(&m_cookie_rwlock, NULL);
+    pthread_rwlock_init(&m_session_var_rwlock, NULL);
     pthread_rwlock_init(&m_file_rwlock, NULL);
     
 	m_file_cache.clear();
 	m_cookies.clear();
-	
+	m_session_vars.clear();
 	m_type_table.clear();
 	m_file_cache_size = 0;
 }
@@ -27,6 +28,7 @@ memory_cache::~memory_cache()
 	
 	pthread_rwlock_destroy(&m_file_rwlock);
 	pthread_rwlock_destroy(&m_cookie_rwlock);
+	pthread_rwlock_destroy(&m_session_var_rwlock);
 }
 
 //Cookie
@@ -65,6 +67,31 @@ int memory_cache::get_cookie(const char * name, Cookie & ck)
     return ret;
 }
 
+void memory_cache::push_session_var(const char* name, const char* value, const char* uid)
+{
+    pthread_rwlock_wrlock(&m_session_var_rwlock);
+    session_var* pVar = new session_var(name, value, uid);
+    map<string, session_var*>::iterator iter = m_session_vars.find(name);
+    if(iter != m_session_vars.end())
+        m_session_vars.erase(iter);
+    m_session_vars.insert(map<string, session_var*>::value_type(name, pVar));
+    pthread_rwlock_unlock(&m_session_var_rwlock);
+}
+
+int  memory_cache::get_session_var(const char * name, string& value)
+{
+    int ret = -1;
+    pthread_rwlock_rdlock(&m_session_var_rwlock);  
+    map<string, session_var*>::iterator iter = m_session_vars.find(name);
+    if(iter != m_session_vars.end())
+    {
+        //ck = iter->second;
+        ret = 0;
+    }
+    pthread_rwlock_unlock(&m_session_var_rwlock);
+    return ret;
+}
+	
 //File
 map<string, file_cache *>::iterator memory_cache::_find_oldest_file_()
 {
@@ -206,6 +233,18 @@ void memory_cache::clear_files()
 	}
 	m_file_cache.clear();
 	pthread_rwlock_unlock(&m_file_rwlock);
+}
+
+void memory_cache::clear_session_vars()
+{
+    pthread_rwlock_wrlock(&m_session_var_rwlock);
+	map<string, session_var *>::iterator iter_f;
+	for(iter_f = m_session_vars.begin(); iter_f != m_session_vars.end(); iter_f++)
+	{
+		delete iter_f->second;
+	}
+	m_session_vars.clear();
+	pthread_rwlock_unlock(&m_session_var_rwlock);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -365,6 +404,7 @@ void memory_cache::unload()
     save_cookies();
     clear_cookies();
     clear_files();
+    clear_session_vars();
 }
 
 void memory_cache::load()

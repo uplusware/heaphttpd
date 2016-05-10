@@ -32,17 +32,12 @@ void ApiSample::Response()
         
 		header.SetStatusCode(SC200);
 		header.SetField("Content-Type", "text/html");
-		header.SetCookie(m_session->m_cache, "test1", "value1",
-            90, NULL, "/", NULL, FALSE, FALSE);
-        header.SetCookie(m_session->m_cache, "test2", "value2",
-            100, NULL, "/", NULL, TRUE, TRUE);
-        header.SetCookie(m_session->m_cache, "test3", "value3",
-            120, NULL, "/", ".uplusware.com", TRUE, TRUE);
-        header.SetCookie(m_session->m_cache, "test4", "value4",
-            -1, NULL, "/", NULL);
-		//header.SetField("Set-Cookie", m_session->m_clientip.c_str());
-		header.Text();
-        
+		
+		m_session->SetCookie("test1", "value1", 90, NULL, "/", NULL, FALSE, FALSE);
+        m_session->SetCookie("test2", "value2", 100, NULL, "/", NULL, TRUE, TRUE);
+        m_session->SetCookie("test3", "value3", 120, NULL, "/", ".uplusware.com", TRUE, TRUE);
+        m_session->SetCookie("test4", "value4", -1, NULL, "/", NULL);
+		
 		strResp = "<html></head><title>API Sample</title></head><body><h1>niuhttpd web server/0.3</h1>API Sample: ";
 		strResp += abc;
 		strResp += " + ";
@@ -52,8 +47,8 @@ void ApiSample::Response()
 		strResp += "</body></html>";
         header.SetField("Content-Length", strResp.length());
 	}
-    m_session->HttpSend(header.Text(), header.Length());
-	m_session->HttpSend(strResp.c_str(), strResp.length());
+    m_session->SendHeader(header.Text(), header.Length());
+	m_session->SendContent(strResp.c_str(), strResp.length());
 
 }
 

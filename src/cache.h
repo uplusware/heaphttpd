@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include "cookie.h"
+#include "httpsessionvar.h"
 
 #define FILE_MAX_SIZE 	(1024*1024*4)   /* 4M */
 #define MAX_CACHE_SIZE	(1024*1024*512) /* 512M */
@@ -102,20 +103,25 @@ public:
 	volatile unsigned long long m_file_cache_size;
 	
 	map<string, string> m_type_table;
-	map<string, Cookie> m_cookies;
 	
 	void load();
 	void unload();
 	
 	void _save_cookies_();
+	
 	void reload_cookies();
 	void save_cookies();
 	void clear_cookies();
 	void access_cookie(const char* name);
 	
+	void clear_session_vars();
+	
 	void push_cookie(const char * name, Cookie & ck);
 	void pop_cookie(const char * name);
 	int  get_cookie(const char * name, Cookie & ck);
+	
+	void push_session_var(const char* name, const char* value, const char* uid);
+	int  get_session_var(const char * name, string& value);
 	
 	file_cache* lock_file(const char * name, CACHE_DATA ** cache_data);
     void unlock_file(file_cache* fc);
@@ -145,8 +151,11 @@ private:
     string m_service_name;
     string m_dirpath;
     map<string, file_cache *>::iterator _find_oldest_file_();
-    
+    map<string, Cookie> m_cookies;
+	map<string, session_var*> m_session_vars;
+	
     pthread_rwlock_t m_cookie_rwlock;
+    pthread_rwlock_t m_session_var_rwlock;
     pthread_rwlock_t m_file_rwlock;
 };
 

@@ -150,8 +150,8 @@ void doc::Response()
             header.SetField("Content-Type", "text/html");
             header.SetField("Content-Length", header.GetDefaultHTMLLength());
             
-            m_session->HttpSend(header.Text(), header.Length());
-            m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            m_session->SendHeader(header.Text(), header.Length());
+            m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
             goto END_STEP1;
         }
         
@@ -163,8 +163,8 @@ void doc::Response()
             header.SetField("Content-Type", "text/html");
             header.SetField("Content-Length", header.GetDefaultHTMLLength());
             
-            m_session->HttpSend(header.Text(), header.Length());
-            m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            m_session->SendHeader(header.Text(), header.Length());
+            m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
             goto END_STEP1;
         }
     }
@@ -186,7 +186,7 @@ void doc::Response()
         header.SetStatusCode(SC304);
         unsigned int zero = 0;
         header.SetField("Content-Length", zero);    
-        m_session->HttpSend(header.Text(), header.Length());
+        m_session->SendHeader(header.Text(), header.Length());
         goto END_STEP1;
     }
     else
@@ -212,8 +212,8 @@ void doc::Response()
                 header.SetField("Content-Type", "text/html");
                 header.SetField("Content-Length", header.GetDefaultHTMLLength());
                 
-                m_session->HttpSend(header.Text(), header.Length());
-                m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                m_session->SendHeader(header.Text(), header.Length());
+                m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                 goto END_STEP1;
             }
             
@@ -249,7 +249,7 @@ void doc::Response()
         header.SetStatusCode(SC304);
         unsigned int zero = 0;
         header.SetField("Content-Length", zero);    
-        m_session->HttpSend(header.Text(), header.Length()); 
+        m_session->SendHeader(header.Text(), header.Length()); 
         goto END_STEP1;                     
     }
     
@@ -343,13 +343,13 @@ void doc::Response()
             header.SetField("Content-Range", strContentRangeResponse.c_str());
         }
         
-        m_session->HttpSend(header.Text(), header.Length());
+        m_session->SendHeader(header.Text(), header.Length());
         
         if(strcmp(szHttpRequestRanges, "") == 0)
         {
             if(m_session->GetMethod() != hmHead)
             {
-                m_session->HttpSend(file_cache_buf, nResourceLength);
+                m_session->SendContent(file_cache_buf, nResourceLength);
             }
         }
         else
@@ -361,7 +361,7 @@ void doc::Response()
                     int rest_length = nResourceLength - content_ranges[v].beg;
                     if(rest_length <= 0)
                         continue;
-                    m_session->HttpSend(file_cache_buf + content_ranges[v].beg, 
+                    m_session->SendContent(file_cache_buf + content_ranges[v].beg, 
                         rest_length > content_ranges[v].len ? content_ranges[v].len : rest_length);
                 }
             }
@@ -378,8 +378,8 @@ void doc::Response()
             header.SetStatusCode(SC404);
             header.SetField("Content-Type", "text/html");
             header.SetField("Content-Length", header.GetDefaultHTMLLength());
-            m_session->HttpSend(header.Text(), header.Length());
-            m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            m_session->SendHeader(header.Text(), header.Length());
+            m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
         }
         else
         {
@@ -409,7 +409,7 @@ void doc::Response()
                 header.SetField("Content-Range", strContentRangeResponse.c_str());
             }
             
-            m_session->HttpSend(header.Text(), header.Length());
+            m_session->SendHeader(header.Text(), header.Length());
             
             if(strcmp(szHttpRequestRanges, "") == 0)
             {
@@ -425,7 +425,7 @@ void doc::Response()
                             break;
                         
                         int rlen = ifsResource.gcount();
-                        m_session->HttpSend(rbuf, rlen);
+                        m_session->SendContent(rbuf, rlen);
                     }
                 }
             }
@@ -448,7 +448,7 @@ void doc::Response()
                             
                             int rlen = ifsResource.gcount();
                             len_sum += rlen;
-                            m_session->HttpSend(rbuf, rlen);
+                            m_session->SendContent(rbuf, rlen);
                             if(len_sum == content_ranges[v].len)
                                 break;
                         }

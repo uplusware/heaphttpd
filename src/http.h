@@ -31,7 +31,8 @@ enum Http_Connection
 class CHttp
 {
 public:
-	CHttp(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport, const char* clientip, memory_cache* ch,
+	CHttp(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	    const char* clientip, memory_cache* ch,
 		const char* work_path, const char* php_mode, 
         const char* fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
@@ -41,10 +42,15 @@ public:
 
 	virtual Http_Connection LineParse(char* text);
 	virtual int ProtRecv(char* buf, int len);
-		
-
-	int HttpSend(const char* buf, int len);
-	int HttpRecv(char* buf, int len);
+    
+    void SetCookie(const char* szName, const char* szValue,
+        int nMaxAge = -1, const char* szExpires = NULL,
+        const char* szPath = NULL, const char* szDomain = NULL, 
+        BOOL bSecure = FALSE, BOOL bHttpOnly = FALSE);
+    void SetSessionVar(const char* szName, const char* szValue);
+	
+	int SendHeader(const char* buf, int len);
+	int SendContent(const char* buf, int len);
 	
 	void SetMetaVarsToEnv();
 	void SetMetaVar(const char* name, const char* val);
@@ -108,6 +114,11 @@ public:
     void SetServiceObject(const char * objname, SERVICE_OBJECT_HANDLE objptr);
     void* GetServiceObject(const char* objname);
 	WebCGI m_cgi;
+	
+private:
+    int HttpSend(const char* buf, int len);
+    int HttpRecv(char* buf, int len);
+
 protected:
 	SSL* m_ssl;
 	
@@ -136,6 +147,7 @@ protected:
 	string m_password;
 
 	string m_cookie;
+    string m_session_var_uid;
     
     string m_work_path;
 	string m_php_mode;
@@ -157,6 +169,8 @@ protected:
     BOOL m_keep_alive;
     WebSocket_HandShake m_web_socket_handshake;
     ServiceObjMap* m_srvobj;
+    
+    map<string, string> m_set_cookies;
 };
 
 #endif /* _HTTP_H_ */

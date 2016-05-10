@@ -264,7 +264,6 @@ class CHttpResponseHdr
 {
 private:
 	map<string, string> m_mapHeader;
-	map<string, string> m_cookies;
     string m_strHeader;
 	Http_StatsCode m_StatusCode;
 	bool m_isHdrUpdated;
@@ -284,11 +283,6 @@ public:
     void SetField(const char* name, long long value);
     
 	void SetFields(const char* fields);
-	    
-    void SetCookie(memory_cache * pCache, const char* szName, const char* szValue,
-        int nMaxAge = -1, const char* szExpires = NULL,
-        const char* szPath = NULL, const char* szDomain = NULL, 
-        BOOL bSecure = FALSE, BOOL bHttpOnly = FALSE);
 
 	const char* Text();
 	

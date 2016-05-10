@@ -76,8 +76,8 @@ void Htdoc::Response()
         header.SetField("Content-Type", "text/html");
 		header.SetField("Content-Length", header.GetDefaultHTMLLength());
 		
-		m_session->HttpSend(header.Text(), header.Length());
-		m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+		m_session->SendHeader(header.Text(), header.Length());
+		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 		return;
 	}
 
@@ -108,7 +108,7 @@ void Htdoc::Response()
             header.SetField("Upgrade", "websocket");
             header.SetField("Connection", "Upgrade");
             header.SetField("Sec-WebSocket-Accept", strwsaccept_b64.c_str());
-            m_session->HttpSend(header.Text(), header.Length());
+            m_session->SendHeader(header.Text(), header.Length());
 			
 			m_session->SetWebSocketHandShake(Websocket_Ack);
 			
@@ -135,8 +135,8 @@ void Htdoc::Response()
 		
                     header.SetField("Content-Type", "text/html");
             		header.SetField("Content-Length", header.GetDefaultHTMLLength());
-                    m_session->HttpSend(header.Text(), header.Length());
-            		m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    m_session->SendHeader(header.Text(), header.Length());
+            		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                     return;
                 }
                 void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
@@ -148,8 +148,8 @@ void Htdoc::Response()
 		
                     header.SetField("Content-Type", "text/html");
             		header.SetField("Content-Length", header.GetDefaultHTMLLength());
-                    m_session->HttpSend(header.Text(), header.Length());
-            		m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    m_session->SendHeader(header.Text(), header.Length());
+            		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 		
                 }
                 else
@@ -172,8 +172,8 @@ void Htdoc::Response()
 	
                         header.SetField("Content-Type", "text/html");
                 		header.SetField("Content-Length", header.GetDefaultHTMLLength());
-                        m_session->HttpSend(header.Text(), header.Length());
-                		m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                        m_session->SendHeader(header.Text(), header.Length());
+                		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                 		
                     }
                 }
@@ -190,8 +190,8 @@ void Htdoc::Response()
 		
         header.SetField("Content-Type", "text/html");
 		header.SetField("Content-Length", header.GetDefaultHTMLLength());
-        m_session->HttpSend(header.Text(), header.Length());
-		m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+        m_session->SendHeader(header.Text(), header.Length());
+		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 		return;
 	}
 	string strResource = m_session->GetResource();
@@ -250,8 +250,8 @@ void Htdoc::Response()
 
             header.SetField("Content-Type", "text/html");
     		header.SetField("Content-Length", header.GetDefaultHTMLLength());
-            m_session->HttpSend(header.Text(), header.Length());
-    		m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            m_session->SendHeader(header.Text(), header.Length());
+    		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
             return;
         }
                 
@@ -265,8 +265,8 @@ void Htdoc::Response()
             header.SetField("Content-Type", "text/html");
 			header.SetField("Content-Length", header.GetDefaultHTMLLength());
 			
-			m_session->HttpSend(header.Text(), header.Length());
-			m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+			m_session->SendHeader(header.Text(), header.Length());
+			m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 			fprintf(stderr, "dlopen %s\n", dlerror());
 		}
 		else
@@ -291,8 +291,8 @@ void Htdoc::Response()
                 header.SetField("Content-Type", "text/html");
 				header.SetField("Content-Length", header.GetDefaultHTMLLength());
 		
-				m_session->HttpSend(header.Text(), header.Length());
-				m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+				m_session->SendHeader(header.Text(), header.Length());
+				m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 				fprintf(stderr, "dlsym %s\n", errmsg);
 			}
 		}
@@ -331,10 +331,10 @@ void Htdoc::Response()
 					header.SetStatusCode(SC200);
 					header.SetFields(strHeader.c_str());
 					header.SetField("Content-Length", strBody.length());
-					m_session->HttpSend(header.Text(), header.Length());
+					m_session->SendHeader(header.Text(), header.Length());
 					
 					if(strBody != "" && m_session->GetMethod() != hmHead)
-						m_session->HttpSend(strBody.c_str(), strBody.length());
+						m_session->SendContent(strBody.c_str(), strBody.length());
                 }
 				else
 				{
@@ -343,8 +343,8 @@ void Htdoc::Response()
 					
                     header.SetField("Content-Type", "text/html");
 					header.SetField("Content-Length", header.GetDefaultHTMLLength());
-					m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-					m_session->HttpSend(header.Text(), header.Length());
+					m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+					m_session->SendHeader(header.Text(), header.Length());
 				}
                 close(fds[0]);
 				waitpid(cgipid, NULL, 0);
@@ -377,8 +377,8 @@ void Htdoc::Response()
             header.SetField("Content-Type", "text/html");
 			header.SetField("Content-Length", header.GetDefaultHTMLLength());
 			
-			m_session->HttpSend(header.Text(), header.Length());
-			m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+			m_session->SendHeader(header.Text(), header.Length());
+			m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 		}
 	}
 	else
@@ -437,9 +437,9 @@ void Htdoc::Response()
 						}
 						header.SetField("Content-Length", strBody.length());
 						//printf("%s", header.Text());
-						m_session->HttpSend(header.Text(), header.Length());
+						m_session->SendHeader(header.Text(), header.Length());
 						if(strBody != "" && m_session->GetMethod() != hmHead)
-							m_session->HttpSend(strBody.c_str(), strBody.length());
+							m_session->SendContent(strBody.c_str(), strBody.length());
 					}
 					else
 					{
@@ -449,8 +449,8 @@ void Htdoc::Response()
 						header.SetField("Content-Type", "text/html");
 						header.SetField("Content-Length", header.GetDefaultHTMLLength());
 						
-						m_session->HttpSend(header.Text(), header.Length());
-						m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+						m_session->SendHeader(header.Text(), header.Length());
+						m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 					}
 					close(fds[0]);
 					waitpid(cgipid, NULL, 0);
@@ -545,9 +545,9 @@ void Htdoc::Response()
 						}
 						header.SetField("Content-Length", strBody.length());
 						//printf("%s", header.Text());
-						m_session->HttpSend(header.Text(), header.Length());
+						m_session->SendHeader(header.Text(), header.Length());
 						if(strBody != "" && m_session->GetMethod() != hmHead)
-							m_session->HttpSend(strBody.c_str(), strBody.length());
+							m_session->SendContent(strBody.c_str(), strBody.length());
 					}
 					else
 					{
@@ -557,8 +557,8 @@ void Htdoc::Response()
 						header.SetField("Content-Type", "text/html");
 						header.SetField("Content-Length", header.GetDefaultHTMLLength());
 						
-						m_session->HttpSend(header.Text(), header.Length());
-						m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+						m_session->SendHeader(header.Text(), header.Length());
+						m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 					}
 				}
 				else
@@ -569,8 +569,8 @@ void Htdoc::Response()
 					header.SetField("Content-Type", "text/html");
 					header.SetField("Content-Length", header.GetDefaultHTMLLength());
 					
-					m_session->HttpSend(header.Text(), header.Length());
-					m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+					m_session->SendHeader(header.Text(), header.Length());
+					m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 				}
                 if(fcgi)
                     delete fcgi;
@@ -584,8 +584,8 @@ void Htdoc::Response()
 				header.SetField("Content-Type", "text/html");
 				header.SetField("Content-Length", header.GetDefaultHTMLLength());
 				
-				m_session->HttpSend(header.Text(), header.Length());
-				m_session->HttpSend(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+				m_session->SendHeader(header.Text(), header.Length());
+				m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 			}
         }
         else
