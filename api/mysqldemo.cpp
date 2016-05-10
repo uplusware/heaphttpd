@@ -36,8 +36,8 @@ void ApiMySQLDemo::Response()
 		header.SetField("Content-Length", strDatabases.length());
     }
     
-    m_session->HttpSendHeader(header.Text(), header.Length());
-	m_session->HttpSendContent(strDatabases.c_str(), strDatabases.length());
+    m_session->SendHeader(header.Text(), header.Length());
+	m_session->SendContent(strDatabases.c_str(), strDatabases.length());
 
 }
 
