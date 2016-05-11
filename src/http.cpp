@@ -153,8 +153,10 @@ void CHttp::SetCookie(const char* szName, const char* szValue,
     const char* szPath, const char* szDomain, 
     BOOL bSecure, BOOL bHttpOnly)
 {
+    string strEncodedValue;
+    NIU_URLFORMAT_ENCODE((const unsigned char*)szValue, strEncodedValue);
     string strCookie;
-    Cookie ck(szName, szValue, nMaxAge, szExpires, szPath, szDomain, bSecure, bHttpOnly);   
+    Cookie ck(szName, strEncodedValue.c_str(), nMaxAge, szExpires, szPath, szDomain, bSecure, bHttpOnly);   
     ck.toString(strCookie);
     
     map<string, string>::iterator iter = m_set_cookies.find(szName);
@@ -192,26 +194,37 @@ void CHttp::SetSessionVar(const char* szName, const char* szValue)
     {
         psuid = m_session_var_uid.c_str();
     }
-    printf("%s %s %s\n", psuid, szName, szValue);
-    m_cache->push_session_var(psuid, szName, szValue);
+    string strEncodedValue;
+    NIU_URLFORMAT_ENCODE((const unsigned char*)szValue, strEncodedValue);
+    m_cache->push_session_var(psuid, szName, strEncodedValue.c_str());
 }
 
 int CHttp::GetSessionVar(const char* szName, string& strValue)
 {
     if(m_session_var_uid != "")
-        return m_cache->get_session_var(m_session_var_uid.c_str(), szName, strValue);
+    {
+        string strEncodedValue;
+        int ret = m_cache->get_session_var(m_session_var_uid.c_str(), szName, strEncodedValue);
+        NIU_URLFORMAT_DECODE((const unsigned char*)strEncodedValue.c_str(), strValue);
+        return ret;
+    }
     else
         return -1;
 }
 
 void CHttp::SetServerVar(const char* szName, const char* szValue)
 {
-    m_cache->push_server_var(szName, szValue);
+    string strEncodedValue;
+    NIU_URLFORMAT_ENCODE((const unsigned char*)szValue, strEncodedValue);
+    m_cache->push_server_var(szName, strEncodedValue.c_str());
 }
 
 int CHttp::GetServerVar(const char* szName, string& strValue)
 {
-    return m_cache->get_server_var(szName, strValue);
+    string strEncodedValue;
+    int ret = m_cache->get_server_var(szName, strEncodedValue);
+    NIU_URLFORMAT_DECODE((const unsigned char*)strEncodedValue.c_str(), strValue);
+    return ret;
 }
 
 int CHttp::SendHeader(const char* buf, int len)

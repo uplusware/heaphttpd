@@ -43,23 +43,31 @@ void ApiSample::Response()
 		int r2 = m_session->GetSessionVar("session_var2", strValue2);
 		int r3 = m_session->GetSessionVar("session_var3", strValue3);
 		if(r1 != 0)
-    		m_session->SetSessionVar("session_var1", "hello session 1!");
+    		m_session->SetSessionVar("session_var1", "hello session 1! = ] <script>alert(\"aaaa\")</script>");
     	if(r2 != 0)
-        	m_session->SetSessionVar("session_var2", "hello session 2!");
+        	m_session->SetSessionVar("session_var2", "hello session 2! = ]");
         if(r3 != 0)
-        	m_session->SetSessionVar("session_var3", "hello session 3!");
+        	m_session->SetSessionVar("session_var3", "hello session 3! = ]");
     	
     	string strServerValue1, strServerValue2, strServerValue3;
     	int s1 = m_session->GetServerVar("server_var1", strServerValue1);
 		int s2 = m_session->GetServerVar("server_var2", strServerValue2);
 		int s3 = m_session->GetServerVar("server_var3", strServerValue3);
 		if(s1 != 0)
-    		m_session->SetServerVar("server_var1", "hello server 1!");
+    		m_session->SetServerVar("server_var1", "hello server 1! = ]");
     	if(s2 != 0)
-        	m_session->SetServerVar("server_var2", "hello server 2!");
+        	m_session->SetServerVar("server_var2", "hello server 2! = ]");
         if(s3 != 0)
-        	m_session->SetServerVar("server_var3", "hello server 3!");
-        	
+        	m_session->SetServerVar("server_var3", "hello server 3! = ]");
+        
+        ToHTML(strValue1);
+        ToHTML(strValue2);
+        ToHTML(strValue3);
+        
+        ToHTML(strServerValue1);
+        ToHTML(strServerValue2);
+        ToHTML(strServerValue3);
+        
 		strResp = "<html></head><title>API Sample</title></head><body><h1>niuhttpd web server/0.3</h1>API Sample: ";
 		strResp += abc;
 		strResp += " + ";
