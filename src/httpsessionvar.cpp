@@ -20,27 +20,29 @@ session_var::session_var(const char* szline)
     vector<string> vVars;
     vSplitString(szline, vVars, ";", TRUE);
     vector<string>::iterator iter_c;
-    
+    //printf("var line: %s\n", szline);
     SessionVarParsePhase phase = SESSION_VAR_UID;
     for(iter_c = vVars.begin(); iter_c != vVars.end(); iter_c++)
     {
         string strField(*iter_c);
         strtrim(strField);
+        //printf("var field: %s\n", strField.c_str());
         
         if(phase == SESSION_VAR_UID)
         {
             memcpy(m_uid, strField.c_str(), HTTP_SESSION_UID_LEN);
-            phase == SESSION_VAR_CREATE;
+            m_uid[HTTP_SESSION_UID_LEN] = '\0';
+            phase = SESSION_VAR_CREATE;
         }
         else if(phase == SESSION_VAR_CREATE)
         {
             m_create = atoi(strField.c_str());
-            phase == SESSION_VAR_ACCESS;
+            phase = SESSION_VAR_ACCESS;
         }
         else if(phase == SESSION_VAR_ACCESS)
         {
             m_access = atoi(strField.c_str());
-            phase == SESSION_VAR_KEYVAL;
+            phase = SESSION_VAR_KEYVAL;
         }
         else if(phase == SESSION_VAR_KEYVAL)
         {
@@ -48,7 +50,9 @@ session_var::session_var(const char* szline)
             strcut(strField.c_str(), "=", NULL, m_value);
             strtrim(m_name);
             strtrim(m_value);
-            phase == SESSION_VAR_OPTION;
+            phase = SESSION_VAR_OPTION;
+            
+            //printf("var name: %s value: %s\n", m_name.c_str(), m_value.c_str());
         }
     }
 }

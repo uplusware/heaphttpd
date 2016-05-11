@@ -109,6 +109,7 @@ public:
 	void unload();
 	
 	void _save_cookies_();
+	void _reload_cookies_();
 	
 	void reload_cookies();
 	void save_cookies();

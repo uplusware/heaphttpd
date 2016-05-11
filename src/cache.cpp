@@ -85,7 +85,6 @@ int  memory_cache::get_session_var(const char* uid, const char * name, string& v
 {
     int ret = -1;
     reload_session_vars();
-    
     pthread_rwlock_rdlock(&m_session_var_rwlock);
     map<session_var_key, session_var*>::iterator iter = m_session_vars.find(session_var_key(uid, name));
     if(iter != m_session_vars.end())
@@ -183,10 +182,13 @@ void memory_cache::_reload_session_vars_()
 	                && dirp->d_name[name_len - 7] == 's'
 	                && dirp->d_name[name_len - 8] == '.')
 	            {
+	                
 			        string strFileName = dirp->d_name;
 			        string strFilePath = m_dirpath.c_str();
 			        strFilePath += "/variable/";
 			        strFilePath += strFileName;
+			        
+			        //printf("%s\n", strFilePath.c_str());
 			        ifstream* session_vars_stream = new ifstream(strFilePath.c_str(), ios_base::binary);;
 			        string strline;
 			        if(session_vars_stream && !session_vars_stream->is_open())
@@ -194,18 +196,29 @@ void memory_cache::_reload_session_vars_()
 				        delete session_vars_stream;
 				        continue;
 			        }
+			        map<session_var_key, session_var*>::iterator iter;
 			        while(session_vars_stream && getline(*session_vars_stream, strline))
 			        {
 				        strtrim(strline);
 				        if(strline == "")
 					        continue;
 					    session_var* session_var_instance = new session_var(strline.c_str());
-					    map<session_var_key, session_var*>::iterator iter = m_session_vars.find(session_var_key(session_var_instance->getUID(), session_var_instance->getName()));
+					    iter = m_session_vars.find(session_var_key(session_var_instance->getUID(), session_var_instance->getName()));
                         if(iter != m_session_vars.end() 
                             && iter->second->getCreateTime() < session_var_instance->getCreateTime())
                         {
-                            iter->second->setAccessTime(time(NULL));
-					        m_session_vars.insert(map<session_var_key, session_var*>::value_type(session_var_key(session_var_instance->getUID(), session_var_instance->getName()), session_var_instance));
+                            if(iter->second)
+                                delete iter->second;
+                            m_session_vars.erase(iter);/* Remove the older one */
+					        m_session_vars.insert(map<session_var_key, session_var*>::value_type(
+					            session_var_key(session_var_instance->getUID(), session_var_instance->getName()),
+					            session_var_instance));
+					    }
+					    else
+					    {
+					        m_session_vars.insert(map<session_var_key, session_var*>::value_type(
+					            session_var_key(session_var_instance->getUID(), session_var_instance->getName()),
+					            session_var_instance));
 					    }
 			        }
 			    }
@@ -247,6 +260,7 @@ int  memory_cache::get_server_var(const char * name, string& value)
         value = iter->second->getValue();
         ret = 0;
     }
+    
     pthread_rwlock_unlock(&m_server_var_rwlock);
     return ret;
 }
@@ -264,37 +278,31 @@ void memory_cache::_save_server_vars_()
 	    ofstream* server_var_stream = NULL;
 	                      
 	    map<string, server_var*>::iterator iter_s;
-	    bool bSave = true;
 	    for(iter_s = m_server_vars.begin(); iter_s != m_server_vars.end(); iter_s++)
 	    {
-	        bSave = true;
-	        if(time(NULL) - iter_s->second->getAccessTime() > 90) /* No-inactive http request, 90s for timeout*/
-	        {
-	            bSave = false;
-	        }
-	        if(bSave)
-	        {
-	            if(!server_var_stream)
-	            {
-	                server_var_stream = new ofstream(szServerVarFile, ios::out | ios::binary | ios::trunc);
-	            }
-	            if(!server_var_stream->is_open())
-	                break;
-	            
-	            char szTime[256];
-	            sprintf(szTime, "%d", iter_s->second->getCreateTime());
-	            server_var_stream->write(szTime, strlen(szTime));
-	            server_var_stream->write(";", 1);
-	            
-    	        sprintf(szTime, "%d", iter_s->second->getAccessTime());
-	            server_var_stream->write(szTime, strlen(szTime));
-	            server_var_stream->write(";", 1);
-	            
-	            server_var_stream->write(iter_s->second->getName(), strlen(iter_s->second->getName()));
-	            server_var_stream->write("=", 1);
-	            server_var_stream->write(iter_s->second->getValue(), strlen(iter_s->second->getValue()));
-	            server_var_stream->write("\n", 1);
+            if(!server_var_stream)
+            {
+                server_var_stream = new ofstream(szServerVarFile, ios::out | ios::binary | ios::trunc);
             }
+            if(server_var_stream && !server_var_stream->is_open())
+            {
+                delete server_var_stream;
+                continue;
+            }
+            
+            char szTime[256];
+            sprintf(szTime, "%d", iter_s->second->getCreateTime());
+            server_var_stream->write(szTime, strlen(szTime));
+            server_var_stream->write(";", 1);
+
+            sprintf(szTime, "%d", iter_s->second->getAccessTime());
+            server_var_stream->write(szTime, strlen(szTime));
+            server_var_stream->write(";", 1);
+
+            server_var_stream->write(iter_s->second->getName(), strlen(iter_s->second->getName()));
+            server_var_stream->write("=", 1);
+            server_var_stream->write(iter_s->second->getValue(), strlen(iter_s->second->getValue()));
+            server_var_stream->write("\n", 1);
 	    }
 	    if(server_var_stream && server_var_stream->is_open())
 	    {
@@ -354,8 +362,16 @@ void memory_cache::_reload_server_vars_()
                         if(iter != m_server_vars.end() 
                             && iter->second->getCreateTime() < server_var_instance->getCreateTime())
                         {
-                            iter->second->setAccessTime(time(NULL));
-					        m_server_vars.insert(map<string, server_var*>::value_type(server_var_instance->getName(), server_var_instance));
+                            if(iter->second)
+                                delete iter->second;
+                            m_server_vars.erase(iter); /* Remove the older one */
+					        m_server_vars.insert(map<string, server_var*>::value_type(
+					            server_var_instance->getName(), server_var_instance));
+					    }
+					    else
+					    {
+					        m_server_vars.insert(map<string, server_var*>::value_type(
+					            server_var_instance->getName(), server_var_instance));
 					    }
 			        }
 			    }
@@ -530,9 +546,8 @@ void memory_cache::clear_session_vars()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-void memory_cache::reload_cookies()
+void memory_cache::_reload_cookies_()
 {
-    pthread_rwlock_wrlock(&m_cookie_rwlock);
     m_cookies.clear();
     
     char szCookieFolder[256];
@@ -580,7 +595,11 @@ void memory_cache::reload_cookies()
                         if(iter != m_cookies.end() 
                             && iter->second.getCreateTime() < cookie_instance.getCreateTime())
                         {
-                            iter->second.setAccessTime(time(NULL));
+                            m_cookies.erase(iter); /* Remove the older one */
+					        m_cookies.insert(map<string, Cookie>::value_type(cookie_instance.getName(), cookie_instance));
+					    }
+					    else
+					    {
 					        m_cookies.insert(map<string, Cookie>::value_type(cookie_instance.getName(), cookie_instance));
 					    }
 			        }
@@ -589,6 +608,12 @@ void memory_cache::reload_cookies()
 	    }
 	    closedir(dp);
     }
+}
+
+void memory_cache::reload_cookies()
+{
+    pthread_rwlock_wrlock(&m_cookie_rwlock);
+    _reload_cookies_();
     pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 

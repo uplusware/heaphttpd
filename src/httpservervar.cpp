@@ -17,7 +17,7 @@ server_var::server_var(const char* szline)
     vector<string> vVars;
     vSplitString(szline, vVars, ";", TRUE);
     vector<string>::iterator iter_c;
-    
+        
     ServerVarParsePhase phase = SERVER_VAR_CREATE;
     for(iter_c = vVars.begin(); iter_c != vVars.end(); iter_c++)
     {
@@ -27,12 +27,12 @@ server_var::server_var(const char* szline)
         if(phase == SERVER_VAR_CREATE)
         {
             m_create = atoi(strField.c_str());
-            phase == SERVER_VAR_ACCESS;
+            phase = SERVER_VAR_ACCESS;
         }
         else if(phase == SERVER_VAR_ACCESS)
         {
             m_access = atoi(strField.c_str());
-            phase == SERVER_VAR_KEYVAL;
+            phase = SERVER_VAR_KEYVAL;
         }
         else if(phase == SERVER_VAR_KEYVAL)
         {
@@ -40,7 +40,7 @@ server_var::server_var(const char* szline)
             strcut(strField.c_str(), "=", NULL, m_value);
             strtrim(m_name);
             strtrim(m_value);
-            phase == SERVER_VAR_OPTION;
+            phase = SERVER_VAR_OPTION;
         }
     }
 }

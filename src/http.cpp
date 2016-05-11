@@ -173,7 +173,6 @@ void CHttp::SetSessionVar(const char* szName, const char* szValue)
     char szuid[33];
     if(m_session_var_uid == "")
     {
-        
         srand(time(NULL));
         sprintf(szuid_seed, "%08x-%08x-%p-%08x", time(NULL), getpid(), this, rand());
         
@@ -193,15 +192,16 @@ void CHttp::SetSessionVar(const char* szName, const char* szValue)
     {
         psuid = m_session_var_uid.c_str();
     }
+    printf("%s %s %s\n", psuid, szName, szValue);
     m_cache->push_session_var(psuid, szName, szValue);
 }
 
-void CHttp::GetSessionVar(const char* szName, string& strValue)
+int CHttp::GetSessionVar(const char* szName, string& strValue)
 {
     if(m_session_var_uid != "")
-        m_cache->get_session_var(m_session_var_uid.c_str(), szName, strValue);
+        return m_cache->get_session_var(m_session_var_uid.c_str(), szName, strValue);
     else
-        strValue = "";
+        return -1;
 }
 
 void CHttp::SetServerVar(const char* szName, const char* szValue)
@@ -209,10 +209,9 @@ void CHttp::SetServerVar(const char* szName, const char* szValue)
     m_cache->push_server_var(szName, szValue);
 }
 
-void CHttp::GetServerVar(const char* szName, string& strValue)
+int CHttp::GetServerVar(const char* szName, string& strValue)
 {
-    strValue = "";
-    m_cache->get_server_var(szName, strValue);
+    return m_cache->get_server_var(szName, strValue);
 }
 
 int CHttp::SendHeader(const char* buf, int len)
