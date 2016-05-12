@@ -8,7 +8,7 @@
 
 #include "http.h"
 #include "httpcomm.h"
-#include "util/escape.h"
+#include "niuapi.h"
 
 class doc
 {
@@ -27,45 +27,33 @@ public:
 	virtual void Response();
 	
 protected:
-    int generate_cookie_content(const char* szName, const char* szValue, const char* szPath, string & strOut)
+    const char* encodeURI(const char* src, string& dst)
 	{
-		strOut = szName;
-		strOut += "=";
-		strOut += szValue;
-		strOut += "; Version=1; Path=";
-		strOut += szPath;
-		return 0;
+		NIU_URLFORMAT_ENCODE((const unsigned char *) src, dst);
+		return dst.c_str();
 	}
 	
-	void to_safety_querystring(const char* src, string& dst)
+	const char* decodeURI(const char* src, string& dst)
 	{
-		encodeURI((unsigned char *) src, dst);
+		NIU_URLFORMAT_DECODE((const unsigned char *) src, dst);
+		return dst.c_str();
 	}
 	
-	const char* XMLSaftyString(string& str)
+	const char* escapeHTML(const char* src, string& dst)
 	{
-		Replace(str, "&", "&amp;");
-		Replace(str, "<", "&lt;");
-		Replace(str, ">", "&gt;");
-		Replace(str, "'", "&apos;");
-		Replace(str, "\"", "&quot;");
+	    dst = src;
+		Replace(dst, "&", "&amp;");
 		
-		return str.c_str();
-	}
-	
-	void ToHTML(string& str)
-	{
-		Replace(str, "&", "&amp;");
+		Replace(dst, "\r", "");
+		Replace(dst, "\n", "<BR>");
+		Replace(dst, " ", "&nbsp;");
+		Replace(dst, "\t", "&nbsp;&nbsp;&nbsp;&nbsp;");
 		
-		Replace(str, "\r", "");
-		Replace(str, "\n", "<BR>");
-		Replace(str, " ", "&nbsp;");
-		Replace(str, "\t", "&nbsp;&nbsp;&nbsp;&nbsp;");
-		
-		Replace(str, "<", "&lt;");
-		Replace(str, ">", "&gt;");
-		Replace(str, "'", "&apos;");
-		Replace(str, "\"", "&quot;");
+		Replace(dst, "<", "&lt;");
+		Replace(dst, ">", "&gt;");
+		Replace(dst, "'", "&apos;");
+		Replace(dst, "\"", "&quot;");
+		return dst.c_str();
 	}
 };
 

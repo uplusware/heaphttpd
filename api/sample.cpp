@@ -60,13 +60,15 @@ void ApiSample::Response()
         if(s3 != 0)
         	m_session->SetServerVar("server_var3", "hello server 3! = ]");
         
-        ToHTML(strValue1);
-        ToHTML(strValue2);
-        ToHTML(strValue3);
+        string strEscapedValue1, strEscapedValue2, strEscapedValue3;
+        string strEscapedServerValue1, strEscapedServerValue2, strEscapedServerValue3;
+        escapeHTML(strValue1.c_str(), strEscapedValue1);
+        escapeHTML(strValue2.c_str(), strEscapedValue2);
+        escapeHTML(strValue3.c_str(), strEscapedValue3);
         
-        ToHTML(strServerValue1);
-        ToHTML(strServerValue2);
-        ToHTML(strServerValue3);
+        escapeHTML(strServerValue1.c_str(), strEscapedServerValue1);
+        escapeHTML(strServerValue2.c_str(), strEscapedServerValue2);
+        escapeHTML(strServerValue3.c_str(), strEscapedServerValue3);
         
 		strResp = "<html></head><title>API Sample</title></head><body><h1>niuhttpd web server/0.3</h1>API Sample: ";
 		strResp += abc;
@@ -76,17 +78,17 @@ void ApiSample::Response()
 		strResp += szTmp;
 		strResp += "<p><a href='javascript:alert(document.cookie)'>cookie</a>";
 		strResp += "<p>Session Variables: <p>session_var1=";
-		strResp += strValue1;
+		strResp += strEscapedValue1;
 		strResp += "<p>session_var2=";
-		strResp += strValue2;
+		strResp += strEscapedValue2;
 		strResp += "<p>session_var3=";
-		strResp += strValue3;
+		strResp += strEscapedValue3;
 		strResp += "<p>Server Variables: <p>server_var1=";
-		strResp += strServerValue1;
+		strResp += strEscapedServerValue1;
 		strResp += "<p>server_var2=";
-		strResp += strServerValue2;
+		strResp += strEscapedServerValue2;
 		strResp += "<p>server_var3=";
-		strResp += strServerValue3;
+		strResp += strEscapedServerValue3;
 		strResp += "</body></html>";
         header.SetField("Content-Length", strResp.length());
 	}
