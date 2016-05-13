@@ -657,6 +657,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 		write(fd, &result, sizeof(unsigned int));
 		close(fd);
 		fd_set accept_mask;
+    	FD_ZERO(&accept_mask);
 		struct timeval accept_timeout;
 		struct timespec ts;
 		stQueueMsg* pQMsg;
@@ -711,7 +712,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 			}
 			else
 			{
-				if((errno != ETIMEDOUT)&&(errno != EINTR)&&(errno != EMSGSIZE))
+				if(errno != ETIMEDOUT && errno != EINTR && errno != EMSGSIZE)
 				{
 					fprintf(stderr, "mq_timedreceive error, errno = %d, %S %d\n", errno, __FILE__, __LINE__);
 					svr_exit = TRUE;
@@ -719,8 +720,6 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 				}
 				
 			}
-
-			FD_ZERO(&accept_mask);
 			FD_SET(m_sockfd, &accept_mask);
 			
 			accept_timeout.tv_sec = 1;

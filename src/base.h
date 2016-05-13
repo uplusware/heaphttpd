@@ -171,7 +171,7 @@ public:
 		}
 
 		p = NULL;
-		
+		FD_ZERO(&mask);		
 		while(1)
 		{
 			if(nRecv >= blen)
@@ -180,7 +180,6 @@ public:
 			timeout.tv_sec = 1; 
 			timeout.tv_usec = 0;
 					
-			FD_ZERO(&mask);
 			FD_SET(sockfd, &mask);
 			res = select(sockfd + 1, &mask, NULL, NULL, &timeout);
 			//printf("%d %d\n", sockfd, res);
@@ -359,6 +358,7 @@ public:
 		p = NULL;
 
 #if	1	
+        FD_ZERO(&mask);
 		while(1)
 		{
 			if(nRecv >= blen)
@@ -367,7 +367,6 @@ public:
 			timeout.tv_sec = 1; 
 			timeout.tv_usec = 0;
 					
-			FD_ZERO(&mask);
 			FD_SET(sockfd, &mask);
 			res = select(sockfd + 1, &mask, NULL, NULL, &timeout);
             

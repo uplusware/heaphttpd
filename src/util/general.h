@@ -223,12 +223,12 @@ int __inline__ _Recv_(int sockfd, char* buf, unsigned int buf_len)
 	
 	int len;
 	unsigned int nRecv = 0;
+	FD_ZERO(&mask);
 	while(1)
 	{
 		timeout.tv_sec = WAIT_TIME_INTERVAL; 
 		timeout.tv_usec = 0;
 
-		FD_ZERO(&mask);
 		FD_SET(sockfd, &mask);
 		res = select(sockfd + 1, &mask, NULL, NULL, &timeout);
 		
@@ -283,13 +283,12 @@ int __inline__ _Send_(int sockfd, const char * buf, unsigned int buf_len)
 	struct timeval timeout; 
 	
 	unsigned int nSend = 0;
-	
+	FD_ZERO(&mask);	
 	while(1)
 	{
 		timeout.tv_sec = WAIT_TIME_INTERVAL; 
 		timeout.tv_usec = 0;
 
-		FD_ZERO(&mask);
 		FD_SET(sockfd, &mask);
 		
 		res = select(sockfd + 1, NULL, &mask, NULL, &timeout);
@@ -361,12 +360,12 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
 	
 	int len;
 	unsigned int nRecv = 0;
+	FD_ZERO(&mask);
 	while(1)
 	{
 		timeout.tv_sec = WAIT_TIME_INTERVAL; 
 		timeout.tv_usec = 0;
 
-		FD_ZERO(&mask);
 		FD_SET(sockfd, &mask);
 		res = select(sockfd + 1, &mask, NULL, NULL, &timeout);
 		
@@ -461,13 +460,13 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
 	struct timeval timeout; 
 	int ret;
 	unsigned int nSend = 0;
+	FD_ZERO(&mask);
 	
 	while(1)
 	{
 		timeout.tv_sec = WAIT_TIME_INTERVAL; 
 		timeout.tv_usec = 0;
 
-		FD_ZERO(&mask);
 		FD_SET(sockfd, &mask);
 		
 		res = select(sockfd + 1, NULL, &mask, NULL, &timeout);

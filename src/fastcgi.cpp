@@ -93,7 +93,6 @@ int FastCGI::Connect()
 
     }
     
-    // printf("connect res: %d\n", res);
 
 	timeout.tv_sec = 10; 
 	timeout.tv_usec = 0;      
@@ -105,7 +104,6 @@ int FastCGI::Connect()
 	FD_SET(m_sockfd, &mask_w);
 	res = select(m_sockfd + 1, &mask_r, &mask_w, NULL, &timeout);
 	
-	// printf("select res: %d\n", res);
 	if( res != 1) 
 	{
 		close(m_sockfd);
