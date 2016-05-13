@@ -744,8 +744,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 					{
 						continue;
 					}
-                    //printf("clt_sockfd: %d\n", clt_sockfd);
-					string client_ip = inet_ntoa(clt_addr.sin_addr);
+                    string client_ip = inet_ntoa(clt_addr.sin_addr);
 					int access_result;
 					if(CHttpBase::m_permit_list.size() > 0)
 					{
@@ -810,9 +809,10 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 
 						sem_post(&STATIC_THREAD_POOL_SEM);
 #else					
-						int next_process_index = m_next_process % m_work_processes.size();
+						unsigned long dst_process_index = ntohl(inet_addr(client_ip.c_str())) % m_work_processes.size(); 
+					    /* m_next_process % m_work_processes.size(); */
 						char pid_file[1024];
-						sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid", m_service_name.c_str(), next_process_index);
+						sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid", m_service_name.c_str(), dst_process_index);
 						if(check_pid_file(pid_file) == true) /* The related process had crashed */
 						{
 						    WORK_PROCESS_INFO  wpinfo;
@@ -827,7 +827,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 									exit(-1);
 								}
 								close(wpinfo.sockfds[0]);
-								Worker * pWorker = new Worker(m_service_name.c_str(), next_process_index,
+								Worker * pWorker = new Worker(m_service_name.c_str(), dst_process_index,
 								    CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
 								pWorker->Working();
 								delete pWorker;
@@ -838,7 +838,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 							{
 								close(wpinfo.sockfds[1]);
 								wpinfo.pid = work_pid;
-								m_work_processes[next_process_index] = wpinfo;
+								m_work_processes[dst_process_index] = wpinfo;
 							}
 							else
 							{
@@ -862,8 +862,8 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
             		    client_param.client_cer_check = CHttpBase::m_client_cer_check;
 
 						client_param.ctrl = SessionParamData;
-						SEND_FD(m_work_processes[next_process_index].sockfds[0], clt_sockfd, &client_param);
-						m_next_process++;
+						SEND_FD(m_work_processes[dst_process_index].sockfds[0], clt_sockfd, &client_param);
+						/* m_next_process++; */
 #endif /* CYGWIN */
 		
 					}

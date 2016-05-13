@@ -123,12 +123,14 @@ public:
 	void _save_session_vars_();
 	void _reload_session_vars_();
 	void reload_session_vars();
+	void save_session_vars();
 	void push_session_var(const char* uid, const char* name, const char* value);
 	int  get_session_var(const char* uid, const char* name, string& value);
 	void clear_session_vars();
 	
     void _save_server_vars_();
     void _reload_server_vars_();
+    void save_server_vars();
 	void reload_server_vars();
 	void push_server_var(const char* name, const char* value);
 	int  get_server_var(const char* name, string& value);

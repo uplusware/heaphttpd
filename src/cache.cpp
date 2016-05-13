@@ -77,6 +77,13 @@ void memory_cache::push_session_var( const char* uid, const char* name, const ch
         m_session_vars.erase(iter);
     m_session_vars.insert(map<session_var_key, session_var*>::value_type(session_var_key(uid, name), pVar));
     //Save session vars for other process for synchronization
+    /* _save_session_vars_(); */
+    pthread_rwlock_unlock(&m_session_var_rwlock);
+}
+
+void memory_cache::save_session_vars()
+{
+    pthread_rwlock_wrlock(&m_session_var_rwlock);
     _save_session_vars_();
     pthread_rwlock_unlock(&m_session_var_rwlock);
 }
@@ -84,7 +91,7 @@ void memory_cache::push_session_var( const char* uid, const char* name, const ch
 int  memory_cache::get_session_var(const char* uid, const char * name, string& value)
 {
     int ret = -1;
-    reload_session_vars();
+    /* reload_session_vars(); */
     pthread_rwlock_rdlock(&m_session_var_rwlock);
     map<session_var_key, session_var*>::iterator iter = m_session_vars.find(session_var_key(uid, name));
     if(iter != m_session_vars.end())
@@ -244,6 +251,13 @@ void memory_cache::push_server_var(const char* name, const char* value)
         m_server_vars.erase(iter);
     m_server_vars.insert(map<string, server_var*>::value_type(name, pVar));
     //Save server vars for other process for synchronization
+    _save_server_vars_();
+    pthread_rwlock_unlock(&m_server_var_rwlock);
+}
+
+void memory_cache::save_server_vars()
+{
+    pthread_rwlock_wrlock(&m_server_var_rwlock);
     _save_server_vars_();
     pthread_rwlock_unlock(&m_server_var_rwlock);
 }
@@ -711,6 +725,8 @@ void memory_cache::access_cookie(const char* name)
 void memory_cache::unload()
 {
     save_cookies();
+    save_session_vars();
+    save_server_vars();
     clear_cookies();
     clear_files();
     clear_session_vars();
