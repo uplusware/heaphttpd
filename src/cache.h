@@ -172,6 +172,8 @@ private:
     pthread_rwlock_t m_session_var_rwlock;
     pthread_rwlock_t m_server_var_rwlock;
     pthread_rwlock_t m_file_rwlock;
+    map<string, unsigned long> m_server_vars_file_versions;
+    //map<string, unsigned long> m_session_vars_file_versions;
 };
 
 class cache_instance

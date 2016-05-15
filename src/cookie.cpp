@@ -9,7 +9,7 @@ Cookie::Cookie()
 
 Cookie::Cookie(const char* szName, const char* szValue,
     int nMaxAge, const char* szExpires, const char* szPath, const char* szDomain, 
-    BOOL bSecure, BOOL bHttpOnly)
+    BOOL bSecure, BOOL bHttpOnly, const char* szVersion)
 {
     m_Name = (szName == NULL ? "" : szName);
     m_Value = (szValue == NULL ? "" : szValue);
@@ -19,7 +19,7 @@ Cookie::Cookie(const char* szName, const char* szValue,
     m_MaxAge = nMaxAge;
     m_Secure = bSecure;
     m_HttpOnly = bHttpOnly;
-    
+    m_Version = (szVersion == NULL ? "1" : szVersion);
     m_CreateTime = time(NULL);
     m_AccessTime = time(NULL);
 }
@@ -61,7 +61,12 @@ Cookie::Cookie(const char* szSetCookie)
         }
         else
         {
-            if(strncasecmp(strField.c_str(), "Expires", strlen("Expires")) == 0)
+            if(strncasecmp(strField.c_str(), "Version", strlen("Version")) == 0)
+		    {
+			    strcut(strField.c_str(), "=", NULL, m_Version);
+			    strtrim(m_Version);
+		    }
+		    else if(strncasecmp(strField.c_str(), "Expires", strlen("Expires")) == 0)
 		    {
 			    strcut(strField.c_str(), "=", NULL, m_Expires);
 			    strtrim(m_Expires);
@@ -126,6 +131,12 @@ void Cookie::toString(string & strCookie)
 	strCookie += "=";
 	strCookie += m_Value;
 	strCookie += ";";
+	if(m_Version != "")
+	{
+	    strCookie += " Version=";
+	    strCookie += m_Version;
+	    strCookie += ";";
+	}
 	if(m_MaxAge != -1)
 	{
 	    char szMaxAge[64];

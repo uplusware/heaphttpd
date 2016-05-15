@@ -37,8 +37,13 @@ void memory_cache::push_cookie(const char * name, Cookie & ck)
     pthread_rwlock_wrlock(&m_cookie_rwlock);
     map<string, Cookie>::iterator iter = m_cookies.find(name);
     if(iter != m_cookies.end())
-        m_cookies.erase(iter);
-    m_cookies.insert(map<string, Cookie>::value_type(name, ck));
+    {
+        iter->second = ck;
+    }
+    else
+    {
+        m_cookies.insert(map<string, Cookie>::value_type(name, ck));
+    }
     //Save cookie for other process for synchronization
     _save_cookies_();
     pthread_rwlock_unlock(&m_cookie_rwlock);
@@ -74,8 +79,11 @@ void memory_cache::push_session_var( const char* uid, const char* name, const ch
     
     map<session_var_key, session_var*>::iterator iter = m_session_vars.find(session_var_key(uid, name));
     if(iter != m_session_vars.end())
-        m_session_vars.erase(iter);
-    m_session_vars.insert(map<session_var_key, session_var*>::value_type(session_var_key(uid, name), pVar));
+    {
+        iter->second = pVar;
+    }
+    else
+        m_session_vars.insert(map<session_var_key, session_var*>::value_type(session_var_key(uid, name), pVar));
     //Save session vars for other process for synchronization
     /* _save_session_vars_(); */
     pthread_rwlock_unlock(&m_session_var_rwlock);
@@ -111,8 +119,8 @@ void memory_cache::_save_session_vars_()
 	    char szSessionVarFilePrefix[256];
 	    sprintf(szSessionVarFilePrefix, "%s-%d-", m_service_name.c_str(), m_process_seq);
 	
-	    sprintf(szSessionVarFile, "%s/variable/%s%08x.session", m_dirpath.c_str(), 
-	        szSessionVarFilePrefix, time(NULL)/86400);
+	    sprintf(szSessionVarFile, "%s/variable/%s%05u.session", m_dirpath.c_str(), 
+	        szSessionVarFilePrefix, getpid());
 	    ofstream* session_var_stream = NULL;
 	                      
 	    map<session_var_key, session_var*>::iterator iter_s;
@@ -215,11 +223,13 @@ void memory_cache::_reload_session_vars_()
                             && iter->second->getCreateTime() < session_var_instance->getCreateTime())
                         {
                             if(iter->second)
-                                delete iter->second;
-                            m_session_vars.erase(iter);/* Remove the older one */
+                                delete iter->second; /* Remove the older one */
+                            iter->second = session_var_instance;
+                            /*
+                            m_session_vars.erase(iter);
 					        m_session_vars.insert(map<session_var_key, session_var*>::value_type(
 					            session_var_key(session_var_instance->getUID(), session_var_instance->getName()),
-					            session_var_instance));
+					            session_var_instance)); */
 					    }
 					    else
 					    {
@@ -248,8 +258,12 @@ void memory_cache::push_server_var(const char* name, const char* value)
     server_var* pVar = new server_var(name, value);
     map<string, server_var*>::iterator iter = m_server_vars.find(name);
     if(iter != m_server_vars.end())
-        m_server_vars.erase(iter);
-    m_server_vars.insert(map<string, server_var*>::value_type(name, pVar));
+    {
+        /* m_server_vars.erase(iter); */
+        iter->second = pVar;
+    }
+    else
+        m_server_vars.insert(map<string, server_var*>::value_type(name, pVar));
     //Save server vars for other process for synchronization
     _save_server_vars_();
     pthread_rwlock_unlock(&m_server_var_rwlock);
@@ -274,7 +288,6 @@ int  memory_cache::get_server_var(const char * name, string& value)
         value = iter->second->getValue();
         ret = 0;
     }
-    
     pthread_rwlock_unlock(&m_server_var_rwlock);
     return ret;
 }
@@ -287,8 +300,13 @@ void memory_cache::_save_server_vars_()
 	    char szServerVarFilePrefix[256];
 	    sprintf(szServerVarFilePrefix, "%s-%d-", m_service_name.c_str(), m_process_seq);
 	
-	    sprintf(szServerVarFile, "%s/variable/%s%08x.server", m_dirpath.c_str(), 
-	        szServerVarFilePrefix, time(NULL)/86400);
+	    sprintf(szServerVarFile, "%s/variable/%s%05u.server", m_dirpath.c_str(), 
+	        szServerVarFilePrefix, getpid());
+	    
+	    unsigned long nVersion = 0;
+	    map<string, unsigned long>::iterator iter_ver = m_server_vars_file_versions.find(szServerVarFile);
+	    if(iter_ver!=  m_server_vars_file_versions.end())
+	        nVersion = iter_ver->second;
 	    ofstream* server_var_stream = NULL;
 	                      
 	    map<string, server_var*>::iterator iter_s;
@@ -297,13 +315,17 @@ void memory_cache::_save_server_vars_()
             if(!server_var_stream)
             {
                 server_var_stream = new ofstream(szServerVarFile, ios::out | ios::binary | ios::trunc);
-            }
-            if(server_var_stream && !server_var_stream->is_open())
-            {
-                delete server_var_stream;
-                continue;
-            }
-            
+                if(!server_var_stream || !server_var_stream->is_open())
+                    break;
+                //Write the version in the first line
+           	    nVersion++;
+           	    m_server_vars_file_versions[szServerVarFile] = nVersion;
+           	    
+                char szVersion[256];
+                sprintf(szVersion, "#%lu", nVersion);
+                server_var_stream->write(szVersion, strlen(szVersion));
+                server_var_stream->write("\n", 1);
+            }            
             char szTime[256];
             sprintf(szTime, "%d", iter_s->second->getCreateTime());
             server_var_stream->write(szTime, strlen(szTime));
@@ -329,8 +351,6 @@ void memory_cache::_save_server_vars_()
 
 void memory_cache::_reload_server_vars_()
 {
-    m_server_vars.clear();
-    
     char szVarFolder[256];
 	sprintf(szVarFolder, "%s/variable", m_dirpath.c_str());
 	
@@ -359,28 +379,49 @@ void memory_cache::_reload_server_vars_()
 			        string strFilePath = m_dirpath.c_str();
 			        strFilePath += "/variable/";
 			        strFilePath += strFileName;
+			        
+			        unsigned long nOldVersion = 0;
+	                map<string, unsigned long>::iterator iter_ver = m_server_vars_file_versions.find(strFilePath);
+            	    if(iter_ver!=  m_server_vars_file_versions.end())
+	                    nOldVersion = iter_ver->second;
+	        
 			        ifstream* server_vars_stream = new ifstream(strFilePath.c_str(), ios_base::binary);;
 			        string strline;
-			        if(server_vars_stream && !server_vars_stream->is_open())
-			        {
-				        delete server_vars_stream;
-				        continue;
-			        }
-			        while(server_vars_stream && getline(*server_vars_stream, strline))
+			        while(server_vars_stream  && server_vars_stream->is_open() && getline(*server_vars_stream, strline))
 			        {
 				        strtrim(strline);
 				        if(strline == "")
+				        {
 					        continue;
+					    }
+					    else if(strline[0] == '#')
+					    {
+					        unsigned long nNewVersion;
+					        sscanf(strline.c_str(), "#%lu", &nNewVersion);
+					        
+					        if(nOldVersion == nNewVersion) /* Skip when version are same. */
+					        {
+					            break;
+					        }
+					        else
+					        {
+					            m_server_vars_file_versions[strFilePath.c_str()] = nNewVersion;
+					            continue;
+					        }
+					    }
 					    server_var* server_var_instance = new server_var(strline.c_str());
 					    map<string, server_var*>::iterator iter = m_server_vars.find(server_var_instance->getName());
                         if(iter != m_server_vars.end() 
                             && iter->second->getCreateTime() < server_var_instance->getCreateTime())
                         {
                             if(iter->second)
-                                delete iter->second;
-                            m_server_vars.erase(iter); /* Remove the older one */
+                                delete iter->second;  /* Remove the older one */
+                            iter->second = server_var_instance;
+                            
+                            /*
+                            m_server_vars.erase(iter);
 					        m_server_vars.insert(map<string, server_var*>::value_type(
-					            server_var_instance->getName(), server_var_instance));
+					            server_var_instance->getName(), server_var_instance));*/
 					    }
 					    else
 					    {
@@ -388,6 +429,12 @@ void memory_cache::_reload_server_vars_()
 					            server_var_instance->getName(), server_var_instance));
 					    }
 			        }
+			        if(server_vars_stream && server_vars_stream->is_open())
+			        {
+                        server_vars_stream->close();
+			        }
+			        if(server_vars_stream)
+			            delete server_vars_stream;
 			    }
 		    }
 	    }
@@ -609,8 +656,12 @@ void memory_cache::_reload_cookies_()
                         if(iter != m_cookies.end() 
                             && iter->second.getCreateTime() < cookie_instance.getCreateTime())
                         {
-                            m_cookies.erase(iter); /* Remove the older one */
+                            /* Remove the older one */
+                            /*
+                            m_cookies.erase(iter); 
 					        m_cookies.insert(map<string, Cookie>::value_type(cookie_instance.getName(), cookie_instance));
+					        */
+					        iter->second = cookie_instance;
 					    }
 					    else
 					    {

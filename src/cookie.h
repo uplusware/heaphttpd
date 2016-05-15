@@ -22,7 +22,7 @@ public:
     Cookie();
     Cookie(const char* szName, const char* szValue,
         int nMaxAge, const char* szExpires, const char* szPath, const char* szDomain, 
-        BOOL bSecure, BOOL bHttpOnly);
+        BOOL bSecure = FALSE, BOOL bHttpOnly = FALSE, const char* szVersion = "1");
     Cookie(const char* szSetCookie);
     virtual ~Cookie();
     
@@ -40,6 +40,7 @@ private:
     
     string m_Name;
     string m_Value;
+    string m_Version;
     string m_Domain;
     string m_Expires;
     string m_Path;
