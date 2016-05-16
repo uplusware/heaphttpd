@@ -42,13 +42,13 @@ int FastCGI::Connect()
 	int err_code = 1;
 	int err_code_len = sizeof(err_code);
 	int res;
-	struct sockaddr_in ser_addr;
+	struct sockaddr_in6 ser_addr;
     struct sockaddr_un ser_unix;
 
 	fd_set mask_r, mask_w; 
 	struct timeval timeout; 
 	
-	m_sockfd = socket(m_sockType == INET_SOCK ? AF_INET : AF_UNIX, SOCK_STREAM, 0);
+	m_sockfd = socket(m_sockType == INET_SOCK ? AF_INET6 : AF_UNIX, SOCK_STREAM, 0);
 	if(m_sockfd < 0)
 	{
 		err_msg = "system error\r\n";
@@ -60,11 +60,19 @@ int FastCGI::Connect()
 	
     if(m_sockType == INET_SOCK)
     {
-	    ser_addr.sin_family = AF_INET;
-	    ser_addr.sin_port = htons(m_nPort);
-	    ser_addr.sin_addr.s_addr = inet_addr(m_strIP.c_str());
-
-        res = connect(m_sockfd, (struct sockaddr*)&ser_addr,sizeof(struct sockaddr));
+	    ser_addr.sin6_family = AF_INET6;
+	    ser_addr.sin6_port = htons(m_nPort);
+	    string stripv6;
+	    if(m_strIP.find(":") == string::npos)
+	    {
+	        stripv6 = "::ffff:";
+	        stripv6 += m_strIP;
+	    }
+	    else
+	        stripv6 = m_strIP;
+	    inet_pton(AF_INET6, stripv6.c_str(), &ser_addr.sin6_addr);
+	    /* printf("%s\n", stripv6.c_str()); */
+        res = connect(m_sockfd, (struct sockaddr*)&ser_addr, sizeof(struct sockaddr_in6));
     }
     else
     {
