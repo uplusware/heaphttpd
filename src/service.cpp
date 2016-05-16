@@ -767,7 +767,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
                         continue;
                     }
                     string client_ip;
-                    if(strncmp(szclientip, "::ffff:", 7) == 0)
+                    if(strncmp(szclientip, "::ffff:", 7) == 0 && strstr(szclientip, ".") != NULL)
                     {
                         client_ip = szclientip + 7;
                     }
