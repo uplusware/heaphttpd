@@ -120,7 +120,7 @@ BOOL CHttpBase::LoadConfig()
 			{
 				strcut(strline.c_str(), "=", NULL, m_hostip );
 				strtrim(m_hostip);
-				//printf("[%s]\n", m_hostip.c_str());
+				/* printf("[%s]\n", m_hostip.c_str()); */
 			}
 			else if(strncasecmp(strline.c_str(), "InstanceNum", strlen("InstanceNum")) == 0)
 			{
@@ -128,7 +128,7 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, maxconn );
 				strtrim(maxconn);
 				m_max_instance_num = atoi(maxconn.c_str());
-				//printf("%d\n", m_max_conn);
+				/* printf("%d\n", m_max_instance_num); */
 			}
 			else if(strncasecmp(strline.c_str(), "InstanceThreadNum", strlen("InstanceThreadNum")) == 0)
 			{
@@ -257,6 +257,7 @@ BOOL CHttpBase::LoadConfig()
 			{
 				printf("%s\n", strline.c_str());
 			}
+			strline = "";
 		}
 		
 	}
