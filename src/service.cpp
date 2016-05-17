@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <semaphore.h>
@@ -619,42 +620,50 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 	{		
 		int nFlag;
 		
-		struct sockaddr_in6 svr_addr;
+		struct addrinfo hints;
+        struct addrinfo *server_addr, *rp;
+        
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+        hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+        hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+        hints.ai_protocol = 0;          /* Any protocol */
+        hints.ai_canonname = NULL;
+        hints.ai_addr = NULL;
+        hints.ai_next = NULL;
+        
+        char szPort[32];
+        sprintf(szPort, "%u", nPort);
+                
+        int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort, &hints, &server_addr);
+        if (s != 0)
+        {
+           fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+           break;
+        }
+        
+        for (rp = server_addr; rp != NULL; rp = rp->ai_next)
+        {
+           m_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+           if (m_sockfd == -1)
+               continue;
+           
+           nFlag = 1;
+		   setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
 		
-		bzero(&svr_addr, sizeof(struct sockaddr_in6));
-		
-		m_sockfd = socket(AF_INET6, SOCK_STREAM, 0);
-		
-		svr_addr.sin6_family = AF_INET6;
-		svr_addr.sin6_port = htons(nPort);
-		        
-		if(hostip && hostip[0] != '\0')
-		{
-		    string stripv6;
-	        if(strstr(hostip, ":") == NULL)
-	        {
-	            stripv6 = "::ffff:";
-	            stripv6 += hostip;
-	        }
-	        else
-	            stripv6 = hostip;
-	        
-		    inet_pton(AF_INET6, stripv6.c_str(), &svr_addr.sin6_addr);
-    	}
-		else
-		    svr_addr.sin6_addr = in6addr_any;
-		
-		nFlag =1;
-		setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
-		
-		if(bind(m_sockfd, (struct sockaddr*)&svr_addr, sizeof(struct sockaddr_in6)) == -1)
-		{
-			uTrace.Write(Trace_Error, "Service BIND error, Port: %d.", nPort);
-			result = 1;
-			write(fd, &result, sizeof(unsigned int));
-			close(fd);
-			break;
-		}
+           if (bind(m_sockfd, rp->ai_addr, rp->ai_addrlen) == 0)
+               break;                  /* Success */
+
+           close(m_sockfd);
+        }
+        
+        if (rp == NULL)
+        {               /* No address succeeded */
+              fprintf(stderr, "Could not bind\n");
+              break;
+        }
+
+        freeaddrinfo(server_addr);           /* No longer needed */
 		
 		nFlag = fcntl(m_sockfd, F_GETFL, 0);
 		fcntl(m_sockfd, F_SETFL, nFlag|O_NONBLOCK);
@@ -746,13 +755,13 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 			}
 			else if(rc == 1)
 			{
-				struct sockaddr_in6 clt_addr;
-				socklen_t clt_size = sizeof(struct sockaddr_in6);
+				struct sockaddr_storage clt_addr;
+				struct sockaddr_in * v4_addr;
+				struct sockaddr_in6 * v6_addr;
+				socklen_t clt_size = sizeof(struct sockaddr_storage);
 				int clt_sockfd;
 				if(FD_ISSET(m_sockfd, &accept_mask))
 				{
-					
-					CHttpBase::m_global_uid++;
 					clt_sockfd = accept(m_sockfd, (sockaddr*)&clt_addr, &clt_size);
 
 					if(clt_sockfd < 0)
@@ -761,22 +770,30 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 					}
 					
 					char szclientip[INET6_ADDRSTRLEN];
-					if(inet_ntop(AF_INET6, (void*)&clt_addr.sin6_addr, szclientip, INET6_ADDRSTRLEN) == NULL)
-				    {    
-                        close(clt_sockfd);
-                        continue;
+					if (clt_addr.ss_family == AF_INET)
+					{
+					    v4_addr = (struct sockaddr_in*)&clt_addr;
+                        if(inet_ntop(AF_INET, (void*)&v4_addr->sin_addr, szclientip, INET6_ADDRSTRLEN) == NULL)
+				        {    
+                            close(clt_sockfd);
+                            continue;
+                        }
+                        m_next_process = ntohl(v4_addr->sin_addr.s_addr) % m_work_processes.size(); 
                     }
-                    string client_ip;
-                    if(strncmp(szclientip, "::ffff:", 7) == 0 && strstr(szclientip, ".") != NULL)
+                    else if(clt_addr.ss_family == AF_INET6)
                     {
-                        client_ip = szclientip + 7;
+                        v6_addr = (struct sockaddr_in6*)&clt_addr;
+                        if(inet_ntop(AF_INET6, (void*)&v6_addr->sin6_addr, szclientip, INET6_ADDRSTRLEN) == NULL)
+				        {    
+                            close(clt_sockfd);
+                            continue;
+                        }
+                        m_next_process = ntohl(v6_addr->sin6_addr.s6_addr32[3]) % m_work_processes.size(); 
                     }
-                    else
-                    {
-                        client_ip = szclientip;
-                    }
+					
+                    string client_ip = szclientip;
                                       
-                    /* printf("%s\n", client_ip.c_str()); */
+                     printf("%s\n", client_ip.c_str());
 					int access_result;
 					if(CHttpBase::m_permit_list.size() > 0)
 					{
@@ -842,9 +859,10 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 						sem_post(&STATIC_THREAD_POOL_SEM);
 #else					                    
                         /* printf("%08x\n", ntohl(clt_addr.sin6_addr.s6_addr32[3])); */
-						unsigned long dst_process_index = ntohl(clt_addr.sin6_addr.s6_addr32[3]) % m_work_processes.size(); 
+						
 						char pid_file[1024];
-						sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid", m_service_name.c_str(), dst_process_index);
+						sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid",
+						    m_service_name.c_str(), m_next_process);
 						if(check_pid_file(pid_file) == true) /* The related process had crashed */
 						{
 						    WORK_PROCESS_INFO  wpinfo;
@@ -859,7 +877,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 									exit(-1);
 								}
 								close(wpinfo.sockfds[0]);
-								Worker * pWorker = new Worker(m_service_name.c_str(), dst_process_index,
+								Worker * pWorker = new Worker(m_service_name.c_str(), m_next_process,
 								    CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
 								pWorker->Working();
 								delete pWorker;
@@ -870,7 +888,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 							{
 								close(wpinfo.sockfds[1]);
 								wpinfo.pid = work_pid;
-								m_work_processes[dst_process_index] = wpinfo;
+								m_work_processes[m_next_process] = wpinfo;
 							}
 							else
 							{
@@ -894,7 +912,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
             		    client_param.client_cer_check = CHttpBase::m_client_cer_check;
 
 						client_param.ctrl = SessionParamData;
-						SEND_FD(m_work_processes[dst_process_index].sockfds[0], clt_sockfd, &client_param);
+						SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param);
 						/* m_next_process++; */
 #endif /* CYGWIN */
 		
@@ -932,3 +950,4 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 	
 	return 0;
 }
+
