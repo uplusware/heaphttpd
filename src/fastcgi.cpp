@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <stdio.h> 
 #include <sys/types.h> 
+#include <netdb.h>
 #include <sys/socket.h> 
 #include <netinet/in.h> 
 #include <arpa/inet.h>
@@ -60,19 +61,50 @@ int FastCGI::Connect()
 	
     if(m_sockType == INET_SOCK)
     {
-	    ser_addr.sin6_family = AF_INET6;
-	    ser_addr.sin6_port = htons(m_nPort);
-	    string stripv6;
-	    if(m_strIP.find(":") == string::npos)
-	    {
-	        stripv6 = "::ffff:";
-	        stripv6 += m_strIP;
-	    }
-	    else
-	        stripv6 = m_strIP;
-	    inet_pton(AF_INET6, stripv6.c_str(), &ser_addr.sin6_addr);
-	    /* printf("%s\n", stripv6.c_str()); */
-        res = connect(m_sockfd, (struct sockaddr*)&ser_addr, sizeof(struct sockaddr_in6));
+	    struct addrinfo hints;
+        struct addrinfo *server_addr, *rp;
+        
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+        hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+        hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+        hints.ai_protocol = 0;          /* Any protocol */
+        hints.ai_canonname = NULL;
+        hints.ai_addr = NULL;
+        hints.ai_next = NULL;
+        
+        char szPort[32];
+        sprintf(szPort, "%u", m_nPort);
+        int s = getaddrinfo(m_strIP != "" ? m_strIP.c_str() : NULL, szPort, &hints, &server_addr);
+        if (s != 0)
+        {
+           fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+           return FALSE;
+        }
+        
+        for (rp = server_addr; rp != NULL; rp = rp->ai_next)
+        {
+            m_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+            if (m_sockfd == -1)
+               continue;
+
+            int flags = fcntl(m_sockfd, F_GETFL, 0); 
+            fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK);
+
+            timeout.tv_sec = 10; 
+            timeout.tv_usec = 0;
+
+            connect(m_sockfd, rp->ai_addr, rp->ai_addrlen);
+            break;
+        }
+         
+        if (rp == NULL)
+        {
+            err_msg = "system error\r\n";
+		    return -1;
+        }
+
+        freeaddrinfo(server_addr);           /* No longer needed */
     }
     else
     {
@@ -97,8 +129,7 @@ int FastCGI::Connect()
     	strcpy(ser_unix.sun_path, m_strSockfile.c_str());
     	size = offsetof(struct sockaddr_un, sun_path) + strlen(ser_unix.sun_path);
 
-        res = connect(m_sockfd, (struct sockaddr*)&ser_unix, size);
-
+        connect(m_sockfd, (struct sockaddr*)&ser_unix, size);
     }
     
 
