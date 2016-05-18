@@ -79,11 +79,12 @@ void CHttpBase::SetConfigFile(const char* config_file, const char* permit_list_f
 
 BOOL CHttpBase::LoadConfig()
 {	
+
 	m_permit_list.clear();
 	m_reject_list.clear();
 	
 	ifstream configfilein(m_config_file.c_str(), ios_base::binary);
-	string strline;
+	string strline = "";
 	if(!configfilein.is_open())
 	{
 		printf("%s is not exist.", m_config_file.c_str());

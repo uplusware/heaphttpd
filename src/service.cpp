@@ -74,7 +74,8 @@ int SEND_FD(int sfd, int fd_file, CLIENT_PARAM* param)
     iov[0].iov_base = param;  
     iov[0].iov_len = sizeof(CLIENT_PARAM);  
     msg.msg_iov = iov;  
-    msg.msg_iovlen = 1;  
+    msg.msg_iovlen = 1;
+
     return sendmsg(sfd, &msg, 0); 
 
 }
@@ -97,11 +98,14 @@ int RECV_FD(int sfd, int* fd_file, CLIENT_PARAM* param)
     iov[0].iov_base = param;  
     iov[0].iov_len = sizeof(CLIENT_PARAM);  
     msg.msg_iov = iov;  
-    msg.msg_iovlen = 1;  
+    msg.msg_iovlen = 1;
+
     if((nrecv = recvmsg(sfd, &msg, 0)) <= 0)  
     {  
+
         return nrecv;  
     }
+
     cmptr = CMSG_FIRSTHDR(&msg);  
     if((cmptr != NULL) && (cmptr->cmsg_len == CMSG_LEN(sizeof(int))))  
     {  
@@ -349,6 +353,7 @@ static void CLEAR_QUEUE(mqd_t qid)
 //Worker
 Worker::Worker(const char* service_name, int process_seq, int thread_num, int sockfd)
 {
+
 	m_sockfd = sockfd;
 	m_thread_num = thread_num;
 	m_process_seq = process_seq;
@@ -372,6 +377,7 @@ void Worker::Working()
 	bool bQuit = false;
 	while(!bQuit)
 	{
+
 		int clt_sockfd;
 		CLIENT_PARAM client_param;
 		if(RECV_FD(m_sockfd, &clt_sockfd, &client_param)  < 0)
@@ -528,7 +534,7 @@ void Service::ReloadList()
 int Service::Run(int fd, const char* hostip, unsigned short nPort)
 {	
 	CUplusTrace uTrace(LOGNAME, LCKNAME);
-	CHttpBase::LoadConfig();
+	/* CHttpBase::LoadConfig(); */
 
 	m_child_list.clear();
 	unsigned int result = 0;
@@ -589,6 +595,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 		int work_pid = fork();
 		if(work_pid == 0)
 		{
+
 			if(lock_pid_file(pid_file) == false)
 			{
 				exit(-1);
@@ -634,7 +641,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
         
         char szPort[32];
         sprintf(szPort, "%u", nPort);
-                
+
         int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort, &hints, &server_addr);
         if (s != 0)
         {
@@ -778,7 +785,8 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
                             close(clt_sockfd);
                             continue;
                         }
-                        m_next_process = ntohl(v4_addr->sin_addr.s_addr) % m_work_processes.size(); 
+                        m_next_process = ntohl(v4_addr->sin_addr.s_addr) % m_work_processes.size();
+
                     }
                     else if(clt_addr.ss_family == AF_INET6)
                     {
@@ -789,11 +797,14 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
                             continue;
                         }
                         m_next_process = ntohl(v6_addr->sin6_addr.s6_addr32[3]) % m_work_processes.size(); 
+
+                    }
+                    else
+                    {
+                        m_next_process = 0; 
                     }
 					
                     string client_ip = szclientip;
-                                      
-                     printf("%s\n", client_ip.c_str());
 					int access_result;
 					if(CHttpBase::m_permit_list.size() > 0)
 					{
@@ -858,8 +869,6 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 
 						sem_post(&STATIC_THREAD_POOL_SEM);
 #else					                    
-                        /* printf("%08x\n", ntohl(clt_addr.sin6_addr.s6_addr32[3])); */
-						
 						char pid_file[1024];
 						sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid",
 						    m_service_name.c_str(), m_next_process);
@@ -913,7 +922,6 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 
 						client_param.ctrl = SessionParamData;
 						SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param);
-						/* m_next_process++; */
 #endif /* CYGWIN */
 		
 					}

@@ -24,11 +24,13 @@ memory_cache::memory_cache(const char* service_name, int process_seq, const char
 	
     pthread_rwlock_init(&m_cookie_rwlock, NULL);
     pthread_rwlock_init(&m_session_var_rwlock, NULL);
+    pthread_rwlock_init(&m_server_var_rwlock, NULL);
     pthread_rwlock_init(&m_file_rwlock, NULL);
-    
+
 	m_file_cache.clear();
 	m_cookies.clear();
 	m_session_vars.clear();
+	m_server_vars.clear();
 	m_type_table.clear();
 	m_file_cache_size = 0;
 }
@@ -40,6 +42,7 @@ memory_cache::~memory_cache()
 	pthread_rwlock_destroy(&m_file_rwlock);
 	pthread_rwlock_destroy(&m_cookie_rwlock);
 	pthread_rwlock_destroy(&m_session_var_rwlock);
+	pthread_rwlock_destroy(&m_server_var_rwlock);
 }
 
 //Cookie
@@ -855,16 +858,16 @@ void memory_cache::unload()
 {
     save_session_vars();
     save_server_vars();
-    
+
     clear_session_vars();
     clear_server_vars();
+
     clear_files();
 }
 
 void memory_cache::load()
 {
 	unload();
-	
 	reload_server_vars();
 	reload_session_vars();
 	
