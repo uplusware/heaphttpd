@@ -43,17 +43,17 @@ memory_cache::~memory_cache()
 }
 
 //Cookie
-void memory_cache::push_cookie(const char * name, Cookie & ck)
+void memory_cache::push_cookie(const char * name, Cookie* ck)
 {
     pthread_rwlock_wrlock(&m_cookie_rwlock);
-    map<string, Cookie>::iterator iter = m_cookies.find(name);
+    map<string, Cookie*>::iterator iter = m_cookies.find(name);
     if(iter != m_cookies.end())
     {
         iter->second = ck;
     }
     else
     {
-        m_cookies.insert(map<string, Cookie>::value_type(name, ck));
+        m_cookies.insert(map<string, Cookie*>::value_type(name, ck));
     }
     //Save cookie for other process for synchronization
     _save_cookies_();
@@ -63,17 +63,17 @@ void memory_cache::push_cookie(const char * name, Cookie & ck)
 void memory_cache::pop_cookie(const char * name)
 {
     pthread_rwlock_wrlock(&m_cookie_rwlock);
-    map<string, Cookie>::iterator iter = m_cookies.find(name);
+    map<string, Cookie*>::iterator iter = m_cookies.find(name);
     if(iter != m_cookies.end())
         m_cookies.erase(iter);
     pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 
-int memory_cache::get_cookie(const char * name, Cookie & ck)
+int memory_cache::get_cookie(const char * name, Cookie* ck)
 {
     int ret = -1;
     pthread_rwlock_rdlock(&m_cookie_rwlock);  
-    map<string, Cookie>::iterator iter = m_cookies.find(name);
+    map<string, Cookie*>::iterator iter = m_cookies.find(name);
     if(iter != m_cookies.end())
     {
         ck = iter->second;
@@ -719,21 +719,23 @@ void memory_cache::_reload_cookies_()
 				        strtrim(strline);
 				        if(strline == "")
 					        continue;
-					    Cookie cookie_instance(strline.c_str());
-					    map<string, Cookie>::iterator iter = m_cookies.find(cookie_instance.getName());
+					    Cookie* cookie_instance = new Cookie(strline.c_str());
+					    map<string, Cookie*>::iterator iter = m_cookies.find(cookie_instance->getName());
                         if(iter != m_cookies.end() 
-                            && iter->second.getCreateTime() < cookie_instance.getCreateTime())
+                            && iter->second->getCreateTime() < cookie_instance->getCreateTime())
                         {
                             /* Remove the older one */
                             /*
                             m_cookies.erase(iter); 
-					        m_cookies.insert(map<string, Cookie>::value_type(cookie_instance.getName(), cookie_instance));
+					        m_cookies.insert(map<string, Cookie*>::value_type(cookie_instance.getName(), cookie_instance));
 					        */
+					        if(iter->second)
+					            delete iter->second;
 					        iter->second = cookie_instance;
 					    }
 					    else
 					    {
-					        m_cookies.insert(map<string, Cookie>::value_type(cookie_instance.getName(), cookie_instance));
+					        m_cookies.insert(map<string, Cookie*>::value_type(cookie_instance->getName(), cookie_instance));
 					    }
 			        }
 			    }
@@ -762,28 +764,28 @@ void memory_cache::_save_cookies_()
 	        szCookieFilePrefix, m_localhostname.c_str());
 	    ofstream* cookie_stream = NULL;
 	                      
-	    map<string, Cookie>::iterator iter_c;
+	    map<string, Cookie*>::iterator iter_c;
 	    bool bSave = true;
 	    for(iter_c = m_cookies.begin(); iter_c != m_cookies.end(); iter_c++)
 	    {
 	        bSave = true;
-	        const char* szExpires = iter_c->second.getExpires();
+	        const char* szExpires = iter_c->second->getExpires();
 	        
 	        if(szExpires[0] != '\0' && time(NULL) > ParseCookieDateTimeString(szExpires))
 	        {
 	            bSave = false;
 	        }
-	        if(iter_c->second.getMaxAge() == -1 
-	            && (time(NULL) - iter_c->second.getAccessTime() > 90)) /* No-inactive http request, 90s for timeout*/
+	        if(iter_c->second->getMaxAge() == -1 
+	            && (time(NULL) - iter_c->second->getAccessTime() > 90)) /* No-inactive http request, 90s for timeout*/
 	        {
 	            bSave = false;
 	        }
-	        else if(iter_c->second.getMaxAge() == 0)
+	        else if(iter_c->second->getMaxAge() == 0)
 	        {
 	            bSave = false;
 	        }
-	        else if(iter_c->second.getMaxAge() > 0 
-	            && (time(NULL) - iter_c->second.getCreateTime() > iter_c->second.getMaxAge()))
+	        else if(iter_c->second->getMaxAge() > 0 
+	            && (time(NULL) - iter_c->second->getCreateTime() > iter_c->second->getMaxAge()))
 	        {
 	            bSave = false;    
 	        }
@@ -796,14 +798,14 @@ void memory_cache::_save_cookies_()
 	            if(!cookie_stream->is_open())
 	                break;
 	            string strCookie;
-	            iter_c->second.toString(strCookie);
+	            iter_c->second->toString(strCookie);
 	            
 	            char szTime[256];
-	            sprintf(szTime, "%d", iter_c->second.getCreateTime());
+	            sprintf(szTime, "%d", iter_c->second->getCreateTime());
 	            cookie_stream->write(szTime, strlen(szTime));
 	            cookie_stream->write(";", 1);
 	            
-    	        sprintf(szTime, "%d", iter_c->second.getAccessTime());
+    	        sprintf(szTime, "%d", iter_c->second->getAccessTime());
 	            cookie_stream->write(szTime, strlen(szTime));
 	            cookie_stream->write(";", 1);
 	            
@@ -829,15 +831,23 @@ void memory_cache::save_cookies()
 
 void memory_cache::clear_cookies()
 {
+    pthread_rwlock_wrlock(&m_cookie_rwlock);
+	map<string, Cookie*>::iterator iter_c;
+	for(iter_c = m_cookies.begin(); iter_c != m_cookies.end(); iter_c++)
+	{
+	    if(iter_c->second)
+    		delete iter_c->second;
+	}
     m_cookies.clear();
+	pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 
 void memory_cache::access_cookie(const char* name)
 {
     pthread_rwlock_wrlock(&m_cookie_rwlock);
-    map<string, Cookie>::iterator iter = m_cookies.find(name);
+    map<string, Cookie*>::iterator iter = m_cookies.find(name);
     if(iter != m_cookies.end())
-        iter->second.setAccessTime(time(NULL));
+        iter->second->setAccessTime(time(NULL));
     pthread_rwlock_unlock(&m_cookie_rwlock);
 }
 

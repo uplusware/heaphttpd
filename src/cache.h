@@ -116,9 +116,9 @@ public:
 	void clear_cookies();
 	void access_cookie(const char* name);
 	
-	void push_cookie(const char * name, Cookie & ck);
+	void push_cookie(const char * name, Cookie * ck);
 	void pop_cookie(const char * name);
-	int  get_cookie(const char * name, Cookie & ck);
+	int  get_cookie(const char * name, Cookie * ck);
 	
 	void _save_session_vars_();
 	void _reload_session_vars_();
@@ -164,7 +164,7 @@ private:
     string m_service_name;
     string m_dirpath;
     map<string, file_cache *>::iterator _find_oldest_file_();
-    map<string, Cookie> m_cookies;
+    map<string, Cookie*> m_cookies;
 	map<session_var_key, session_var*> m_session_vars;
 	map<string, server_var*> m_server_vars;
 	
