@@ -1,7 +1,7 @@
 # niuhttpd
 C++ web server framework
 
-Support API, CGI/FastCGI, PHP/PHP-FPM, WebSocket and MySQL and MongoDB
+Support API, CGI/FastCGI(Spawn-fcgi), PHP/PHP-FPM, web.py, WebSocket and MySQL and MongoDB
 
 Please refer the code sample in api, cgi and ws direcory for the 2ndary development.
 * Run release.sh to generate the intsallation files package
@@ -10,6 +10,7 @@ Please refer the code sample in api, cgi and ws direcory for the 2ndary developm
 * cd api and `make clean` then `make install MONGODB=1` (It's for MongoDB)
 * cd cgi and `make install` (it's for CGI code sample)
 * cd ws and `make install` (it's for WebSocket code sample)
+* cd webpy and `make install` (it's for web.py, need to install Spawn-fcgi)
 * /etc/init.d/niuhttpd start
 
 ##niu means 钮(niǔ).
