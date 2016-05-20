@@ -11,5 +11,4 @@ class hello:
 
 web.wsgi.runwsgi = lambda func, addr=None: web.wsgi.runfcgi(func, addr)
 if __name__ == "__main__":
-    web.webapi.internalerror = web.debugerror
     app.run()
