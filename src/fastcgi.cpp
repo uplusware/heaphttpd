@@ -75,6 +75,8 @@ int FastCGI::Connect()
         
         char szPort[32];
         sprintf(szPort, "%u", m_nPort);
+        
+        /*printf("fast-cgi: %s %s\n", m_strIP.c_str(), szPort);*/
         int s = getaddrinfo(m_strIP != "" ? m_strIP.c_str() : NULL, szPort, &hints, &server_addr);
         if (s != 0)
         {
@@ -301,7 +303,7 @@ int FastCGI::SendParams(map<string, string> &params_map)
 					name_value_pair44.valueLengthB3 = (value_len & 0xFF000000) >> 24;
 					Send((char*)&name_value_pair44, sizeof(FCGI_NameValuePair44));
 				}
-				//printf("%s = [%s]\n", it->first.c_str(), it->second.c_str());
+				/* printf("%s = [%s]\n", it->first.c_str(), it->second.c_str()); */
 				Send((char*)it->first.c_str(), it->first.length());
 				Send((char*)it->second.c_str(), it->second.length());
 			}
@@ -391,6 +393,7 @@ int FastCGI::Send_STDIN(const char* inbuf, unsigned long inbuf_len)
 	
 	if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
 	{
+	    /* printf("%s\n", inbuf); */
 		Send(inbuf, inbuf_len);
 		return 0;
 	}

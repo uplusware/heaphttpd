@@ -115,7 +115,8 @@ void Htdoc::Response()
             /* - WebSocket handshake finishes, begin to communication -*/
             
             string strResource = m_session->GetResource();
-	
+            strtrim(strResource, "/");
+	        //printf("%s\n", strResource.c_str());
             if(strResource != "")
             {
                 string strWSFunctionName = "ws_";
@@ -234,13 +235,19 @@ void Htdoc::Response()
     //printf("%s\n", strResource.c_str());
 	m_session->SetResource(strResource.c_str());
 	
-	if(strncmp(strResource.c_str(), "api/", 4) == 0)
+	string fcgi_name = "/";
+	fcgi_name += m_fastcgi_name;
+	fcgi_name += "/";
+	
+	if(strncmp(strResource.c_str(), "/api/", 5) == 0)
 	{
-        string strApiName = strResource.c_str() + 4;
+        string strApiName = strResource.c_str() + 5; /* length of "/api/" */
 		string strLibName = m_work_path.c_str();
 		strLibName += "/api/lib";
 		strLibName += strApiName;
 		strLibName += ".so";
+		
+		//printf("%s\n", strLibName.c_str());
 		
 		struct stat statbuf;
         if(stat(strLibName.c_str(), &statbuf) < 0)
@@ -255,7 +262,7 @@ void Htdoc::Response()
             return;
         }
                 
-		//printf("%s\n", strLibName.c_str());
+		
 		void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
 		if(!lhandle)
 		{
@@ -298,14 +305,115 @@ void Htdoc::Response()
 		}
 	
 	}
-	else if(strncmp(strResource.c_str(), "cgi-bin/", 7) == 0)
+	else if(strncmp(strResource.c_str(), fcgi_name.c_str(), fcgi_name.length()) == 0)
+    {
+    	string pyfile =  m_work_path.c_str();
+		pyfile += m_session->GetResource();
+		
+		//printf("%s\n", pyfile.c_str());
+		
+		//printf("%s\n", m_session->GetResource());
+		m_session->SetMetaVar("SCRIPT_FILENAME", m_fastcgi_pgm.c_str());
+		m_session->SetMetaVar("REDIRECT_STATUS", "200");
+		
+        FastCGI* fcgi = NULL;
+        if(strcasecmp(m_fastcgi_socktype.c_str(), "UNIX") == 0)
+            fcgi = new FastCGI(m_fastcgi_sockfile.c_str());
+        else
+			fcgi = new FastCGI(m_fastcgi_addr.c_str(), m_fastcgi_port);
+		if(fcgi && fcgi->Connect() == 0 && fcgi->BeginRequest(1) == 0)
+		{	
+			if(m_session->m_cgi.m_meta_var.size() > 0)
+				fcgi->SendParams(m_session->m_cgi.m_meta_var);
+			fcgi->SendEmptyParams();
+			if(m_session->m_cgi.GetDataLen() > 0)
+			{
+				fcgi->Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
+			}
+			fcgi->SendEmpty_STDIN();
+			
+			string strResponse, strHeader, strBody;
+			string strerr;
+			unsigned int appstatus;
+			unsigned char protocolstatus;
+			
+			int t = fcgi->RecvAppData(strResponse, strerr, appstatus, protocolstatus);
+			if(strResponse != "")
+			{
+				strcut(strResponse.c_str(), NULL, "\r\n\r\n", strHeader);
+				strcut(strResponse.c_str(), "\r\n\r\n", NULL, strBody);
+				
+				if(strHeader != "")
+				{
+					strHeader += "\r\n";
+				}
+				CHttpResponseHdr header;
+				header.SetStatusCode(SC200);
+				header.SetFields(strHeader.c_str());
+				
+				string strWanning, strParseError;
+				
+				//Replace the body with parse error
+				if(strParseError != "")
+				{
+					strBody = strParseError;
+				}
+				
+				//Append the warnning
+				if(strWanning != "")
+				{
+					strBody = strWanning + strBody;
+				}
+				header.SetField("Content-Length", strBody.length());
+				//printf("%s", header.Text());
+				m_session->SendHeader(header.Text(), header.Length());
+				if(strBody != "" && m_session->GetMethod() != hmHead)
+					m_session->SendContent(strBody.c_str(), strBody.length());
+			}
+			else
+			{
+				CHttpResponseHdr header;
+				header.SetStatusCode(SC500);
+				
+				header.SetField("Content-Type", "text/html");
+				header.SetField("Content-Length", header.GetDefaultHTMLLength());
+				
+				m_session->SendHeader(header.Text(), header.Length());
+				m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+			}
+		}
+		else
+		{
+			CHttpResponseHdr header;
+			header.SetStatusCode(SC500);
+			
+			header.SetField("Content-Type", "text/html");
+			header.SetField("Content-Length", header.GetDefaultHTMLLength());
+			
+			m_session->SendHeader(header.Text(), header.Length());
+			m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+		}
+        if(fcgi)
+            delete fcgi;
+    }
+	else if(strncmp(strResource.c_str(), "/cgi-bin/", 8) == 0)
 	{
-		string strcgipath =  m_work_path.c_str();
-		strcgipath += "/cgi-bin/";
-		strcgipath += m_session->GetCGIPgmName();
+	    string script_name;
+        string path_info;
         
+        strcut(m_session->GetResource(), NULL, ".cgi", script_name); 
+        strcut(m_session->GetResource(), ".cgi", NULL, path_info); 
+        script_name += ".cgi";
+        
+		string strcgipath =  m_work_path.c_str();
+		strcgipath += script_name;
+
 		if(access(strcgipath.c_str(), 01) != -1)
 		{
+		    //printf("SCRIPT_NAME: %s PATH_INFO: %s\n", script_name.c_str(), path_info.c_str());
+		    m_session->SetMetaVar("SCRIPT_NAME", script_name.c_str());
+  		    m_session->SetMetaVar("PATH_INFO", path_info.c_str());
+
             int fds[2];
             socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
     

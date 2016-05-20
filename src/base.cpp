@@ -44,6 +44,13 @@ unsigned short CHttpBase::m_fpm_port = 9000;
 string CHttpBase::m_fpm_sockfile = "/var/run/php5-fpm.sock";
 string CHttpBase::m_phpcgi_path = "/usr/bin/php-cgi";
 
+string  CHttpBase::m_fastcgi_name = "webpy";
+string  CHttpBase::m_fastcgi_pgm = "/var/niuhttpd/webpy/main.py";
+string  CHttpBase::m_fastcgi_socktype = "INET";
+string	CHttpBase::m_fastcgi_addr = "127.0.0.1";
+unsigned short CHttpBase::m_fastcgi_port = 9001;
+string CHttpBase::m_fastcgi_sockfile = "/var/run/webpy-fcgi.sock";
+
 volatile unsigned int CHttpBase::m_global_uid = 0;
 
 unsigned int CHttpBase::m_max_instance_num = 10;
@@ -254,6 +261,40 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, m_phpcgi_path);
 				strtrim(m_phpcgi_path);
 			}
+			/* Fast-CGI */
+			else if(strncasecmp(strline.c_str(), "FastCGIName", strlen("FastCGIName")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_fastcgi_name);
+				strtrim(m_fastcgi_name);
+			}
+			else if(strncasecmp(strline.c_str(), "FastCGIPgm", strlen("FastCGIPgm")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_fastcgi_pgm);
+				strtrim(m_fastcgi_pgm);
+			}
+			else if(strncasecmp(strline.c_str(), "FastCGISockType", strlen("FastCGISockType")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_fastcgi_socktype);
+				strtrim(m_fastcgi_socktype);
+			}
+			else if(strncasecmp(strline.c_str(), "FastCGIIPAddr", strlen("FastCGIIPAddr")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_fastcgi_addr);
+				strtrim(m_fastcgi_addr);
+			}
+			else if(strncasecmp(strline.c_str(), "FastCGIPort", strlen("FastCGIPort")) == 0)
+			{
+				string fastcgi_port;
+				strcut(strline.c_str(), "=", NULL, fastcgi_port);
+				strtrim(fastcgi_port);
+				m_fastcgi_port = atoi(fastcgi_port.c_str());
+			}
+            else if(strncasecmp(strline.c_str(), "FastCGISockFile", strlen("FastCGISockFile")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_fastcgi_sockfile);
+				strtrim(m_fastcgi_sockfile);
+			}
+			
 			else
 			{
 				printf("%s\n", strline.c_str());

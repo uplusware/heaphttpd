@@ -36,6 +36,9 @@ public:
 		const char* work_path, const char* php_mode, 
         const char* fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
+        const char* fastcgi_name, const char* fastcgi_pgm, 
+        const char* fastcgi_socktype, const char* fastcgi_sockfile,
+        const char* fastcgi_addr, unsigned short fastcgi_port,
         const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme = asNone,
 		SSL* ssl = NULL);
 	virtual ~CHttp();
@@ -89,11 +92,6 @@ public:
 		return m_http_method;
 	}
 	
-	const char* GetCGIPgmName()
-	{
-		return m_cgi_pgm.c_str();
-	}
-	
     const char* GetRequestField(const char* name)
     {
         return m_request_hdr.GetField(name);
@@ -123,7 +121,7 @@ public:
 private:
     int HttpSend(const char* buf, int len);
     int HttpRecv(char* buf, int len);
-
+    void ParseMethod(const string & strtext);
 protected:
 	SSL* m_ssl;
 	
@@ -133,7 +131,7 @@ protected:
 
 	Http_Method m_http_method;
 	string m_resource;
-	
+	string m_uri;
 	string m_querystring;
 	string m_postdata;
 	
@@ -158,15 +156,21 @@ protected:
 	string m_php_mode;
     string m_fpm_socktype;
     string m_fpm_sockfile;
-
 	string m_fpm_addr;
 	unsigned short m_fpm_port;
     string m_phpcgi_path;
     string m_private_path;
+
+	string m_fastcgi_name;
+    string m_fastcgi_pgm;    
+    string m_fastcgi_socktype;
+    string m_fastcgi_sockfile;
+	string m_fastcgi_addr;
+	unsigned short m_fastcgi_port;
+    
     unsigned int m_global_uid;
     
     CHttpRequestHdr m_request_hdr;
-	string m_cgi_pgm;
 	
 	BOOL m_passed_wwwauth;
 	AUTH_SCHEME m_wwwauth_scheme;

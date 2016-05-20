@@ -30,7 +30,10 @@ const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DEL
 CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport, const char* clientip, memory_cache* ch,
 	const char* work_path, const char* php_mode, 
     const char* fpm_socktype, const char* fpm_sockfile,
-    const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path, 
+    const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
+    const char* fastcgi_name, const char* fastcgi_pgm,  
+    const char* fastcgi_socktype, const char* fastcgi_sockfile,
+    const char* fastcgi_addr, unsigned short fastcgi_port,
 	const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme, 
 	SSL* ssl)
 {
@@ -70,10 +73,17 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	m_php_mode = php_mode;
     m_fpm_socktype = fpm_socktype;
     m_fpm_sockfile = fpm_sockfile;
-
 	m_fpm_addr = fpm_addr;
 	m_fpm_port = fpm_port;
     m_phpcgi_path = phpcgi_path;
+    
+    m_fastcgi_name = fastcgi_name;
+    m_fastcgi_pgm = fastcgi_pgm;
+    m_fastcgi_socktype = fastcgi_socktype;
+    m_fastcgi_sockfile = fastcgi_sockfile;
+	m_fastcgi_addr = fastcgi_addr;
+	m_fastcgi_port = fastcgi_port;
+
     m_private_path = private_path;
     m_global_uid = global_uid;
     
@@ -257,187 +267,109 @@ int CHttp::SendContent(const char* buf, int len)
 {
     return HttpSend(buf, len);
 }
+void CHttp::ParseMethod(const string & strtext)
+{
+    int buf_len = strtext.length();
+    char* sz_resource = (char*)malloc(buf_len + 1);
+    char* sz_querystring = (char*)malloc(buf_len + 1);
+    memset(sz_resource, 0, buf_len + 1);
+    memset(sz_querystring, 0, buf_len + 1);
+    
+    sscanf(strtext.c_str(), "%*[^/]%[^? \t\r\n]?%[^ \t\r\n]", sz_resource, sz_querystring);
+    
+	m_resource = sz_resource;
+	m_querystring = sz_querystring;
+	free(sz_resource);
+	free(sz_querystring);
 	
+	m_uri = m_resource;
+	if(m_querystring != "")
+	{
+    	m_uri += "?";
+    	m_uri += m_querystring;
+	}
+	
+	m_cgi.SetMeta("REQUEST_URI", m_uri.c_str());
+	m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
+}
+
 Http_Connection CHttp::LineParse(char* text)
 {
 	string strtext = text;
 	strtrim(strtext);
 	
-	//printf("%s\n", strtext.c_str());
+	/* printf("%s\n", strtext.c_str()); */
 	
 	if(strncasecmp(strtext.c_str(),"GET ", 4) == 0)
 	{	
 		m_cgi.SetMeta("REQUEST_METHOD", "GET");
-		string strCgiPathInfo;
-		strcut(strtext.c_str(), "/cgi-bin/", " ", m_cgi_pgm);
-        strcut(m_cgi_pgm.c_str(), NULL, "/", m_cgi_pgm);
-                
-		m_cgi.SetMeta("SCRIPT_NAME", m_cgi_pgm.c_str());
-		string strTmp = "/cgi-bin/";
-		strTmp += m_cgi_pgm;
-		strcut(strtext.c_str(), strTmp.c_str(), NULL, strCgiPathInfo);
-		m_cgi.SetMeta("PATH_INFO", strCgiPathInfo.c_str());
-		
+				
 		m_http_method = hmGet;
         m_request_hdr.SetMethod(m_http_method);
-        
-		m_resource = strtext.c_str();
-
-		strcut(strtext.c_str(), "GET /", " ", m_resource);
-		strcut(m_resource.c_str(), NULL, "?", m_resource);
-		
-		strcut(strtext.c_str(), "?", " ", m_querystring);
-		m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
-		
-		//printf("%s %s\n", m_querystring.c_str(), m_cgi_pgm.c_str());
-		
+        ParseMethod(strtext);
 	}
 	else if(strncasecmp(strtext.c_str(), "POST ", 5) == 0)
 	{
 		m_cgi.SetMeta("REQUEST_METHOD", "POST");
-		string strCgiPathInfo;
-		strcut(strtext.c_str(), "/cgi-bin/", " ", m_cgi_pgm);
-        strcut(m_cgi_pgm.c_str(), NULL, "/", m_cgi_pgm);
-		m_cgi.SetMeta("SCRIPT_NAME", m_cgi_pgm.c_str());
-		string strTmp = "/cgi-bin/";
-		strTmp += m_cgi_pgm;
-		strcut(strtext.c_str(), strTmp.c_str(), NULL, strCgiPathInfo);
-		m_cgi.SetMeta("PATH_INFO", strCgiPathInfo.c_str());
 		
 		m_http_method = hmPost;
         m_request_hdr.SetMethod(m_http_method);
 
-		strcut(strtext.c_str(), "POST /", " ", m_resource);
-		strcut(m_resource.c_str(), NULL, "?", m_resource);
-		strcut(strtext.c_str(), "?", " ", m_querystring);
-		m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
-		
+        ParseMethod(strtext);
 	}
 	else if(strncasecmp(strtext.c_str(), "PUT ", 4) == 0)
 	{
 		m_cgi.SetMeta("REQUEST_METHOD", "PUT");
-		string strCgiPathInfo;
-		strcut(strtext.c_str(), "/cgi-bin/", " ", m_cgi_pgm);
-        strcut(m_cgi_pgm.c_str(), NULL, "/", m_cgi_pgm);
-		m_cgi.SetMeta("SCRIPT_NAME", m_cgi_pgm.c_str());
-		string strTmp = "/cgi-bin/";
-		strTmp += m_cgi_pgm;
-		strcut(strtext.c_str(), strTmp.c_str(), NULL, strCgiPathInfo);
-		m_cgi.SetMeta("PATH_INFO", strCgiPathInfo.c_str());
-		
+				
 		m_http_method = hmPut;
         m_request_hdr.SetMethod(m_http_method);
 
-		strcut(strtext.c_str(), "PUT /", " ", m_resource);
-		strcut(m_resource.c_str(), NULL, "?", m_resource);
-
-		strcut(strtext.c_str(), "?", " ", m_querystring);
-		m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
+        ParseMethod(strtext);
 	}
 	else if(strncasecmp(strtext.c_str(), "HEAD ", 5) == 0)
 	{
 		m_cgi.SetMeta("REQUEST_METHOD", "HEAD");
-		string strCgiPathInfo;
-		strcut(strtext.c_str(), "/cgi-bin/", " ", m_cgi_pgm);
-        strcut(m_cgi_pgm.c_str(), NULL, "/", m_cgi_pgm);
-		m_cgi.SetMeta("SCRIPT_NAME", m_cgi_pgm.c_str());
-		string strTmp = "/cgi-bin/";
-		strTmp += m_cgi_pgm;
-		strcut(strtext.c_str(), strTmp.c_str(), NULL, strCgiPathInfo);
-		m_cgi.SetMeta("PATH_INFO", strCgiPathInfo.c_str());
-		
+				
 		m_http_method = hmHead;
         m_request_hdr.SetMethod(m_http_method);
 
-		strcut(strtext.c_str(), "HEAD /", " ", m_resource);
-		strcut(m_resource.c_str(), NULL, "?", m_resource);
-
-		strcut(strtext.c_str(), "?", " ", m_querystring);
-		m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
+        ParseMethod(strtext);
 	}
 	else if(strncasecmp(strtext.c_str(), "DELETE ", 7) == 0)
 	{
 		m_cgi.SetMeta("REQUEST_METHOD", "DELETE");
-		string strCgiPathInfo;
-		strcut(strtext.c_str(), "/cgi-bin/", " ", m_cgi_pgm);
-        strcut(m_cgi_pgm.c_str(), NULL, "/", m_cgi_pgm);
-		m_cgi.SetMeta("SCRIPT_NAME", m_cgi_pgm.c_str());
-		string strTmp = "/cgi-bin/";
-		strTmp += m_cgi_pgm;
-		strcut(strtext.c_str(), strTmp.c_str(), NULL, strCgiPathInfo);
-		m_cgi.SetMeta("PATH_INFO", strCgiPathInfo.c_str());
-		
+				
 		m_http_method = hmDelete;
         m_request_hdr.SetMethod(m_http_method);
 
-		strcut(strtext.c_str(), "DELETE /", " ", m_resource);
-		strcut(m_resource.c_str(), NULL, "?", m_resource);
-
-		strcut(strtext.c_str(), "?", " ", m_querystring);
-		m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
+        ParseMethod(strtext);
 	}
 	else if(strncasecmp(strtext.c_str(), "OPTIONS ", 8) == 0)
 	{
 		m_cgi.SetMeta("REQUEST_METHOD", "OPTIONS");
-		string strCgiPathInfo;
-		strcut(strtext.c_str(), "/cgi-bin/", " ", m_cgi_pgm);
-        strcut(m_cgi_pgm.c_str(), NULL, "/", m_cgi_pgm);
-		m_cgi.SetMeta("SCRIPT_NAME", m_cgi_pgm.c_str());
-		string strTmp = "/cgi-bin/";
-		strTmp += m_cgi_pgm;
-		strcut(strtext.c_str(), strTmp.c_str(), NULL, strCgiPathInfo);
-		m_cgi.SetMeta("PATH_INFO", strCgiPathInfo.c_str());
-		
+				
 		m_http_method = hmOptions;
         m_request_hdr.SetMethod(m_http_method);
 
-		strcut(strtext.c_str(), "OPTIONS /", " ", m_resource);
-		strcut(m_resource.c_str(), NULL, "?", m_resource);
-
-		strcut(strtext.c_str(), "?", " ", m_querystring);
-		m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
+        ParseMethod(strtext);
 	}
 	else if(strncasecmp(strtext.c_str(), "TRACE ", 6) == 0)
 	{
 		m_cgi.SetMeta("REQUEST_METHOD", "TRACE");
-		string strCgiPathInfo;
-		strcut(strtext.c_str(), "/cgi-bin/", " ", m_cgi_pgm);
-        strcut(m_cgi_pgm.c_str(), NULL, "/", m_cgi_pgm);
-		m_cgi.SetMeta("SCRIPT_NAME", m_cgi_pgm.c_str());
-		string strTmp = "/cgi-bin/";
-		strTmp += m_cgi_pgm;
-		strcut(strtext.c_str(), strTmp.c_str(), NULL, strCgiPathInfo);
-		m_cgi.SetMeta("PATH_INFO", strCgiPathInfo.c_str());
-		
+				
 		m_http_method = hmTrace;
         m_request_hdr.SetMethod(m_http_method);
 
-		strcut(strtext.c_str(), "TRACE /", " ", m_resource);
-		strcut(m_resource.c_str(), NULL, "?", m_resource);
-
-		strcut(strtext.c_str(), "?", " ", m_querystring);
-		m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
+        ParseMethod(strtext);
 	}
 	else if(strncasecmp(strtext.c_str(), "CONNECT ", 8) == 0)
 	{
 		m_cgi.SetMeta("REQUEST_METHOD", "CONNECT");
-		string strCgiPathInfo;
-		strcut(strtext.c_str(), "/cgi-bin/", " ", m_cgi_pgm);
-        strcut(m_cgi_pgm.c_str(), NULL, "/", m_cgi_pgm);
-		m_cgi.SetMeta("SCRIPT_NAME", m_cgi_pgm.c_str());
-		string strTmp = "/cgi-bin/";
-		strTmp += m_cgi_pgm;
-		strcut(strtext.c_str(), strTmp.c_str(), NULL, strCgiPathInfo);
-		m_cgi.SetMeta("PATH_INFO", strCgiPathInfo.c_str());
-		
+				
 		m_http_method = hmConnect;
         m_request_hdr.SetMethod(m_http_method);
 
-		strcut(strtext.c_str(), "CONNECT /", " ", m_resource);
-		strcut(m_resource.c_str(), NULL, "?", m_resource);
-
-		strcut(strtext.c_str(), "?", " ", m_querystring);
-		m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
+        ParseMethod(strtext);
 	}
     else if(strcasecmp(strtext.c_str(), "") == 0) /* if true, then http request header finished. */
     {
@@ -561,7 +493,10 @@ Http_Connection CHttp::LineParse(char* text)
         
         Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), 
             m_fpm_socktype.c_str(), m_fpm_sockfile.c_str(), 
-            m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str());
+            m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str(),
+            m_fastcgi_name.c_str(), m_fastcgi_pgm.c_str(), 
+            m_fastcgi_socktype.c_str(), m_fastcgi_sockfile.c_str(), 
+            m_fastcgi_addr.c_str(), m_fastcgi_port);
         doc->Response();
             
         delete doc;

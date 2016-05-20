@@ -511,6 +511,14 @@ public:
 	static string	m_fpm_addr;
 	static unsigned short m_fpm_port;
     static string   m_fpm_sockfile;
+
+    static string   m_fastcgi_name;
+    static string   m_fastcgi_pgm;
+    static string   m_fastcgi_socktype;
+	static string	m_fastcgi_addr;
+	static unsigned short m_fastcgi_port;
+    static string   m_fastcgi_sockfile;
+
 	static volatile unsigned int	m_global_uid;
 	
 	static unsigned int 	m_relaytasknum;
