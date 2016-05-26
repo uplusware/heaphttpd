@@ -37,7 +37,7 @@ using namespace std;
 
 static void usage()
 {
-	printf("Usage:nyouhttpd start | stop | status | reload | version [CONFIG FILE]\n");
+	printf("Usage:niuhttpd start | stop | status | reload | version [CONFIG FILE]\n");
 }
 
 //set to daemon mode
