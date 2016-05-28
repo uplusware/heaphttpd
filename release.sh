@@ -22,7 +22,7 @@ if uname -o | grep -i linux;
 then
 	o=linux
 	cd src/
-	make clean
+#	make clean
 	make
 	cd ..
 elif uname -o | grep -i solaris;
@@ -71,13 +71,15 @@ cp script/extension.xml $3-niuhttpd-bin-$2-${m}-${o}/
 
 cp script/niuhttpd.sh $3-niuhttpd-bin-$2-${m}-${o}/
 
-cp ca/niuhttpd-root.crt $3-niuhttpd-bin-$2-${m}-${o}/niuhttpd-root.crt
+cp ca/ca.cer $3-niuhttpd-bin-$2-${m}-${o}/ca.cer
 
-cp ca/niuhttpd-server.crt $3-niuhttpd-bin-$2-${m}-${o}/niuhttpd-server.crt
-cp ca/niuhttpd-server.key $3-niuhttpd-bin-$2-${m}-${o}/niuhttpd-server.key
+cp ca/server.p12 $3-niuhttpd-bin-$2-${m}-${o}/server.p12
+cp ca/server.cer $3-niuhttpd-bin-$2-${m}-${o}/server.cer
+cp ca/server-key.pem $3-niuhttpd-bin-$2-${m}-${o}/server-key.pem
 
-cp ca/niuhttpd-client.crt $3-niuhttpd-bin-$2-${m}-${o}/niuhttpd-client.crt
-cp ca/niuhttpd-client.key $3-niuhttpd-bin-$2-${m}-${o}/niuhttpd-client.key
+cp ca/client.p12 $3-niuhttpd-bin-$2-${m}-${o}/client.p12
+cp ca/client.cer $3-niuhttpd-bin-$2-${m}-${o}/client.cer
+cp ca/client-key.pem $3-niuhttpd-bin-$2-${m}-${o}/client-key.pem
 
 chmod a+x $3-niuhttpd-bin-$2-${m}-${o}/*
 #ls -al $3-niuhttpd-bin-$2-${m}-${o}
