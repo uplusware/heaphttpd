@@ -30,11 +30,11 @@ unsigned short	CHttpBase::m_httpsport = 443;
 
 string CHttpBase::m_www_authenticate = "";
 BOOL   CHttpBase::m_client_cer_check = FALSE;
-string CHttpBase::m_ca_crt_root   = "/var/niuhttpd/cert/niuhttpd-root.crt";
-string CHttpBase::m_ca_crt_server = "/var/niuhttpd/cert/niuhttpd-server.crt";
-string CHttpBase::m_ca_key_server = "/var/niuhttpd/cert/niuhttpd-server.key";
-string CHttpBase::m_ca_crt_client = "/var/niuhttpd/cert/niuhttpd-client.crt";
-string CHttpBase::m_ca_key_client = "/var/niuhttpd/cert/niuhttpd-client.key";
+string CHttpBase::m_ca_crt_root   = "/var/niuhttpd/cert/ca.cer";
+string CHttpBase::m_ca_crt_server = "/var/niuhttpd/cert/server.cer";
+string CHttpBase::m_ca_key_server = "/var/niuhttpd/cert/server-key.pem";
+string CHttpBase::m_ca_crt_client = "/var/niuhttpd/cert/client.cer";
+string CHttpBase::m_ca_key_client = "/var/niuhttpd/cert/client-key.pem";
 string CHttpBase::m_ca_password = "";
 
 string	CHttpBase::m_php_mode = "fpm";
