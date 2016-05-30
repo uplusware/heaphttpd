@@ -159,9 +159,12 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 			fprintf(stderr, "SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
-
-		SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, NULL);
 		
+		if(session_param->client_cer_check)
+		{
+    		SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER|SSL_VERIFY_FAIL_IF_NO_PEER_CERT, NULL);
+    		SSL_CTX_set_verify_depth(ssl_ctx, 4);
+		}
 		SSL_CTX_load_verify_locations(ssl_ctx, session_param->ca_crt_root.c_str(), NULL);
 		if(SSL_CTX_use_certificate_file(ssl_ctx, session_param->ca_crt_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
@@ -172,13 +175,13 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		SSL_CTX_set_default_passwd_cb_userdata(ssl_ctx, (char*)session_param->ca_password.c_str());
 		if(SSL_CTX_use_PrivateKey_file(ssl_ctx, session_param->ca_key_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
-			fprintf(stderr, "SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_CTX_use_PrivateKey_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 
 		}
 		if(!SSL_CTX_check_private_key(ssl_ctx))
 		{
-			fprintf(stderr, "SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_CTX_check_private_key: %s\n", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
 		
@@ -211,16 +214,25 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
         ssl_rc = SSL_accept(ssl);
 		if(ssl_rc < 0)
 		{
-            fprintf(stderr, "SSL_accept: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            fprintf(stderr, "SSL_accept(%d): %s\n", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl2;
 		}
         else if(ssl_rc = 0)
 		{
+		    fprintf(stderr, "SSL_accept(%d): %s\n", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl1;
 		}
 
         bSSLAccepted = TRUE;
-
+        if(session_param->client_cer_check)
+        {
+            ssl_rc = SSL_get_verify_result(ssl);
+            if(ssl_rc != X509_V_OK)
+            {
+                fprintf(stderr, "SSL_get_verify_result: %s\n", ERR_error_string(ERR_get_error(),NULL));
+                goto clean_ssl1;
+            }
+        }
 		if(session_param->client_cer_check)
 		{
 			X509* client_cert;
