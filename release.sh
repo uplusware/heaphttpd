@@ -71,15 +71,15 @@ cp script/extension.xml $3-niuhttpd-bin-$2-${m}-${o}/
 
 cp script/niuhttpd.sh $3-niuhttpd-bin-$2-${m}-${o}/
 
-cp ca/ca.cer $3-niuhttpd-bin-$2-${m}-${o}/ca.cer
+cp ca/ca.crt $3-niuhttpd-bin-$2-${m}-${o}/ca.crt
 
 cp ca/server.p12 $3-niuhttpd-bin-$2-${m}-${o}/server.p12
-cp ca/server.cer $3-niuhttpd-bin-$2-${m}-${o}/server.cer
-cp ca/server-key.pem $3-niuhttpd-bin-$2-${m}-${o}/server-key.pem
+cp ca/server.crt $3-niuhttpd-bin-$2-${m}-${o}/server.crt
+cp ca/server.key $3-niuhttpd-bin-$2-${m}-${o}/server.key
 
 cp ca/client.p12 $3-niuhttpd-bin-$2-${m}-${o}/client.p12
-cp ca/client.cer $3-niuhttpd-bin-$2-${m}-${o}/client.cer
-cp ca/client-key.pem $3-niuhttpd-bin-$2-${m}-${o}/client-key.pem
+cp ca/client.crt $3-niuhttpd-bin-$2-${m}-${o}/client.crt
+cp ca/client.key $3-niuhttpd-bin-$2-${m}-${o}/client.key
 
 chmod a+x $3-niuhttpd-bin-$2-${m}-${o}/*
 #ls -al $3-niuhttpd-bin-$2-${m}-${o}

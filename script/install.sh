@@ -45,20 +45,20 @@ cp -rf ${path}/html/*  /var/niuhttpd/html/
 cp -f ${path}/niuhttpd.conf /etc/niuhttpd/niuhttpd.conf
 chmod 600 /etc/niuhttpd/niuhttpd.conf
 
-cp -f ${path}/ca.cer /var/niuhttpd/cert/ca.cer
-chmod 600 /var/niuhttpd/cert/ca.cer
+cp -f ${path}/ca.crt /var/niuhttpd/cert/ca.crt
+chmod 600 /var/niuhttpd/cert/ca.crt
 
-cp -f ${path}/server-key.pem /var/niuhttpd/cert/server-key.pem
-chmod 600 /var/niuhttpd/cert/server-key.pem
+cp -f ${path}/server.key /var/niuhttpd/cert/server.key
+chmod 600 /var/niuhttpd/cert/server.key
 
-cp -f ${path}/server.cer /var/niuhttpd/cert/server.cer
-chmod 600 /var/niuhttpd/cert/server.cer
+cp -f ${path}/server.crt /var/niuhttpd/cert/server.crt
+chmod 600 /var/niuhttpd/cert/server.crt
 
-cp -f ${path}/client-key.pem /var/niuhttpd/cert/client-key.pem
-chmod 600 /var/niuhttpd/cert/client-key.pem
+cp -f ${path}/client.key /var/niuhttpd/cert/client.key
+chmod 600 /var/niuhttpd/cert/client.key
  
-cp -f ${path}/client.cer /var/niuhttpd/cert/client.cer
-chmod 600 /var/niuhttpd/cert/client.cer
+cp -f ${path}/client.crt /var/niuhttpd/cert/client.crt
+chmod 600 /var/niuhttpd/cert/client.crt
 
 cp -f ${path}/permit.list /etc/niuhttpd/permit.list
 chmod a-x /etc/niuhttpd/permit.list
