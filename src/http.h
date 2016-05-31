@@ -32,7 +32,7 @@ class CHttp
 {
 public:
 	CHttp(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
-	    const char* clientip, memory_cache* ch,
+	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, const char* php_mode, 
         const char* fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
@@ -118,6 +118,8 @@ public:
     void* GetServiceObject(const char* objname);
 	WebCGI m_cgi;
 	
+	X509* GetClientX509Cert() { return m_client_cert; }
+	
 private:
     int HttpSend(const char* buf, int len);
     int HttpRecv(char* buf, int len);
@@ -128,7 +130,9 @@ protected:
 	int m_sockfd;
 	linesock* m_lsockfd;
 	linessl * m_lssl;
-
+	
+	X509* m_client_cert;
+	
 	Http_Method m_http_method;
 	string m_resource;
 	string m_uri;

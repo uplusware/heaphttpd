@@ -31,8 +31,9 @@ protected:
 	string m_clientip;
 	Service_Type m_st;
     ServiceObjMap * m_srvobj;
+    X509* m_client_cert;
 public:
-	Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, Service_Type st, memory_cache* ch);
+	Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, Service_Type st, memory_cache* ch);
 	virtual ~Session();
 	
 	void Process();

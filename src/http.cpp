@@ -27,7 +27,8 @@
 
 const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" };
 
-CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport, const char* clientip, memory_cache* ch,
+CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
+    const char* clientip, X509* client_cert, memory_cache* ch,
 	const char* work_path, const char* php_mode, 
     const char* fpm_socktype, const char* fpm_sockfile,
     const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
@@ -44,6 +45,8 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	m_wwwauth_scheme = wwwauth_scheme;
 	m_cache = ch;
 
+    m_client_cert = client_cert;
+    
 	m_sockfd = sockfd;
 	m_clientip = clientip;
 	m_servername = servername;

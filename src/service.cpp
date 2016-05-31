@@ -146,9 +146,9 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
     int ssl_rc = -1;
     BOOL bSSLAccepted;
 	SSL_CTX* ssl_ctx = NULL;
+	X509* client_cert = NULL;
     if(session_param->svr_type == stHTTPS)
 	{
-		X509* client_cert;
 		SSL_METHOD* meth;
 		SSL_load_error_strings();
 		OpenSSL_add_ssl_algorithms();
@@ -235,13 +235,8 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
         }
 		if(session_param->client_cer_check)
 		{
-			X509* client_cert;
 			client_cert = SSL_get_peer_certificate(ssl);
-			if (client_cert != NULL)
-			{
-				X509_free (client_cert);
-			}
-			else
+			if (client_cert == NULL)
 			{
 				printf("SSL_get_peer_certificate: %s\n", ERR_error_string(ERR_get_error(),NULL));
 				goto clean_ssl1;
@@ -250,7 +245,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 	}
 
 	pSession = new Session(session_param->srvobjmap, session_param->sockfd, ssl,
-        session_param->client_ip.c_str(), session_param->svr_type, session_param->cache);
+        session_param->client_ip.c_str(), client_cert, session_param->svr_type, session_param->cache);
 	if(pSession != NULL)
 	{
 		pSession->Process();
@@ -258,6 +253,9 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 	}
 
 clean_ssl1:
+    if(client_cert)
+        X509_free (client_cert);
+    client_cert = NULL;
 	if(ssl && bSSLAccepted)
     {
 		SSL_shutdown(ssl);

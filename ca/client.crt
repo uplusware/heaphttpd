@@ -1,0 +1,69 @@
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 2 (0x2)
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=CN, ST=BJ, O=Uplusware, OU=niuhttpd, CN=localhost
+        Validity
+            Not Before: May 31 02:06:20 2016 GMT
+            Not After : May 29 02:06:20 2026 GMT
+        Subject: C=CN, ST=BJ, O=Uplusware, OU=niuhttpd, CN=127.0.0.1
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (1024 bit)
+                Modulus:
+                    00:c5:2d:54:70:e0:be:7f:c8:e5:07:23:6d:09:ac:
+                    92:0e:d7:fa:35:6f:84:29:72:8f:5d:76:e0:ac:73:
+                    d0:00:66:5d:17:7b:f2:c1:d2:72:fb:35:de:62:30:
+                    ad:d4:03:2c:fa:16:f1:45:61:61:cd:e7:5d:b2:27:
+                    5e:64:55:b1:89:91:88:b4:de:4f:1d:b2:dd:fd:a1:
+                    6e:2d:5b:51:a4:91:c1:7c:24:85:fb:5c:26:b3:8f:
+                    e7:1c:f6:62:18:4f:44:52:68:24:09:b0:9a:da:aa:
+                    1d:d9:92:04:d5:87:75:e3:23:c1:8e:5a:23:d0:16:
+                    d0:44:f1:28:00:c5:94:9c:5d
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            Netscape Comment: 
+                OpenSSL Generated Certificate
+            X509v3 Subject Key Identifier: 
+                D2:7E:B6:89:E6:55:F8:AE:31:BF:E8:74:22:F0:F6:DC:88:00:CE:30
+            X509v3 Authority Key Identifier: 
+                keyid:20:2E:3D:C6:C5:10:50:F8:5A:70:D9:36:75:AD:67:01:C4:C4:3F:C7
+
+    Signature Algorithm: sha256WithRSAEncryption
+         2c:26:f2:b7:9b:b8:e9:80:82:d9:f8:2d:e5:b5:61:41:31:bf:
+         ea:f1:6c:6f:69:03:ad:c6:ff:dd:ed:1a:41:fe:c2:2f:9f:50:
+         f5:16:cc:52:46:1e:fa:6b:13:ee:2b:0e:59:ff:b2:9e:9b:34:
+         0c:6d:51:b6:bc:5f:6c:96:91:e5:69:06:ad:b2:57:f1:cb:10:
+         f6:a5:5a:c6:4b:5a:aa:86:68:af:d9:bf:5f:2e:7b:96:70:8d:
+         bf:31:43:e1:5c:9b:d3:f0:41:16:83:4b:d1:df:5f:93:de:be:
+         37:3f:89:2c:41:f9:bb:ee:7d:97:33:02:29:4d:cf:2d:f1:06:
+         31:61:78:42:6e:d2:0f:94:06:32:ba:13:eb:7f:9d:4c:54:39:
+         8b:8c:02:cf:c0:2e:89:6b:c9:4d:7d:3f:3c:af:5f:ef:b7:f7:
+         d8:c5:9a:0d:3c:08:56:a9:90:c4:c7:ea:d7:d4:fa:d3:ad:f0:
+         65:7e:ba:5f:25:ba:c9:66:29:d4:6a:8c:79:2f:9b:2f:87:cd:
+         e4:53:53:93:8c:da:77:d4:5b:44:47:d6:77:c5:51:2f:2f:62:
+         25:a0:64:11:25:8b:f7:27:21:67:7c:d8:5f:02:2f:6c:56:01:
+         ca:a2:e8:5a:af:54:f3:9a:8b:46:17:1f:ba:af:45:e8:ca:57:
+         4b:22:07:4f
+-----BEGIN CERTIFICATE-----
+MIIDHDCCAgSgAwIBAgIBAjANBgkqhkiG9w0BAQsFADBVMQswCQYDVQQGEwJDTjEL
+MAkGA1UECAwCQkoxEjAQBgNVBAoMCVVwbHVzd2FyZTERMA8GA1UECwwIbml1aHR0
+cGQxEjAQBgNVBAMMCWxvY2FsaG9zdDAeFw0xNjA1MzEwMjA2MjBaFw0yNjA1Mjkw
+MjA2MjBaMFUxCzAJBgNVBAYTAkNOMQswCQYDVQQIDAJCSjESMBAGA1UECgwJVXBs
+dXN3YXJlMREwDwYDVQQLDAhuaXVodHRwZDESMBAGA1UEAwwJMTI3LjAuMC4xMIGf
+MA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDFLVRw4L5/yOUHI20JrJIO1/o1b4Qp
+co9dduCsc9AAZl0Xe/LB0nL7Nd5iMK3UAyz6FvFFYWHN512yJ15kVbGJkYi03k8d
+st39oW4tW1GkkcF8JIX7XCazj+cc9mIYT0RSaCQJsJraqh3ZkgTVh3XjI8GOWiPQ
+FtBE8SgAxZScXQIDAQABo3sweTAJBgNVHRMEAjAAMCwGCWCGSAGG+EIBDQQfFh1P
+cGVuU1NMIEdlbmVyYXRlZCBDZXJ0aWZpY2F0ZTAdBgNVHQ4EFgQU0n62ieZV+K4x
+v+h0IvD23IgAzjAwHwYDVR0jBBgwFoAUIC49xsUQUPhacNk2da1nAcTEP8cwDQYJ
+KoZIhvcNAQELBQADggEBACwm8rebuOmAgtn4LeW1YUExv+rxbG9pA63G/93tGkH+
+wi+fUPUWzFJGHvprE+4rDln/sp6bNAxtUba8X2yWkeVpBq2yV/HLEPalWsZLWqqG
+aK/Zv18ue5Zwjb8xQ+Fcm9PwQRaDS9HfX5Pevjc/iSxB+bvufZczAilNzy3xBjFh
+eEJu0g+UBjK6E+t/nUxUOYuMAs/ALolryU19PzyvX++399jFmg08CFapkMTH6tfU
++tOt8GV+ul8luslmKdRqjHkvmy+HzeRTU5OM2nfUW0RH1nfFUS8vYiWgZBEli/cn
+IWd82F8CL2xWAcqi6FqvVPOai0YXH7qvRejKV0siB08=
+-----END CERTIFICATE-----
