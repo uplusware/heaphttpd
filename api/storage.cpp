@@ -260,10 +260,12 @@ int DBStorage::ShowDatabases(string &databases)
     //Transaction begin
 	mysql_autocommit(m_hMySQL, 0);
 	sprintf(sqlcmd,"show databases");
-	mysql_thread_real_query(m_hMySQL, sqlcmd, strlen(sqlcmd));
+	pthread_mutex_lock(&m_thread_pool_mutex);
+	mysql_real_query(m_hMySQL, sqlcmd, strlen(sqlcmd));
     MYSQL_RES *qResult;
 	MYSQL_ROW row;
 	qResult = mysql_store_result(m_hMySQL);
+	pthread_mutex_unlock(&m_thread_pool_mutex);
     if(qResult)
     {			
         while((row = mysql_fetch_row(qResult)))

@@ -13,6 +13,7 @@ StorageEngine::StorageEngine(const char * host, const char* username, const char
 	
 	m_maxConn = maxConn;
 	m_realConn = 0;
+	m_next = 0;
 	m_engine = new stStorageEngine[m_maxConn];
 	
 	for(int i = 0; i < m_maxConn; i++)
@@ -52,48 +53,35 @@ StorageEngine::~StorageEngine()
 
 DBStorage* StorageEngine::WaitEngine(int &index)
 {
-    unsigned int lastMinCount = 0xFFFFFFFF;
-	int i = 0;
-    index = 0;
-	DBStorage* freeOne = NULL;
-	pthread_mutex_lock(&m_engineMutex);
-	for(i = 0; i < m_maxConn; i++)
+    DBStorage* freeOne = NULL;
+    
+    index  = m_next % m_maxConn;
+    
+    if(m_engine[index].storage->Ping() != 0)
 	{
-		if(m_engine[i].opened == TRUE && m_engine[i].storage != NULL)
-		{
-            if(lastMinCount > m_engine[i].usedCount)
-            {
-                lastMinCount = m_engine[i].usedCount;
-                index = i;
-            }
-		}
+		m_engine[index].storage->Close();
+		if(m_engine[index].storage->Connect(m_host.c_str(),
+	        m_username.c_str(), m_password.c_str(), m_database.c_str()) == 0)
+	    {
+	        freeOne = m_engine[index].storage;
+	    }
+	    else
+	    {
+	       fprintf(stderr, "the mysql connection is not avaliable.\n");
+	       freeOne = NULL;
+	    }
 	}
-    
-    m_engine[index].inUse = TRUE;
-    m_engine[index].lTime = time(NULL);
-    m_engine[index].owner = pthread_self();
-    m_engine[index].usedCount++;
-    freeOne = m_engine[index].storage;
-    
-	pthread_mutex_unlock(&m_engineMutex);
-    
-	if(m_engine[index].storage->Ping() != 0)
-    {
-        printf("Reconnect\n");
-        m_engine[index].storage->Close();
-        if(m_engine[index].storage->Connect(m_host.c_str(), m_username.c_str(), m_password.c_str(), m_database.c_str()) < 0)
-            freeOne = NULL;
+	else
+	{
+	    freeOne = m_engine[index].storage;
     }
+    
+    m_next++;
 	return freeOne;
 }
 
 void StorageEngine::PostEngine(int index)
 {
-	pthread_mutex_lock(&m_engineMutex);
-	m_engine[index].lTime = time(NULL);
-	m_engine[index].inUse = FALSE;
-	m_engine[index].owner = 0;
-    m_engine[index].usedCount--;
-	pthread_mutex_unlock(&m_engineMutex);
+
 }
 	

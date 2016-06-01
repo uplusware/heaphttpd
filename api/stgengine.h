@@ -35,7 +35,7 @@ private:
 	
 	string m_encoding;
 	string m_private_path;
-	
+	unsigned long m_next;
 	int m_maxConn;
 	stStorageEngine* m_engine;
 	
