@@ -1,5 +1,5 @@
 # niuhttpd
-C++ web server framework
+Lightweight seb server on Linux and C++ web service framework
 
 Support API, cgi/fast-cgi(Spawn-fcgi), php/php-fpm, web.py, WebSocket and MySQL and MongoDB
 
