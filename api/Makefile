@@ -6,8 +6,12 @@ HTTPAPIOBJS = sample.o
 ifdef MONGODB
     DB_DEF = _MONGODB_
 else
+ifdef MYSQLDB
     DB_DEF = _MARIADB_
     DB_INCDIR = -I/usr/include/mysql/
+else
+	DB_DEF = _SAMPLE_
+endif
 endif
 
 MYSQLDEMOAPI = libmysqldemo.so
@@ -26,10 +30,15 @@ all: apimongodemo
 install: all
 	cp libmongodemo.so /var/niuhttpd/api/
 else
-all: apisample apimysqldemo
+ifdef MYSQLDB
+all: apimysqldemo
+install: all
+	cp libmysqldemo.so /var/niuhttpd/api/
+else
+all: apisample
 install: all
 	cp libsample.so /var/niuhttpd/api/
-	cp libmysqldemo.so /var/niuhttpd/api/
+endif
 endif
 
     

@@ -58,6 +58,7 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	m_cgi.SetMeta("SERVER_PORT", szPort);
 	m_cgi.SetMeta("REMOTE_ADDR", m_clientip.c_str());
 	
+    m_line_text = "";
 	m_lsockfd = NULL;
 	m_lssl = NULL;
 	
@@ -298,7 +299,20 @@ void CHttp::ParseMethod(const string & strtext)
 
 Http_Connection CHttp::LineParse(char* text)
 {
-	string strtext = text;
+    string strtext;
+    m_line_text += text;
+    std::size_t new_line = m_line_text.find('\n');
+    
+    if( new_line == std::string::npos)
+    {
+        return httpContinue;
+    }
+    else
+    {
+        strtext = m_line_text.substr(0, new_line + 1);
+        m_line_text = m_line_text.substr(new_line + 1);
+    }
+
 	strtrim(strtext);
 	
 	/* printf("%s\n", strtext.c_str()); */
@@ -494,16 +508,71 @@ Http_Connection CHttp::LineParse(char* text)
             m_cgi.SetData(m_postdata.c_str(), m_postdata.length());
         }
         
+        vector<stExtDl> dlList;
+        //Extension hook 1
+        for(int x = 0; x < CHttpBase::m_ext_list.size(); x++)
+        {
+            stExtDl ext_dl;
+            ext_dl.handle = dlopen(CHttpBase::m_ext_list[x].libso.c_str(), RTLD_LOCAL | RTLD_NOW);
+            if(ext_dl.handle)
+            {
+                ext_dl.action = CHttpBase::m_ext_list[x].action;
+                dlList.push_back(ext_dl);
+            }
+
+        }
+
+        for(int x = 0; x < dlList.size(); x++)
+        {
+            void* (*ext_request)(CHttp*, const char*);
+            ext_request = (void*(*)(CHttp*, const char*))dlsym(dlList[x].handle, "ext_request");
+            const char* errmsg;
+            if((errmsg = dlerror()) == NULL)
+            {
+                ext_request(this, dlList[x].action.c_str());
+            }
+        }
+
         Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), 
             m_fpm_socktype.c_str(), m_fpm_sockfile.c_str(), 
             m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str(),
             m_fastcgi_name.c_str(), m_fastcgi_pgm.c_str(), 
             m_fastcgi_socktype.c_str(), m_fastcgi_sockfile.c_str(), 
             m_fastcgi_addr.c_str(), m_fastcgi_port);
+
+        //Extension hook 2
+        for(int x = 0; x < dlList.size(); x++)
+        {
+            void* (*ext_response)(CHttp*, const char*, Htdoc*);
+            ext_response = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym(dlList[x].handle, "ext_response");
+            const char* errmsg;
+            if((errmsg = dlerror()) == NULL)
+            {
+                ext_response(this, dlList[x].action.c_str(), doc);
+            }
+        }
         doc->Response();
-            
+        
+        //Extension hook 3
+        for(int x = 0; x < dlList.size(); x++)
+        {
+            void* (*ext_finish)(CHttp*, const char*, Htdoc*);
+            ext_finish = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym(dlList[x].handle, "ext_finish");
+            const char* errmsg;
+            if((errmsg = dlerror()) == NULL)
+            {
+                ext_finish(this, dlList[x].action.c_str(), doc);
+            }
+        }
+
         delete doc;
         
+        for(int x = 0; x < dlList.size(); x++)
+        {
+            if(dlList[x].handle)
+                dlclose(dlList[x].handle);
+        }
+
 		return m_keep_alive ? httpKeepAlive : httpClose;
     }
     else

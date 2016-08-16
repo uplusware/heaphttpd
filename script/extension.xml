@@ -1,4 +1,6 @@
 <? xml version="1.0" encoding="UTF-8" ?>
 <niuhttpd>
-	<extension libso="/var/niuhttpd/libextsample.so" action="x" />
+	<extension libso="/var/niuhttpd/ext/libextsample1.so" action="x" />
+	<extension libso="/var/niuhttpd/ext/libextsample2.so" action="a" />
+	<extension libso="/var/niuhttpd/ext/libextsample3.so" action="d" />
 </niuhttpd>

@@ -130,6 +130,7 @@ protected:
 	int m_sockfd;
 	linesock* m_lsockfd;
 	linessl * m_lssl;
+	string m_line_text;
 	
 	X509* m_client_cert;
 	

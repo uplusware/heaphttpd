@@ -39,6 +39,7 @@ test -x /var/niuhttpd/api || mkdir /var/niuhttpd/api
 test -x /var/niuhttpd/cgi-bin || mkdir /var/niuhttpd/cgi-bin
 test -x /var/niuhttpd/ws || mkdir /var/niuhttpd/ws
 test -x /var/niuhttpd/webpy || mkdir /var/niuhttpd/webpy
+test -x /var/niuhttpd/ext || mkdir /var/niuhttpd/ext
 
 cp -rf ${path}/html/*  /var/niuhttpd/html/ 
 

@@ -257,11 +257,11 @@ void doc::Response()
     szHttpRequestRanges = m_session->GetRequestField("Range");
     x = 0;
     flag = false;
-    while(1)
+    while(szHttpRequestRanges != NULL)
     {
         if(!flag)
         {
-            if(szHttpRequestRanges[x] == '=')
+            if(szHttpRequestRanges[x] == '=' || szHttpRequestRanges[x] != '\0')
             {
                 flag = true;
             }
