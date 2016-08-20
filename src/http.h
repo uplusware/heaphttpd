@@ -12,6 +12,7 @@
 #include "webcgi.h"
 #include "wwwauth.h"
 #include "serviceobj.h"
+#include "extension.h"
 
 enum WebSocket_HandShake
 {
@@ -33,7 +34,7 @@ class CHttp
 public:
 	CHttp(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
-		const char* work_path, const char* php_mode, 
+		const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
         const char* fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         const char* fastcgi_name, const char* fastcgi_pgm, 
@@ -133,7 +134,7 @@ protected:
 	string m_line_text;
 	
 	X509* m_client_cert;
-	
+	vector<stExtension>* m_ext_list;
 	Http_Method m_http_method;
 	string m_resource;
 	string m_uri;
@@ -158,6 +159,7 @@ protected:
     string m_session_var_uid;
     
     string m_work_path;
+
 	string m_php_mode;
     string m_fpm_socktype;
     string m_fpm_sockfile;

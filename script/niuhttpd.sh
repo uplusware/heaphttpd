@@ -32,6 +32,16 @@ niuhttpd_reload()
 	/usr/bin/niuhttpd reload
 }
 
+niuhttpd_access()
+{
+	/usr/bin/niuhttpd access
+}
+
+niuhttpd_extension()
+{
+	/usr/bin/niuhttpd extension
+}
+
 niuhttpd_version()
 {
 	/usr/bin/niuhttpd version
@@ -60,6 +70,14 @@ case "${1:-''}" in
 	niuhttpd_reload
 	;;
 	
+	'access')
+	niuhttpd_access
+	;;
+
+    'extension')
+	niuhttpd_extension
+	;;
+
 	'status')
 	niuhttpd_status
 	;;
@@ -69,7 +87,7 @@ case "${1:-''}" in
 	;;
 	
 	*)
-	echo "Usage: $SELF Usage:niuhttpd start | stop | status | reload | version [CONFIG FILE]"
+	echo "Usage: $SELF Usage:niuhttpd start | stop | status | reload | access | extension | version [CONFIG FILE]"
 	exit 1
 	;;
 esac

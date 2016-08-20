@@ -2,9 +2,10 @@
 	Copyright (c) openheap, uplusware
 	uplusware@gmail.com
 */
-
+#include <dlfcn.h>
 #include "base.h"
 #include "util/security.h"
+#include "tinyxml/tinyxml.h"
 
 //////////////////////////////////////////////////////////////////////////
 //CHttpBase
@@ -17,7 +18,8 @@ string CHttpBase::m_encoding = "UTF-8";
 
 string CHttpBase::m_private_path = "/tmp/niuhttpd/private";
 string CHttpBase::m_work_path = "/var/niuhttpd/";
-
+string CHttpBase::m_ext_list_file = "/etc/niuhttpd/extension.xml";
+vector<stExtension> CHttpBase::m_ext_list;
 
 string CHttpBase::m_localhostname = "uplusware.com";
 string CHttpBase::m_hostip = "";
@@ -117,6 +119,11 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, m_work_path);
 				strtrim(m_work_path);
 				//printf("%s\n", m_work_path.c_str());
+			}
+			else if(strncasecmp(strline.c_str(), "ExtensionListFile", strlen("ExtensionListFile")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_ext_list_file);
+				strtrim(m_ext_list_file);
 			}
 			else if(strncasecmp(strline.c_str(), "LocalHostName", strlen("LocalHostName")) == 0)
 			{
@@ -305,40 +312,10 @@ BOOL CHttpBase::LoadConfig()
 	}
 	configfilein.close();
 
-	ifstream permitfilein(m_permit_list_file.c_str(), ios_base::binary);
-	if(!permitfilein.is_open())
-	{
-		printf("%s is not exist. please creat it", m_permit_list_file.c_str());
-		return FALSE;
-	}
-	while(getline(permitfilein, strline))
-	{
-		strtrim(strline);
-		if((strline != "")&&(strncmp(strline.c_str(), "#", 1) != 0))
-			m_permit_list.push_back(strline);
-	}
-	permitfilein.close();
+	_load_permit_();
+	_load_reject_();
+	_load_ext_();
 
-	
-	ifstream rejectfilein(m_reject_list_file.c_str(), ios_base::binary);
-	if(!rejectfilein.is_open())
-	{
-		printf("%s is not exist. please creat it", m_reject_list_file.c_str());
-		return FALSE;
-	}
-	while(getline(rejectfilein, strline))
-	{
-		strtrim(strline);
-		if((strline != "")&&(strncmp(strline.c_str(), "#", 1) != 0))
-		{
-			stReject sr;
-			sr.ip = strline;
-			sr.expire = 0xFFFFFFFF;
-			m_reject_list.push_back(sr);
-		}
-	}
-	rejectfilein.close();
-		
 	m_runtime = time(NULL);
 
 	//generate the RSA keys
@@ -354,12 +331,7 @@ BOOL CHttpBase::LoadConfig()
 	return TRUE;
 }
 
-BOOL CHttpBase::UnLoadConfig()
-{
-
-}
-
-BOOL CHttpBase::LoadList()
+BOOL CHttpBase::LoadAccessList()
 {
 	string strline;
 	sem_t* plock = NULL;
@@ -370,20 +342,8 @@ BOOL CHttpBase::LoadList()
 	{
 		sem_wait(plock);
 
-		m_permit_list.clear();
-		ifstream permitfilein(m_permit_list_file.c_str(), ios_base::binary);
-		if(!permitfilein.is_open())
-		{
-			printf("%s is not exist. please creat it", m_permit_list_file.c_str());
-			return FALSE;
-		}
-		while(getline(permitfilein, strline))
-		{
-			strtrim(strline);
-			if((strline != "")&&(strncmp(strline.c_str(), "#", 1) != 0))
-				m_permit_list.push_back(strline);
-		}
-		permitfilein.close();
+		_load_permit_();
+
 		sem_post(plock);
 		sem_close(plock);
 	}
@@ -394,34 +354,103 @@ BOOL CHttpBase::LoadList()
 	{
 		sem_wait(plock);
 
-		m_reject_list.clear();
-		ifstream rejectfilein(m_reject_list_file.c_str(), ios_base::binary);
-		if(!rejectfilein.is_open())
-		{
-			printf("%s is not exist. please creat it", m_reject_list_file.c_str());
-			return FALSE;
-		}
-		while(getline(rejectfilein, strline))
-		{
-			strtrim(strline);
-			if((strline != "")&&(strncmp(strline.c_str(), "#", 1) != 0))
-			{
-				stReject sr;
-				sr.ip = strline;
-				sr.expire = 0xFFFFFFFF;
-				m_reject_list.push_back(sr);
-			}
-		}
-		rejectfilein.close();
+		_load_reject_();
+
 		sem_post(plock);
 		sem_close(plock);
 	}
 }
 
-BOOL CHttpBase::UnLoadList()
+BOOL CHttpBase::LoadExtensionList()
 {
+	_load_ext_();
+}
 
+void CHttpBase::_load_permit_()
+{
+	string strline;
+	m_permit_list.clear();
+	ifstream permitfilein(m_permit_list_file.c_str(), ios_base::binary);
+	if(!permitfilein.is_open())
+	{
+		printf("%s is not exist. please creat it", m_permit_list_file.c_str());
+		return;
+	}
+	while(getline(permitfilein, strline))
+	{
+		strtrim(strline);
+		if((strline != "")&&(strncmp(strline.c_str(), "#", 1) != 0))
+			m_permit_list.push_back(strline);
+	}
+	permitfilein.close();
+}
+
+void CHttpBase::_load_reject_()
+{
+	string strline;
+	m_reject_list.clear();
+	ifstream rejectfilein(m_reject_list_file.c_str(), ios_base::binary);
+	if(!rejectfilein.is_open())
+	{
+		printf("%s is not exist. please creat it", m_reject_list_file.c_str());
+		return;
+	}
+	while(getline(rejectfilein, strline))
+	{
+		strtrim(strline);
+		if((strline != "")&&(strncmp(strline.c_str(), "#", 1) != 0))
+		{
+			stReject sr;
+			sr.ip = strline;
+			sr.expire = 0xFFFFFFFF;
+			m_reject_list.push_back(sr);
+		}
+	}
+	rejectfilein.close();
+}
+
+void CHttpBase::_load_ext_()
+{
+	for(int x = 0; x < m_ext_list.size(); x++)
+    {
+    	dlclose(m_ext_list[x].handle);
+    }
+    m_ext_list.clear();
+
+	TiXmlDocument xmlFileterDoc;
+	xmlFileterDoc.LoadFile(m_ext_list_file.c_str());
+	TiXmlElement * pRootElement = xmlFileterDoc.RootElement();
+	if(pRootElement)
+	{
+		TiXmlNode* pChildNode = pRootElement->FirstChild("extension");
+		while(pChildNode)
+		{
+			if(pChildNode && pChildNode->ToElement())
+			{
+				stExtension ext;
+				
+				ext.handle = dlopen(pChildNode->ToElement()->Attribute("libso"), RTLD_NOW);
+				
+				if(ext.handle)
+				{
+					ext.action = pChildNode->ToElement()->Attribute("action");
+					m_ext_list.push_back(ext);
+
+					/* printf("%s, action: %s\n", pChildNode->ToElement()->Attribute("libso"), pChildNode->ToElement()->Attribute("action")); */
+				}
+			}
+			pChildNode = pChildNode->NextSibling("extension");
+		}
+	}
 }
 
 
-
+BOOL CHttpBase::UnLoadConfig()
+{
+	for(int x = 0; x < m_ext_list.size(); x++)
+    {
+    	dlclose(m_ext_list[x].handle);
+    }
+    m_ext_list.clear();
+	return TRUE;
+}

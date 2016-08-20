@@ -183,7 +183,8 @@ public:
 	int Run(int fd, const char* hostip, unsigned short nPort);
 	void Stop();
 	void ReloadConfig();
-	void ReloadList();
+	void ReloadAccess();
+	void ReloadExtension();
 #ifdef CYGWIN    
 	memory_cache* m_cache;
 #endif /* CYGWIN*/

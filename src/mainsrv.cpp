@@ -37,7 +37,7 @@ using namespace std;
 
 static void usage()
 {
-	printf("Usage:niuhttpd start | stop | status | reload | version [CONFIG FILE]\n");
+	printf("Usage:niuhttpd start | stop | status | reload | access | extension | version [CONFIG FILE]\n");
 }
 
 //set to daemon mode
@@ -189,6 +189,27 @@ static int Reload()
 	https_svr.ReloadConfig();
 }
 
+static int ReloadAccess()
+{
+	printf("Reload niuhttpd access list ...\n");
+
+	Service http_svr(stHTTP);
+	http_svr.ReloadAccess();
+
+	Service https_svr(stHTTPS);
+	https_svr.ReloadAccess();
+}
+
+static int ReloadExtension()
+{
+	printf("Reload niuhttpd extension ...\n");
+
+	Service http_svr(stHTTP);
+	http_svr.ReloadExtension();
+
+	Service https_svr(stHTTPS);
+	https_svr.ReloadExtension();
+}
 static int processcmd(const char* cmd, const char* conf, const char* permit, const char* reject)
 {
 	CHttpBase::SetConfigFile(conf, permit, reject);
@@ -209,6 +230,14 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 	else if(strcasecmp(cmd, "reload") == 0)
 	{
 		Reload();
+	}
+	else if(strcasecmp(cmd, "access") == 0)
+	{
+		ReloadAccess();
+	}
+	else if(strcasecmp(cmd, "extension") == 0)
+	{
+		ReloadExtension();
 	}
 	else if(strcasecmp(cmd, "status") == 0)
 	{
@@ -256,6 +285,7 @@ int main(int argc, char* argv[])
 {	
     mkdir("/tmp/niuhttpd", 0777);
     chmod("/tmp/niuhttpd", 0777);
+
 
     mkdir("/var/log/niuhttpd/", 0744);
     

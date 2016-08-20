@@ -29,7 +29,7 @@ const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DEL
 
 CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
-	const char* work_path, const char* php_mode, 
+	const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
     const char* fpm_socktype, const char* fpm_sockfile,
     const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
     const char* fastcgi_name, const char* fastcgi_pgm,  
@@ -44,6 +44,8 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	m_passed_wwwauth = FALSE;
 	m_wwwauth_scheme = wwwauth_scheme;
 	m_cache = ch;
+
+    m_ext_list = ext_list;
 
     m_client_cert = client_cert;
     
@@ -72,7 +74,8 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	m_querystring = "";
 	m_postdata = "";
 	m_http_method = hmGet;
-    
+
+
     m_work_path = work_path;
 	m_php_mode = php_mode;
     m_fpm_socktype = fpm_socktype;
@@ -507,29 +510,16 @@ Http_Connection CHttp::LineParse(char* text)
             m_cgi.SetMeta("CONTENT_LENGTH", szLen);
             m_cgi.SetData(m_postdata.c_str(), m_postdata.length());
         }
-        
-        vector<stExtDl> dlList;
+
         //Extension hook 1
-        for(int x = 0; x < CHttpBase::m_ext_list.size(); x++)
-        {
-            stExtDl ext_dl;
-            ext_dl.handle = dlopen(CHttpBase::m_ext_list[x].libso.c_str(), RTLD_LOCAL | RTLD_NOW);
-            if(ext_dl.handle)
-            {
-                ext_dl.action = CHttpBase::m_ext_list[x].action;
-                dlList.push_back(ext_dl);
-            }
-
-        }
-
-        for(int x = 0; x < dlList.size(); x++)
+        for(int x = 0; x < m_ext_list->size(); x++)
         {
             void* (*ext_request)(CHttp*, const char*);
-            ext_request = (void*(*)(CHttp*, const char*))dlsym(dlList[x].handle, "ext_request");
+            ext_request = (void*(*)(CHttp*, const char*))dlsym((*m_ext_list)[x].handle, "ext_request");
             const char* errmsg;
             if((errmsg = dlerror()) == NULL)
             {
-                ext_request(this, dlList[x].action.c_str());
+                ext_request(this, (*m_ext_list)[x].action.c_str());
             }
         }
 
@@ -541,37 +531,31 @@ Http_Connection CHttp::LineParse(char* text)
             m_fastcgi_addr.c_str(), m_fastcgi_port);
 
         //Extension hook 2
-        for(int x = 0; x < dlList.size(); x++)
+        for(int x = 0; x < m_ext_list->size(); x++)
         {
             void* (*ext_response)(CHttp*, const char*, Htdoc*);
-            ext_response = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym(dlList[x].handle, "ext_response");
+            ext_response = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_response");
             const char* errmsg;
             if((errmsg = dlerror()) == NULL)
             {
-                ext_response(this, dlList[x].action.c_str(), doc);
+                ext_response(this, (*m_ext_list)[x].action.c_str(), doc);
             }
         }
         doc->Response();
         
         //Extension hook 3
-        for(int x = 0; x < dlList.size(); x++)
+        for(int x = 0; x < m_ext_list->size(); x++)
         {
             void* (*ext_finish)(CHttp*, const char*, Htdoc*);
-            ext_finish = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym(dlList[x].handle, "ext_finish");
+            ext_finish = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_finish");
             const char* errmsg;
             if((errmsg = dlerror()) == NULL)
             {
-                ext_finish(this, dlList[x].action.c_str(), doc);
+                ext_finish(this, (*m_ext_list)[x].action.c_str(), doc);
             }
         }
 
         delete doc;
-        
-        for(int x = 0; x < dlList.size(); x++)
-        {
-            if(dlList[x].handle)
-                dlclose(dlList[x].handle);
-        }
 
 		return m_keep_alive ? httpKeepAlive : httpClose;
     }

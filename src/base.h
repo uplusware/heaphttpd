@@ -36,6 +36,7 @@
 
 #include "util/general.h"
 #include "util/base64.h"
+#include "extension.h"
 
 using namespace std;
 
@@ -50,6 +51,7 @@ using namespace std;
 #define MSG_FORWARD			0xFD
 #define MSG_REJECT			0xFC
 #define MSG_LIST_RELOAD		0xFB
+#define MSG_EXT_RELOAD		0xFA
 
 typedef struct
 {
@@ -486,6 +488,10 @@ public:
 
 	static string	m_private_path;
 	static string 	m_work_path;
+	static string   m_ext_list_file;
+
+	static vector<stExtension> m_ext_list;
+
 	static string	m_localhostname;
 	static string	m_encoding;
 	static string	m_hostip;
@@ -549,12 +555,17 @@ public:
 	static BOOL LoadConfig();
 	static BOOL UnLoadConfig();
 
-	static BOOL LoadList();
-	static BOOL UnLoadList();
+	static BOOL LoadAccessList();
+	static BOOL LoadExtensionList();
 	
 	/* Pure virual function	*/
 	virtual BOOL LineParse(char* text) = 0;
 	virtual int ProtRecv(char* buf, int len) = 0;
+
+private:
+	static void _load_permit_();
+	static void _load_reject_();
+	static void _load_ext_();
 };
 
 #endif /* _MAILSYS_H_ */

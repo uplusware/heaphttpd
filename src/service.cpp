@@ -38,6 +38,7 @@ typedef struct
 
 enum CLIENT_PARAM_CTRL{
 	SessionParamData = 0,
+	SessionParamExt,
 	SessionParamQuit
 };
 
@@ -400,10 +401,16 @@ void Worker::Working()
 			fprintf(stderr, "RECV_FD error, clt_sockfd = %d %s %d\n", clt_sockfd, __FILE__, __LINE__);
 			bQuit = true;
 		}
+
 		if(client_param.ctrl == SessionParamQuit)
 		{
 			printf("QUIT\n");
 			bQuit = true;
+		}
+		else if(client_param.ctrl == SessionParamExt)
+		{
+			printf("Reload extensions\n");
+			CHttpBase::LoadExtensionList();
 		}
 		else
 		{
@@ -513,7 +520,7 @@ void Service::ReloadConfig()
 	printf("Reload %s OK\n", SVR_DESP_TBL[m_st]);
 }
 
-void Service::ReloadList()
+void Service::ReloadAccess()
 {
 	string strqueue = "/.niuhttpd_";
 	strqueue += m_service_name;
@@ -531,6 +538,34 @@ void Service::ReloadList()
 
 	stQueueMsg qMsg;
 	qMsg.cmd = MSG_LIST_RELOAD;
+	sem_wait(m_service_sid);
+	mq_send(m_service_qid, (const char*)&qMsg, sizeof(stQueueMsg), 0);
+	sem_post(m_service_sid);
+	
+	if(m_service_qid != (mqd_t)-1)
+		mq_close(m_service_qid);
+	if(m_service_sid != SEM_FAILED)
+		sem_close(m_service_sid);
+}
+
+void Service::ReloadExtension()
+{
+	string strqueue = "/.niuhttpd_";
+	strqueue += m_service_name;
+	strqueue += "_queue";
+
+	string strsem = "/.niuhttpd_";
+	strsem += m_service_name;
+	strsem += "_lock";
+	
+	m_service_qid = mq_open(strqueue.c_str(), O_RDWR);
+	m_service_sid = sem_open(strsem.c_str(), O_RDWR);
+
+	if(m_service_qid == (mqd_t)-1 || m_service_sid == SEM_FAILED)
+		return;
+
+	stQueueMsg qMsg;
+	qMsg.cmd = MSG_EXT_RELOAD;
 	sem_wait(m_service_sid);
 	mq_send(m_service_qid, (const char*)&qMsg, sizeof(stQueueMsg), 0);
 	sem_post(m_service_sid);
@@ -725,6 +760,16 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 					svr_exit = TRUE;
 					break;
 				}
+				else if(pQMsg->cmd == MSG_EXT_RELOAD)
+				{
+					for(int j = 0; j < m_work_processes.size(); j++)
+					{
+						CLIENT_PARAM client_param;
+						client_param.ctrl = SessionParamExt;
+						
+						SEND_FD(m_work_processes[j].sockfds[0], 0, &client_param);
+					}
+				}
 				else if(pQMsg->cmd == MSG_GLOBAL_RELOAD)
 				{
 					CHttpBase::UnLoadConfig();
@@ -732,8 +777,11 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 				}
 				else if(pQMsg->cmd == MSG_LIST_RELOAD)
 				{
-					CHttpBase::UnLoadList();
-					CHttpBase::LoadList();
+					CHttpBase::LoadAccessList();
+				}
+				else if(pQMsg->cmd == MSG_EXT_RELOAD)
+				{
+					CHttpBase::LoadExtensionList();
 				}
 				else if(pQMsg->cmd == MSG_REJECT)
 				{
