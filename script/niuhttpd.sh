@@ -1,8 +1,18 @@
-#!/bin/bash
-
+#!/bin/sh
+# kFreeBSD do not accept scripts as interpreters, using #!/bin/sh and sourcing.
+### BEGIN INIT INFO
+# Provides:          uplusware
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: niuhttpd control script
+# Description:       This file is copied from /etc/init.d/skeleton
+### END INIT INFO
+# Author: Uplusware <uplusware@gmail.com>
 #
-# niuhttpd control script
-#
+DESC="niuhttpd control script"
+DAEMON=/usr/bin/niuhttpd
 
 test -x /usr/bin/niuhttpd || exit 0
 

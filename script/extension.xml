@@ -1,6 +1,11 @@
+<!--- action:                                                           -->
+<!---      default: keep the default action                             -->
+<!---         skip: skip the default response after recieve the request -->
+<!--- action:                                                           -->
+
 <? xml version="1.0" encoding="UTF-8" ?>
 <niuhttpd>
-	<extension libso="/var/niuhttpd/ext/libextsample1.so" action="x" />
-	<extension libso="/var/niuhttpd/ext/libextsample2.so" action="a" />
-	<extension libso="/var/niuhttpd/ext/libextsample3.so" action="d" />
+	<extension libso="/var/niuhttpd/ext/libextsample1.so" action="default" />
+	<extension libso="/var/niuhttpd/ext/libextsample2.so" action="default" />
+	<extension libso="/var/niuhttpd/ext/libextsample3.so" action="default" />
 </niuhttpd>
