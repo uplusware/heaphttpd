@@ -57,8 +57,6 @@ static int Run()
 {
 	CUplusTrace uTrace(LOGNAME, LCKNAME);
 	uTrace.Write(Trace_Msg, "%s", "Service starts");
-	
-	/* CHttpBase::LoadConfig(); */
 
 	int retVal = 0;
 	int http_pid = -1, https_pid = -1;

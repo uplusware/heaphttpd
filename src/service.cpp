@@ -441,23 +441,11 @@ Service::Service(Service_Type st)
 	m_sockfd = -1;
 	m_st = st;
 	m_service_name = SVR_NAME_TBL[m_st];
-#ifdef CYGWIN
-	m_cache = NULL;
-	
-	if((m_st == stHTTP) || (m_st == stHTTPS))
-	{
-		m_cache = new memory_cache(m_service_name.c_str(), m_process_seq, CHttpBase::m_work_path.c_str());
-		m_cache->load();
-	}
-#endif /* CYGWIN */
 }
 
 Service::~Service()
 {
-#ifdef CYGWIN
-	if(m_cache)
-		delete m_cache;
-#endif /* CYGWIN */
+
 }
 
 void Service::Stop()
@@ -579,7 +567,6 @@ void Service::ReloadExtension()
 int Service::Run(int fd, const char* hostip, unsigned short nPort)
 {	
 	CUplusTrace uTrace(LOGNAME, LCKNAME);
-	/* CHttpBase::LoadConfig(); */
 
 	m_child_list.clear();
 	unsigned int result = 0;
@@ -624,10 +611,6 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 	int qBufLen = attr.mq_msgsize;
 	char* qBufPtr = (char*)malloc(qBufLen);
 
-#ifdef CYGWIN
-	ThreadPool WorkerPool(CHttpBase::m_max_instance_thread_num, 
-	    INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, LEAVE_THREAD_POOL_HANDLER);
-#else
 	m_next_process = 0;
 	for(int i = 0; i < CHttpBase::m_max_instance_num; i++)
 	{
@@ -666,7 +649,6 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 			fprintf(stderr, "fork error, work_pid = %d, %S %d\n", work_pid, __FILE__, __LINE__);
 		}
 	}
-#endif /* CYGWIN */
 
 	while(!svr_exit)
 	{		
@@ -762,6 +744,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 				}
 				else if(pQMsg->cmd == MSG_EXT_RELOAD)
 				{
+					CHttpBase::LoadExtensionList();
 					for(int j = 0; j < m_work_processes.size(); j++)
 					{
 						CLIENT_PARAM client_param;
@@ -778,10 +761,6 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 				else if(pQMsg->cmd == MSG_LIST_RELOAD)
 				{
 					CHttpBase::LoadAccessList();
-				}
-				else if(pQMsg->cmd == MSG_EXT_RELOAD)
-				{
-					CHttpBase::LoadExtensionList();
 				}
 				else if(pQMsg->cmd == MSG_REJECT)
 				{
@@ -905,28 +884,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 						close(clt_sockfd);
 					}
 					else
-					{
-#ifdef CYGWIN						
-						SESSION_PARAM* session_param = new SESSION_PARAM;
-                	    session_param->srvobjmap = &m_srvobjmap;
-						session_param->sockfd = clt_sockfd;
-						
-						session_param->client_ip = client_ip;
-						session_param->svr_type = m_st;
-						session_param->cache = m_cache;
-
-                        session_param->ca_crt_root = CHttpBase::m_ca_crt_root;
-                   		session_param->ca_crt_server = CHttpBase::m_ca_crt_server;
-            		    session_param->ca_password = CHttpBase::m_ca_password;
-		                session_param->ca_key_server = CHttpBase::m_ca_key_server;
-		                session_param->client_cer_check = CHttpBase::m_client_cer_check;
-
-						pthread_mutex_lock(&STATIC_THREAD_POOL_MUTEX);
-						STATIC_THREAD_POOL_ARG_QUEUE.push(session_param);
-						pthread_mutex_unlock(&STATIC_THREAD_POOL_MUTEX);
-
-						sem_post(&STATIC_THREAD_POOL_SEM);
-#else					                    
+					{					                    
 						char pid_file[1024];
 						sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid",
 						    m_service_name.c_str(), m_next_process);
@@ -980,7 +938,6 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 
 						client_param.ctrl = SessionParamData;
 						SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param);
-#endif /* CYGWIN */
 		
 					}
 				}
@@ -1009,9 +966,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 
 	mq_unlink(strqueue.c_str());
 	sem_unlink(strsem.c_str());
-#ifdef CYGWIN
-	m_srvobjmap.ReleaseAll();
-#endif /* CYGWIN */
+
 	CHttpBase::UnLoadConfig();
 	
 	return 0;

@@ -121,6 +121,9 @@ public:
 	
 	X509* GetClientX509Cert() { return m_client_cert; }
 	
+	void SetExtensionDate(void* extdata) { m_extdata = extdata; }
+	void* GetExtensionDate() { return m_extdata; }
+
 private:
     int HttpSend(const char* buf, int len);
     int HttpRecv(char* buf, int len);
@@ -187,6 +190,8 @@ protected:
     ServiceObjMap* m_srvobj;
     
     map<string, string> m_set_cookies;
+
+    void* m_extdata;
 };
 
 #endif /* _HTTP_H_ */
