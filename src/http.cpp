@@ -512,6 +512,7 @@ Http_Connection CHttp::LineParse(char* text)
         }
 
         //Extension hook 1
+        BOOL skipAction = FALSE;
         for(int x = 0; x < m_ext_list->size(); x++)
         {
             void* (*ext_request)(CHttp*, const char*);
@@ -520,43 +521,47 @@ Http_Connection CHttp::LineParse(char* text)
             if((errmsg = dlerror()) == NULL)
             {
                 ext_request(this, (*m_ext_list)[x].action.c_str());
+                if((*m_ext_list)[x].action == "skip")
+                    skipAction = TRUE;
             }
         }
 
-        Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), 
-            m_fpm_socktype.c_str(), m_fpm_sockfile.c_str(), 
-            m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str(),
-            m_fastcgi_name.c_str(), m_fastcgi_pgm.c_str(), 
-            m_fastcgi_socktype.c_str(), m_fastcgi_sockfile.c_str(), 
-            m_fastcgi_addr.c_str(), m_fastcgi_port);
-
-        //Extension hook 2
-        for(int x = 0; x < m_ext_list->size(); x++)
+        if(!skipAction)
         {
-            void* (*ext_response)(CHttp*, const char*, Htdoc*);
-            ext_response = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_response");
-            const char* errmsg;
-            if((errmsg = dlerror()) == NULL)
-            {
-                ext_response(this, (*m_ext_list)[x].action.c_str(), doc);
-            }
-        }
-        doc->Response();
-        
-        //Extension hook 3
-        for(int x = 0; x < m_ext_list->size(); x++)
-        {
-            void* (*ext_finish)(CHttp*, const char*, Htdoc*);
-            ext_finish = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_finish");
-            const char* errmsg;
-            if((errmsg = dlerror()) == NULL)
-            {
-                ext_finish(this, (*m_ext_list)[x].action.c_str(), doc);
-            }
-        }
+            Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), 
+                m_fpm_socktype.c_str(), m_fpm_sockfile.c_str(), 
+                m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str(),
+                m_fastcgi_name.c_str(), m_fastcgi_pgm.c_str(), 
+                m_fastcgi_socktype.c_str(), m_fastcgi_sockfile.c_str(), 
+                m_fastcgi_addr.c_str(), m_fastcgi_port);
 
-        delete doc;
+            //Extension hook 2
+            for(int x = 0; x < m_ext_list->size(); x++)
+            {
+                void* (*ext_response)(CHttp*, const char*, Htdoc*);
+                ext_response = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_response");
+                const char* errmsg;
+                if((errmsg = dlerror()) == NULL)
+                {
+                    ext_response(this, (*m_ext_list)[x].action.c_str(), doc);
+                }
+            }
+            doc->Response();
+            
+            //Extension hook 3
+            for(int x = 0; x < m_ext_list->size(); x++)
+            {
+                void* (*ext_finish)(CHttp*, const char*, Htdoc*);
+                ext_finish = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_finish");
+                const char* errmsg;
+                if((errmsg = dlerror()) == NULL)
+                {
+                    ext_finish(this, (*m_ext_list)[x].action.c_str(), doc);
+                }
+            }
 
+            delete doc;
+        }
 		return m_keep_alive ? httpKeepAlive : httpClose;
     }
     else
