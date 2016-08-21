@@ -185,18 +185,13 @@ public:
 	void ReloadConfig();
 	void ReloadAccess();
 	void ReloadExtension();
-#ifdef CYGWIN    
-	memory_cache* m_cache;
-#endif /* CYGWIN*/
 
 protected:
 	mqd_t m_service_qid;
-#ifdef CYGWIN
-	ServiceObjMap m_srvobjmap;
-#endif /* CYGWIN*/
 	sem_t* m_service_sid;
 	string m_service_name;
 	int m_sockfd;
+	int m_ctrl_fd;
 	Service_Type m_st;
 	list<pid_t> m_child_list;
 	vector<WORK_PROCESS_INFO> m_work_processes;
