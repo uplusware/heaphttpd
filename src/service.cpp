@@ -525,7 +525,38 @@ void Service::ReloadAccess()
 		return;
 
 	stQueueMsg qMsg;
-	qMsg.cmd = MSG_LIST_RELOAD;
+	qMsg.cmd = MSG_ACCESS_RELOAD;
+	sem_wait(m_service_sid);
+	mq_send(m_service_qid, (const char*)&qMsg, sizeof(stQueueMsg), 0);
+	sem_post(m_service_sid);
+	
+	if(m_service_qid != (mqd_t)-1)
+		mq_close(m_service_qid);
+	if(m_service_sid != SEM_FAILED)
+		sem_close(m_service_sid);
+}
+
+void Service::AppendReject(const char* data)
+{
+	string strqueue = "/.niuhttpd_";
+	strqueue += m_service_name;
+	strqueue += "_queue";
+
+	string strsem = "/.niuhttpd_";
+	strsem += m_service_name;
+	strsem += "_lock";
+	
+	m_service_qid = mq_open(strqueue.c_str(), O_RDWR);
+	m_service_sid = sem_open(strsem.c_str(), O_RDWR);
+
+	if(m_service_qid == (mqd_t)-1 || m_service_sid == SEM_FAILED)
+		return;
+
+	stQueueMsg qMsg;
+	qMsg.cmd = MSG_REJECT_APPEND;
+	strncpy(qMsg.data.reject_ip, data, 255);
+	qMsg.data.reject_ip[255] = '\0';
+
 	sem_wait(m_service_sid);
 	mq_send(m_service_qid, (const char*)&qMsg, sizeof(stQueueMsg), 0);
 	sem_post(m_service_sid);
@@ -553,7 +584,7 @@ void Service::ReloadExtension()
 		return;
 
 	stQueueMsg qMsg;
-	qMsg.cmd = MSG_EXT_RELOAD;
+	qMsg.cmd = MSG_EXTENSION_RELOAD;
 	sem_wait(m_service_sid);
 	mq_send(m_service_qid, (const char*)&qMsg, sizeof(stQueueMsg), 0);
 	sem_post(m_service_sid);
@@ -742,7 +773,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 					svr_exit = TRUE;
 					break;
 				}
-				else if(pQMsg->cmd == MSG_EXT_RELOAD)
+				else if(pQMsg->cmd == MSG_EXTENSION_RELOAD)
 				{
 					CHttpBase::LoadExtensionList();
 					for(int j = 0; j < m_work_processes.size(); j++)
@@ -758,11 +789,11 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 					CHttpBase::UnLoadConfig();
 					CHttpBase::LoadConfig();
 				}
-				else if(pQMsg->cmd == MSG_LIST_RELOAD)
+				else if(pQMsg->cmd == MSG_ACCESS_RELOAD)
 				{
 					CHttpBase::LoadAccessList();
 				}
-				else if(pQMsg->cmd == MSG_REJECT)
+				else if(pQMsg->cmd == MSG_REJECT_APPEND)
 				{
 					//firstly erase the expire record
 					vector<stReject>::iterator x;

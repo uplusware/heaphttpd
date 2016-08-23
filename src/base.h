@@ -46,12 +46,11 @@ using namespace std;
 #define MAX_PASSWORD_LEN	16
 #define MAX_EMAIL_LEN	5000 //about 5M attachment file
 
-#define MSG_EXIT			0xFF
-#define MSG_GLOBAL_RELOAD	0xFE
-#define MSG_FORWARD			0xFD
-#define MSG_REJECT			0xFC
-#define MSG_LIST_RELOAD		0xFB
-#define MSG_EXT_RELOAD		0xFA
+#define MSG_EXIT				0xFF
+#define MSG_GLOBAL_RELOAD		0xFE
+#define MSG_REJECT_APPEND   	0xFC
+#define MSG_ACCESS_RELOAD		0xFB
+#define MSG_EXTENSION_RELOAD	0xFA
 
 typedef struct
 {

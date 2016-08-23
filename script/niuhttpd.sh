@@ -9,7 +9,7 @@
 # Short-Description: niuhttpd control script
 # Description:       This file is copied from /etc/init.d/skeleton
 ### END INIT INFO
-# Author: Uplusware <uplusware@gmail.com>
+# Author: uplusware.org <uplusware@gmail.com>
 #
 DESC="niuhttpd control script"
 DAEMON=/usr/bin/niuhttpd
@@ -45,6 +45,11 @@ niuhttpd_reload()
 niuhttpd_access()
 {
 	/usr/bin/niuhttpd access
+}
+
+niuhttpd_reject()
+{
+	/usr/bin/niuhttpd reject $1
 }
 
 niuhttpd_extension()
@@ -84,6 +89,10 @@ case "${1:-''}" in
 	niuhttpd_access
 	;;
 
+	'reject')
+	niuhttpd_reject $2
+	;;
+
     'extension')
 	niuhttpd_extension
 	;;
@@ -97,7 +106,7 @@ case "${1:-''}" in
 	;;
 	
 	*)
-	echo "Usage: $SELF Usage:niuhttpd start | stop | status | reload | access | extension | version [CONFIG FILE]"
+	echo "Usage: $SELF Usage:niuhttpd start | stop | status | reload | access | reject [ip] | extension | version"
 	exit 1
 	;;
 esac

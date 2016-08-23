@@ -37,7 +37,7 @@ using namespace std;
 
 static void usage()
 {
-	printf("Usage:niuhttpd start | stop | status | reload | access | extension | version [CONFIG FILE]\n");
+	printf("Usage:niuhttpd start | stop | status | reload | access | reject [ip] | extension | version\n");
 }
 
 //set to daemon mode
@@ -198,6 +198,17 @@ static int ReloadAccess()
 	https_svr.ReloadAccess();
 }
 
+static int AppendReject(const char* data)
+{
+	printf("Append niuhttpd reject list ...\n");
+
+	Service http_svr(stHTTP);
+	http_svr.AppendReject(data);
+
+	Service https_svr(stHTTPS);
+	https_svr.AppendReject(data);
+}
+
 static int ReloadExtension()
 {
 	printf("Reload niuhttpd extension ...\n");
@@ -208,7 +219,7 @@ static int ReloadExtension()
 	Service https_svr(stHTTPS);
 	https_svr.ReloadExtension();
 }
-static int processcmd(const char* cmd, const char* conf, const char* permit, const char* reject)
+static int processcmd(const char* cmd, const char* conf, const char* permit, const char* reject, const char* data)
 {
 	CHttpBase::SetConfigFile(conf, permit, reject);
 	if(!CHttpBase::LoadConfig())
@@ -232,6 +243,10 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 	else if(strcasecmp(cmd, "access") == 0)
 	{
 		ReloadAccess();
+	}
+	else if(strcasecmp(cmd, "reject") == 0 && data != NULL)
+	{
+		AppendReject(data);
 	}
 	else if(strcasecmp(cmd, "extension") == 0)
 	{
@@ -296,7 +311,11 @@ int main(int argc, char* argv[])
     
     if(argc == 2)
     {
-        processcmd(argv[1], CONFIG_FILE_PATH, PERMIT_FILE_PATH, REJECT_FILE_PATH);
+        processcmd(argv[1], CONFIG_FILE_PATH, PERMIT_FILE_PATH, REJECT_FILE_PATH, NULL);
+    }
+    else if(argc == 3)
+    {
+        processcmd(argv[1], CONFIG_FILE_PATH, PERMIT_FILE_PATH, REJECT_FILE_PATH, argv[2]);
     }
     else
     {

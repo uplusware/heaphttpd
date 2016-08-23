@@ -185,6 +185,7 @@ public:
 	void ReloadConfig();
 	void ReloadAccess();
 	void ReloadExtension();
+	void AppendReject(const char* data);
 
 protected:
 	mqd_t m_service_qid;
