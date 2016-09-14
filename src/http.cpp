@@ -18,6 +18,8 @@
 #include "htdoc.h"
 #include "fstring.h"
 #include "http.h"
+#include "http2.h"
+#include "http2comm.h"
 #include "util/general.h"
 #include "niuapi.h"
 #include "serviceobj.h"
@@ -27,7 +29,7 @@
 
 const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" };
 
-CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp::CHttp(BOOL http2, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
 	const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
     const char* fpm_socktype, const char* fpm_sockfile,
@@ -37,7 +39,7 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
     const char* fastcgi_addr, unsigned short fastcgi_port,
 	const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme, 
 	SSL* ssl)
-{
+{	
     m_srvobj = srvobj;
     m_web_socket_handshake = Websocket_None;
     m_keep_alive = TRUE; //HTTP 1.1 Keep-Alive is enabled as default
@@ -110,7 +112,8 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	}
 
 	m_content_type = application_x_www_form_urlencoded;
-
+	if(http2)
+        m_http2 = new CHttp2(this);
 	return;
 }
 
@@ -123,19 +126,22 @@ CHttp::~CHttp()
 	{
 		if(m_sockfd > 0)
 		{
-			close(m_sockfd);
+			shutdown(m_sockfd, 2);
 			m_sockfd = -1;
 		}
 	}
-	
+    
 	if(m_postdata_ex)
 		delete m_postdata_ex;
 
 	if(m_formdata)
 		delete m_formdata;
 
+    if(m_http2)
+        delete m_http2;
+    
 	if(m_lsockfd)
-		delete m_lsockfd;	
+		delete m_lsockfd;
 }
 
 int CHttp::HttpSend(const char* buf, int len)
@@ -152,17 +158,64 @@ int CHttp::HttpRecv(char* buf, int len)
 {
     //printf("%s\n", buf);
 	if(m_ssl)
+	{
+		//printf("m_lssl->drecv(%p, %d)\n", buf, len);
 		return m_lssl->drecv(buf, len);
+	}
 	else
 		return m_lsockfd->drecv(buf, len);	
 }
 
 int CHttp::ProtRecv(char* buf, int len)
 {
-	if(m_ssl)
-		return m_lssl->lrecv(buf, len);
-	else
-		return m_lsockfd->lrecv(buf, len);
+    if(m_ssl)
+        return m_lssl->lrecv(buf, len);
+    else
+        return m_lsockfd->lrecv(buf, len);
+}
+
+Http_Connection CHttp::HTTPProcessing()
+{
+    Http_Connection httpConn = httpKeepAlive;
+    int result;
+    char sz_http_data[4096];
+    while(1)
+    {
+        result = ProtRecv(sz_http_data, 4095);
+        if(result <= 0)
+        {
+            httpConn = httpClose; // socket is broken. close the keep-alive connection
+            break;
+        }
+        else
+        {
+            sz_http_data[result] = '\0';
+            httpConn = LineParse((const char*)sz_http_data);
+            if(httpConn != httpContinue) // Session finished or keep-alive connection closed.
+                break;
+        }
+    }
+    
+    return httpConn;
+}
+
+Http_Connection CHttp::HTTP2Processing()
+{
+    Http_Connection httpConn = httpKeepAlive;
+    if(m_http2)
+	{
+        while(1)
+        {
+            int result = m_http2->ProtRecv();
+            if(result <= 0)
+            {
+                httpConn = httpClose;
+                break;
+            }
+        }
+        return httpConn;
+	}
+    return httpClose;
 }
 
 void CHttp::SetCookie(const char* szName, const char* szValue,
@@ -267,12 +320,21 @@ int CHttp::SendHeader(const char* buf, int len)
 	}
 	
     strHeader += "\r\n";
-    return HttpSend(strHeader.c_str(), strHeader.length());
+    if(m_http2)
+    {
+        m_http2->ParseHTTP1Header(strHeader.c_str(), strHeader.length());
+    }
+    else
+        return HttpSend(strHeader.c_str(), strHeader.length());
 }
 
 int CHttp::SendContent(const char* buf, int len)
-{
-    return HttpSend(buf, len);
+{   if(m_http2)
+    {
+        return m_http2->ParseHTTP1Content(buf, len);
+    }
+    else
+        return HttpSend(buf, len);
 }
 void CHttp::ParseMethod(const string & strtext)
 {
@@ -300,12 +362,11 @@ void CHttp::ParseMethod(const string & strtext)
 	m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
 }
 
-Http_Connection CHttp::LineParse(char* text)
+Http_Connection CHttp::LineParse(const char* text)
 {
     string strtext;
     m_line_text += text;
     std::size_t new_line = m_line_text.find('\n');
-    
     if( new_line == std::string::npos)
     {
         return httpContinue;
@@ -317,8 +378,6 @@ Http_Connection CHttp::LineParse(char* text)
     }
 
 	strtrim(strtext);
-	
-	/* printf("%s\n", strtext.c_str()); */
 	
 	if(strncasecmp(strtext.c_str(),"GET ", 4) == 0)
 	{	
@@ -548,6 +607,8 @@ Http_Connection CHttp::LineParse(char* text)
             }
             doc->Response();
             
+            if(m_http2)
+                m_http2->SendContentEOF();
             //Extension hook 3
             for(int x = 0; x < m_ext_list->size(); x++)
             {

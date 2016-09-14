@@ -361,8 +361,9 @@ void doc::Response()
                     int rest_length = nResourceLength - content_ranges[v].beg;
                     if(rest_length <= 0)
                         continue;
-                    m_session->SendContent(file_cache_buf + content_ranges[v].beg, 
-                        rest_length > content_ranges[v].len ? content_ranges[v].len : rest_length);
+                    if(m_session->GetMethod() != hmHead)
+                        m_session->SendContent(file_cache_buf + content_ranges[v].beg, 
+                            rest_length > content_ranges[v].len ? content_ranges[v].len : rest_length);
                 }
             }
         }
@@ -425,7 +426,8 @@ void doc::Response()
                             break;
                         
                         int rlen = ifsResource.gcount();
-                        m_session->SendContent(rbuf, rlen);
+                        if(m_session->GetMethod() != hmHead)
+                            m_session->SendContent(rbuf, rlen);
                     }
                 }
             }
@@ -448,7 +450,8 @@ void doc::Response()
                             
                             int rlen = ifsResource.gcount();
                             len_sum += rlen;
-                            m_session->SendContent(rbuf, rlen);
+                            if(m_session->GetMethod() != hmHead)
+                                m_session->SendContent(rbuf, rlen);
                             if(len_sum == content_ranges[v].len)
                                 break;
                         }

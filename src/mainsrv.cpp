@@ -294,11 +294,12 @@ static void handle_signal(int sid)
 	signal(SIGPIPE, handle_signal);
 }
 
+#include "util/huffman.h"
+
 int main(int argc, char* argv[])
-{	
+{
     mkdir("/tmp/niuhttpd", 0777);
     chmod("/tmp/niuhttpd", 0777);
-
 
     mkdir("/var/log/niuhttpd/", 0744);
     

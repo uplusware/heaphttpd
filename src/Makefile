@@ -13,7 +13,7 @@ WSLIBOBJS = websocket.o
 
 HTTPLIB = libniuhttp.so
 HTTPLIBOBJS =   httpsessionvar.o httpservervar.o cookie.o   \
-                http.o httpcomm.o cache.o htdoc.o \
+                http.o httpcomm.o cache.o htdoc.o http2.o http2comm.o hpack.o   \
                 fstring.o webdoc.o webcgi.o niuapi.o wwwauth.o fastcgi.o	\
                 util/digcalc.o	            \
                 util/sha1.o                 \
@@ -22,6 +22,7 @@ HTTPLIBOBJS =   httpsessionvar.o httpservervar.o cookie.o   \
                 util/trace.o	            \
                 util/sysdep.o               \
                 util/uuid.o                 \
+                util/huffman.o              \
                 tinyxml/tinyxmlparser.o	    \
                 tinyxml/tinyxmlerror.o      \
                 tinyxml/tinyxml.o           \
@@ -32,15 +33,21 @@ MDEF = CYGWIN
 else
 MDEF = _LINUX_OS_
 endif
+ifdef TLSV1_2
+TLSV_DEF = TLSV1_2_SUPPORT
+else
+TLSV_DEF = SSLV23_SUPPORT
+endif
+
 INCDIR =
-LDDIRS = -L.
+LDDIRS = -L. -L/usr/local/lib
 LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lniuauth -lniuwebsocket
-LDLIST_SVR = -lstdc++ -lrt -ldl -lssl -lcrypto  -lpthread -lniuhttp -lniuauth -lniuwebsocket
+LDLIST_SVR = -lstdc++ -lrt -ldl -lssl -lcrypto -lpthread -lniuhttp -lniuauth -lniuwebsocket
 LDLIST_TOOL = -lstdc++
 LDLIST_AUTH = -lstdc++
 LDLIST_WS = -lstdc++ -lssl -lcrypto
 
-FLAGS = -O2 -fPIC -w
+FLAGS = -g -fPIC -w
 
 all: libws libauth libhttp websrv pgmtool
 
@@ -67,7 +74,7 @@ $(WSLIB): $(WSLIBOBJS)
 	$(CC) -shared -W -fPIC -o $@ $(WSLIBOBJS) $(LDDIRS) $(LDLIST_WS)
     
 %.o : %.cpp
-	$(CC) -D$(MDEF) $(INCDIR) $(FLAGS) -c $< -o $@
+	$(CC) -D$(MDEF) -D$(TLSV_DEF) $(INCDIR) $(FLAGS) -c $< -o $@
 
 clean:
 	-rm -f  $(HTTPSRV) $(HTTPLIB) $(WSLIB) $(AUTHLIB) $(NIUTOOL) $(WSLIBOBJS) $(HTTPSRVOBJS) $(NIUTOOLOBJS) $(HTTPLIBOBJS) $(AUTHLIBOBJS) *.elf *.gdb *.o *.a *.so

@@ -27,6 +27,7 @@ typedef struct
 	int sockfd;
 	string client_ip;
 	Service_Type svr_type;
+	BOOL   http2;
     string ca_crt_root;
     string ca_crt_server;
     string ca_password;
@@ -46,7 +47,7 @@ typedef struct {
 	CLIENT_PARAM_CTRL ctrl;
 	char client_ip[128];
     Service_Type svr_type;
-
+	BOOL http2;
     char ca_crt_root[256];
     char ca_crt_server[256];
     char ca_password[256];
@@ -140,8 +141,55 @@ static pthread_mutex_t STATIC_THREAD_POOL_MUTEX;
 static sem_t STATIC_THREAD_POOL_SEM;
 static volatile unsigned int STATIC_THREAD_POOL_SIZE = 0;
 
+/*
+OpenSSL example:
+	unsigned char vector[] = {
+	 6, 's', 'p', 'd', 'y', '/', '1',
+	 8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+	};
+	unsigned int length = sizeof(vector);
+*/
+
+static int alpn_cb(SSL *ssl,
+				const unsigned char **out,
+				unsigned char *outlen,
+				const unsigned char *in,
+				unsigned int inlen,
+				void *arg)
+{
+	unsigned char* p = (unsigned char*)in;
+	while(inlen > 0 && in && (p - in) < inlen)
+	{
+		int len = p[0];
+		p++;
+		for(int x = 0; x < len; x++)
+		{
+			printf("%c", p[x]);
+		}
+		printf(" %d %d\n", SSL_TLSEXT_ERR_OK, SSL_TLSEXT_ERR_NOACK);
+		
+		if(len == 2)
+		{
+			if(memcmp(p, "h2", 2) == 0)
+			{
+				BOOL* pIsHttp2 = (BOOL*)arg;
+				*pIsHttp2 = TRUE;
+				*out = p;
+				*outlen = len;
+				return SSL_TLSEXT_ERR_OK;
+			}
+		}
+		p = p + len;
+	}
+	
+	*out = NULL;
+	*outlen = 0;
+	return SSL_TLSEXT_ERR_NOACK;
+}
+
 static void SESSION_HANDLING(SESSION_PARAM* session_param)
 {
+	BOOL isHttp2 = FALSE;
 	Session* pSession = NULL;
     SSL* ssl = NULL;
     int ssl_rc = -1;
@@ -151,9 +199,13 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
     if(session_param->svr_type == stHTTPS)
 	{
 		SSL_METHOD* meth;
+#ifndef TLSV1_2_SUPPORT
 		SSL_load_error_strings();
 		OpenSSL_add_ssl_algorithms();
-		meth = (SSL_METHOD*)SSLv23_server_method();
+#else
+        OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
+#endif /* 0 */
+		meth = (SSL_METHOD*)TLSv1_2_server_method();
 		ssl_ctx = SSL_CTX_new(meth);
 		if(!ssl_ctx)
 		{
@@ -193,7 +245,10 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             goto clean_ssl3;
         }
 		SSL_CTX_set_mode(ssl_ctx, SSL_MODE_AUTO_RETRY);
-
+		
+		if(session_param->http2)
+			SSL_CTX_set_alpn_select_cb(ssl_ctx, alpn_cb, &isHttp2);
+		
 		ssl = SSL_new(ssl_ctx);
 		if(!ssl)
 		{
@@ -244,9 +299,9 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 			}
 		}
 	}
-
+	
 	pSession = new Session(session_param->srvobjmap, session_param->sockfd, ssl,
-        session_param->client_ip.c_str(), client_cert, session_param->svr_type, session_param->cache);
+        session_param->client_ip.c_str(), client_cert, session_param->svr_type, isHttp2, session_param->cache);
 	if(pSession != NULL)
 	{
 		pSession->Process();
@@ -420,6 +475,7 @@ void Worker::Working()
 			session_param->sockfd = clt_sockfd;
 			session_param->client_ip = client_param.client_ip;
 			session_param->svr_type = client_param.svr_type;
+			session_param->http2 = client_param.http2;
 		    session_param->ca_crt_root = client_param.ca_crt_root;
        		session_param->ca_crt_server = client_param.ca_crt_server;
 		    session_param->ca_password = client_param.ca_password;
@@ -956,7 +1012,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 						strncpy(client_param.client_ip, client_ip.c_str(), 127);
 						client_param.client_ip[127] = '\0';
 						client_param.svr_type = m_st;
-
+						client_param.http2 = CHttpBase::m_enablehttp2;
                         strncpy(client_param.ca_crt_root, CHttpBase::m_ca_crt_root.c_str(), 255);
                         client_param.ca_crt_root[255] = '\0';
                    		strncpy(client_param.ca_crt_server, CHttpBase::m_ca_crt_server.c_str(), 255);
@@ -969,6 +1025,7 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 
 						client_param.ctrl = SessionParamData;
 						SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param);
+                        close(clt_sockfd);
 		
 					}
 				}

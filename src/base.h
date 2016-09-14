@@ -295,6 +295,7 @@ public:
 			dlen = 0;
 			
 			int len = SSLRead(sockfd, sslhd, pbuf + dlen, blen - dlen);
+			//printf("SSLRead: %d\n", len);
 			if(len > 0)
 			{
 				rlen = rlen + len;	
@@ -378,6 +379,11 @@ public:
 				len = SSL_read(sslhd, pbuf + nRecv, blen - nRecv);
                 if(len == 0)
 				{
+					ret = SSL_get_error(sslhd, len);
+					if(ret == SSL_ERROR_ZERO_RETURN)
+					{
+						printf("SSL_read: shutdown by the peer\n");
+					}
                     close(sockfd);
                     return -1;
                 }
@@ -442,6 +448,11 @@ public:
 			len = SSL_read(sslhd, pbuf + nRecv, blen - nRecv);
 			if(len <= 0)
 			{
+				ret = SSL_get_error(sslhd, len);
+				if(ret == SSL_ERROR_ZERO_RETURN)
+				{
+					printf("SSL_read: shutdown by the peer\n");
+				}
 				close(sockfd);
 				return -1;
 			}
@@ -500,6 +511,8 @@ public:
 	
 	static BOOL		m_enablehttps;
 	static unsigned short	m_httpsport;
+	static BOOL     m_enablehttp2;
+	
 	static string 	m_www_authenticate;
 	static BOOL 	m_client_cer_check;
 	static string	m_ca_crt_root;
@@ -542,8 +555,8 @@ public:
 	static vector<stReject> m_reject_list;
 	static vector<string> m_permit_list;
 
-	static unsigned char m_rsa_pub_key[128];
-	static unsigned char m_rsa_pri_key[128];
+	/*static unsigned char m_rsa_pub_key[128];
+	static unsigned char m_rsa_pri_key[128];*/
 	
 public:	
 	CHttpBase();

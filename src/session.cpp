@@ -5,13 +5,14 @@
 
 #include "session.h"
 
-Session::Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, Service_Type st, memory_cache* ch)
+Session::Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, Service_Type st, BOOL http2, memory_cache* ch)
 {
     m_srvobj = srvobj;
 	m_sockfd = sockfd;
     m_ssl = ssl;
 	m_clientip = clientip;
 	m_st = st;
+	m_http2 = http2;
 	m_client_cert = client_cert;
 	m_cache = ch;
 }
@@ -43,7 +44,7 @@ void Session::Process()
         {
             if(m_st == stHTTP)
             {
-                pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
+                pProtocol = new CHttp(false, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
                     m_clientip.c_str(), m_client_cert, m_cache,
 					CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(),
                     CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
@@ -56,7 +57,7 @@ void Session::Process()
             }
             else if(m_st == stHTTPS)
             {
-                pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
+                pProtocol = new CHttp(m_http2, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
                     m_clientip.c_str(), m_client_cert, m_cache,
 					CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
                     CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
@@ -74,29 +75,20 @@ void Session::Process()
         }
         catch(string* e)
         {
-            //printf("catched exception: %s\n", e->c_str());
             delete e;
-            close(m_sockfd);
+            shutdown(m_sockfd, 2);
             m_sockfd = -1;
             return;
         }
-        char szmsg[4096];
-        int result;
-        while(1)
+        
+        if(m_http2)
         {
-            result = pProtocol->ProtRecv(szmsg, 4095);
-            if(result <= 0)
-            {
-                httpConn = httpClose; // socket is broken. close the keep-alive connection
-                break;
-            }
-            else
-            {
-                szmsg[result] = '\0';
-                httpConn = pProtocol->LineParse(szmsg);
-                if(httpConn != httpContinue) // Session finished or keep-alive connection closed.
-                    break;
-            }
+            httpConn = pProtocol->HTTP2Processing();
+            printf("@@@@@@@@@@@@@@@: %d\n", httpConn);
+        }
+        else
+        {
+            httpConn = pProtocol->HTTPProcessing();
         }
         delete pProtocol;
     }

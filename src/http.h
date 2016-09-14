@@ -29,10 +29,13 @@ enum Http_Connection
 	httpWebSocket
 };
 
+#include "http2.h"
+class CHttp2;
 class CHttp
 {
 public:
-	CHttp(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+    friend class CHttp2;
+	CHttp(BOOL http2, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
         const char* fpm_socktype, const char* fpm_sockfile, 
@@ -44,7 +47,7 @@ public:
 		SSL* ssl = NULL);
 	virtual ~CHttp();
 
-	virtual Http_Connection LineParse(char* text);
+	virtual Http_Connection LineParse(const char* text);
 	virtual int ProtRecv(char* buf, int len);
     
     void SetCookie(const char* szName, const char* szValue,
@@ -102,7 +105,7 @@ public:
     {
         m_request_hdr.GetField(name, val);
     }
-    
+
     map<string, string> _POST_VARS_; /* var in post data */
 	map<string, string> _GET_VARS_; /* var in query string */
     map<string, string> _COOKIE_VARS_; /* var in cookie */
@@ -123,14 +126,22 @@ public:
 	
 	void SetExtensionDate(void* extdata) { m_extdata = extdata; }
 	void* GetExtensionDate() { return m_extdata; }
-
-private:
-    int HttpSend(const char* buf, int len);
+	
+	int HttpSend(const char* buf, int len);
     int HttpRecv(char* buf, int len);
+	
+    void HelloWorld(int code){ printf("hello world! %d\n", code); }
+    
+    Http_Connection HTTPProcessing();
+    Http_Connection HTTP2Processing();
+    
+    BOOL GetKeepAlive() { return m_keep_alive; }
+    
+private:
     void ParseMethod(const string & strtext);
 protected:
 	SSL* m_ssl;
-	
+	CHttp2 * m_http2;
 	int m_sockfd;
 	linesock* m_lsockfd;
 	linessl * m_lssl;

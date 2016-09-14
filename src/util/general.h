@@ -41,6 +41,10 @@ typedef unsigned int BOOL;
 #define FALSE   0
 #define TRUE   1
 
+#define uint_32 unsigned int
+#define uint_16 unsigned short
+#define uint_8 unsigned char
+
 typedef unsigned char BYTE;
 typedef unsigned short WORD;
 typedef unsigned int DWORD;
@@ -373,9 +377,14 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
 		{
 			taketime = 0;
 			len = SSL_read(ssl, buf + nRecv, buf_len - nRecv);
-            
+            //printf("SSL_read, %d %d %d\n", sockfd, len, buf_len);
             if(len == 0)
             {
+				ret = SSL_get_error(ssl, len);
+				if(ret == SSL_ERROR_ZERO_RETURN)
+				{
+					printf("SSL_read: shutdown by the peer\n");
+				}
                 close(sockfd);
 				return -1;
             }

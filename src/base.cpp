@@ -24,11 +24,13 @@ vector<stExtension> CHttpBase::m_ext_list;
 string CHttpBase::m_localhostname = "uplusware.com";
 string CHttpBase::m_hostip = "";
 
-BOOL		CHttpBase::m_enablehttp = TRUE;
-unsigned short	CHttpBase::m_httpport = 8080;
+BOOL	CHttpBase::m_enablehttp = TRUE;
+unsigned short	CHttpBase::m_httpport = 5080;
 
-BOOL		CHttpBase::m_enablehttps = TRUE;
-unsigned short	CHttpBase::m_httpsport = 443;
+BOOL	CHttpBase::m_enablehttps = TRUE;
+unsigned short	CHttpBase::m_httpsport = 5081;
+
+BOOL   CHttpBase::m_enablehttp2 = FALSE;
 
 string CHttpBase::m_www_authenticate = "";
 BOOL   CHttpBase::m_client_cer_check = FALSE;
@@ -66,9 +68,9 @@ string	CHttpBase::m_reject_list_file = REJECT_FILE_PATH;
 vector<stReject> CHttpBase::m_reject_list;
 vector<string> CHttpBase::m_permit_list;
 
-unsigned char CHttpBase::m_rsa_pub_key[128];
+/*unsigned char CHttpBase::m_rsa_pub_key[128];
 unsigned char CHttpBase::m_rsa_pri_key[128];
-
+*/
 CHttpBase::CHttpBase()
 {
 
@@ -182,6 +184,13 @@ BOOL CHttpBase::LoadConfig()
 				strtrim(httpsport);
 				m_httpsport = atoi(httpsport.c_str());
 				//printf("%d\n", m_httpsport);
+			}
+			else if(strncasecmp(strline.c_str(), "HTTP2Enable", strlen("HTTP2Enable")) == 0)
+			{
+				string HTTP2Enable;
+				strcut(strline.c_str(), "=", NULL, HTTP2Enable );
+				strtrim(HTTP2Enable);
+				m_enablehttp2= (strcasecmp(HTTP2Enable.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
 			else if(strncasecmp(strline.c_str(), "WWWAuthenticate", strlen("WWWAuthenticate")) == 0)
 			{
@@ -319,7 +328,7 @@ BOOL CHttpBase::LoadConfig()
 	m_runtime = time(NULL);
 
 	//generate the RSA keys
-	RSA* rsa = RSA_generate_key(1024, 0x10001, NULL, NULL);
+/*	RSA* rsa = RSA_generate_key(1024, 0x10001, NULL, NULL);
 	if(rsa)
 	{
 		BN_bn2bin( rsa->n, m_rsa_pub_key);
@@ -327,7 +336,7 @@ BOOL CHttpBase::LoadConfig()
 		
 		RSA_free(rsa);
 	}
-	
+*/	
 	return TRUE;
 }
 
