@@ -1,6 +1,21 @@
 #include "hpack.h"
 
+hpack::hpack()
+{
+    
+}
+
 hpack::hpack(const HTTP2_Header_Field* field, int len)
+{
+    parse(field, len);
+}
+
+hpack::~hpack()
+{
+    
+}
+
+void hpack::parse(const HTTP2_Header_Field* field, int len)
 {
     m_field = field;
     m_len = len;
@@ -61,7 +76,7 @@ hpack::hpack(const HTTP2_Header_Field* field, int len)
                     header.name = "";
                     header.value = out_buff;
                     free(out_buff);
-                    printf("%s\n", header.value.c_str());
+                    printf("~~~~~~~~~    %s\n", header.value.c_str());
                     hf_finish(h_node);
             
                 }
@@ -73,8 +88,7 @@ hpack::hpack(const HTTP2_Header_Field* field, int len)
                     header.name = "";
                     header.value = out_buff;
                     free(out_buff);
-                    printf("%s\n", header.value.c_str());
-                                      
+                    printf("~~~~~~~~~    %s\n", header.value.c_str());               
                 }
             }
             else if(header.index == 0)
@@ -141,9 +155,4 @@ hpack::hpack(const HTTP2_Header_Field* field, int len)
             break;
         }
     }
-}
-
-hpack::~hpack()
-{
-    
 }

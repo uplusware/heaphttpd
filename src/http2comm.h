@@ -54,6 +54,7 @@
 #define HTTP2_FRAME_FLAG_UNSET            0x00
 #define HTTP2_FRAME_FLAG_END_STREAM	      0x01
 #define HTTP2_FRAME_FLAG_SETTING_ACK	  0x01
+#define HTTP2_FRAME_FLAG_PING_ACK	      0x01
 #define HTTP2_FRAME_FLAG_END_HEADERS      0x04
 #define HTTP2_FRAME_FLAG_PADDED	          0x08
 #define HTTP2_FRAME_FLAG_PRIORITY	      0x20
@@ -110,7 +111,7 @@ typedef struct
 
 typedef struct
 {
-	char data_padding[0];
+	char data[0];
 } HTTP2_Frame_Data2;
 
 /*
@@ -139,22 +140,26 @@ typedef struct
 
 typedef struct
 {
+    char top[0];
 	uint_8 pad_length;
-	char place_holder[0];
-} HTTP2_Frame_Header1;
+	char bottom[0];
+} HTTP2_Frame_Header_Pad;
 
 typedef struct
 {
+    char top[0];
 	uint_32 e : 1;
 	uint_32 dependency : 31;
 	uint_8 weight;
-    char place_holder[0];
-} HTTP2_Frame_Header2;
+    char block_fragment_padding[0];
+} HTTP2_Frame_Header_Weight;
 
 typedef struct
 {
-	unsigned char block_fragment_padding[0];
-} HTTP2_Frame_Header3;
+    char top[0];
+	unsigned char block_fragment[0];
+    char padding[0];
+} HTTP2_Frame_Header_Fragment;
 
 /*
 	Setting Format
@@ -222,6 +227,67 @@ typedef struct
 	uint_32 r : 1;
 	uint_32 win_size : 31;
 } HTTP2_Frame_Window_Update;
+
+/*
+    PING Payload Format
+    +---------------------------------------------------------------+
+    |                                                               |
+    | Opaque Data (64)                                              |
+    |                                                               |
+    +---------------------------------------------------------------+
+*/
+
+typedef struct
+{
+	uint_8 data[8];
+} HTTP2_Frame_Ping;
+
+/*
+    CONTINUATION Frame Payload
+    +---------------------------------------------------------------+
+    | Header Block Fragment (*)                                   ...
+    +---------------------------------------------------------------+
+*/
+typedef struct
+{
+	unsigned char block_fragment[0];
+} HTTP2_Frame_Continuation;
+
+/*
+    PUSH_PROMISE Payload Format
+    +---------------+
+    |Pad Length? (8)|
+    +-+-------------+-----------------------------------------------+
+    |R| Promised Stream ID (31)                                     |
+    +-+-----------------------------+-------------------------------+
+    | Header Block Fragment (*)                                   ...
+    +---------------------------------------------------------------+
+    | Padding (*)                                                 ...
+    +---------------------------------------------------------------+ 
+*/
+
+typedef struct
+{
+	uint_8 pad_length;
+	uint_32 r : 1;
+	uint_32 promised_stream_ind : 31;
+	char block_fragment_padding[0];
+} HTTP2_Frame_Push_Promise;
+
+typedef struct
+{
+    char top[0];
+	uint_32 r : 1;
+	uint_32 promised_stream_ind : 31;
+	char block_fragment[0];
+} HTTP2_Frame_Push_Promise_Without_Pad;
+
+typedef struct
+{
+    char top[0];
+	char block_fragment[0];
+    char padding[0];
+} HTTP2_Frame_Push_Promise_Fragment;
 
 #pragma pack(pop)
 

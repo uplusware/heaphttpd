@@ -199,13 +199,14 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
     if(session_param->svr_type == stHTTPS)
 	{
 		SSL_METHOD* meth;
-#ifndef TLSV1_2_SUPPORT
-		SSL_load_error_strings();
-		OpenSSL_add_ssl_algorithms();
+#ifdef TLSV1_2_SUPPORT
+	    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
+        meth = (SSL_METHOD*)TLSv1_2_server_method();
 #else
-        OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
-#endif /* 0 */
-		meth = (SSL_METHOD*)TLSv1_2_server_method();
+        SSL_load_error_strings();
+		OpenSSL_add_ssl_algorithms();
+        meth = (SSL_METHOD*)SSLv23_server_method();
+#endif /* TLSV1_2_SUPPORT */
 		ssl_ctx = SSL_CTX_new(meth);
 		if(!ssl_ctx)
 		{

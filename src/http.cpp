@@ -29,7 +29,7 @@
 
 const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" };
 
-CHttp::CHttp(BOOL http2, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
 	const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
     const char* fpm_socktype, const char* fpm_sockfile,
@@ -38,7 +38,7 @@ CHttp::CHttp(BOOL http2, ServiceObjMap * srvobj, int sockfd, const char* servern
     const char* fastcgi_socktype, const char* fastcgi_sockfile,
     const char* fastcgi_addr, unsigned short fastcgi_port,
 	const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme, 
-	SSL* ssl)
+	SSL* ssl, CHttp2* phttp2, uint_32 http2_stream_ind)
 {	
     m_srvobj = srvobj;
     m_web_socket_handshake = Websocket_None;
@@ -96,6 +96,9 @@ CHttp::CHttp(BOOL http2, ServiceObjMap * srvobj, int sockfd, const char* servern
     m_private_path = private_path;
     m_global_uid = global_uid;
     
+    m_lsockfd = NULL;
+    m_lssl = NULL;
+    
 	if(m_ssl)
 	{
 		int flags = fcntl(m_sockfd, F_GETFL, 0); 
@@ -112,8 +115,9 @@ CHttp::CHttp(BOOL http2, ServiceObjMap * srvobj, int sockfd, const char* servern
 	}
 
 	m_content_type = application_x_www_form_urlencoded;
-	if(http2)
-        m_http2 = new CHttp2(this);
+    
+    m_http2 = phttp2;
+    m_http2_stream_ind = http2_stream_ind;
 	return;
 }
 
@@ -131,14 +135,17 @@ CHttp::~CHttp()
 		}
 	}
     
+    if(m_lssl)
+        delete m_lssl;
+    
+    if(m_lsockfd)
+        delete m_lsockfd;
+    
 	if(m_postdata_ex)
 		delete m_postdata_ex;
 
 	if(m_formdata)
 		delete m_formdata;
-
-    if(m_http2)
-        delete m_http2;
     
 	if(m_lsockfd)
 		delete m_lsockfd;
@@ -174,7 +181,7 @@ int CHttp::ProtRecv(char* buf, int len)
         return m_lsockfd->lrecv(buf, len);
 }
 
-Http_Connection CHttp::HTTPProcessing()
+Http_Connection CHttp::Processing()
 {
     Http_Connection httpConn = httpKeepAlive;
     int result;
@@ -197,25 +204,6 @@ Http_Connection CHttp::HTTPProcessing()
     }
     
     return httpConn;
-}
-
-Http_Connection CHttp::HTTP2Processing()
-{
-    Http_Connection httpConn = httpKeepAlive;
-    if(m_http2)
-	{
-        while(1)
-        {
-            int result = m_http2->ProtRecv();
-            if(result <= 0)
-            {
-                httpConn = httpClose;
-                break;
-            }
-        }
-        return httpConn;
-	}
-    return httpClose;
 }
 
 void CHttp::SetCookie(const char* szName, const char* szValue,
@@ -322,16 +310,19 @@ int CHttp::SendHeader(const char* buf, int len)
     strHeader += "\r\n";
     if(m_http2)
     {
-        m_http2->ParseHTTP1Header(strHeader.c_str(), strHeader.length());
+        m_http2->ParseHttp1Header(m_http2_stream_ind, strHeader.c_str(), strHeader.length());
     }
     else
         return HttpSend(strHeader.c_str(), strHeader.length());
 }
 
 int CHttp::SendContent(const char* buf, int len)
-{   if(m_http2)
+{   
+    //printf("Content: %d, %s\n", len, buf);
+        
+    if(m_http2)
     {
-        return m_http2->ParseHTTP1Content(buf, len);
+        return m_http2->ParseHttp1Content(m_http2_stream_ind, buf, len);
     }
     else
         return HttpSend(buf, len);
@@ -360,6 +351,204 @@ void CHttp::ParseMethod(const string & strtext)
 	
 	m_cgi.SetMeta("REQUEST_URI", m_uri.c_str());
 	m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
+}
+
+void CHttp::PushPostData(const char* buf, int len)
+{
+    if(m_content_type == application_x_www_form_urlencoded)
+    {
+        if(m_postdata.length() > MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN)
+            return;
+            
+        char* rbuf = (char*)malloc(len + 1);
+        memcpy(rbuf, buf, len);
+        rbuf[len] = '\0';
+        m_postdata += rbuf;
+        free(rbuf);
+    }
+    else if(m_content_type == multipart_form_data)
+    {
+        if(!m_postdata_ex)
+            m_postdata_ex = new fbuffer(m_private_path.c_str(), m_global_uid);
+        m_postdata_ex->bufcat(buf, len);
+    }
+}
+
+void CHttp::RecvPostData()
+{
+    if(m_content_type == application_x_www_form_urlencoded)
+    {
+        if(m_content_length == 0)
+        {
+            while(1)
+            {
+                if(m_postdata.length() > MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN)
+                    break;
+                char rbuf[1449];
+                int rlen = HttpRecv(rbuf, 1448);
+                if(rlen > 0)
+                {
+                    rbuf[rlen] = '\0';
+                    m_postdata += rbuf;
+                }
+                else
+                    break;
+            }
+        }
+        else
+        {
+            if(m_content_length < MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN)
+            {
+                char* post_data = (char*)malloc(m_content_length + 1);
+                int nlen = HttpRecv(post_data, m_content_length);
+                if( nlen > 0)
+                {
+                    post_data[nlen] = '\0';
+                    m_postdata += post_data;
+                }
+                free(post_data);
+            }
+        }
+    }
+    else if(m_content_type == multipart_form_data)
+    {
+        if(!m_postdata_ex)
+            m_postdata_ex = new fbuffer(m_private_path.c_str(), m_global_uid);
+        if(m_content_length == 0)
+        {
+            while(1)
+            {
+                char rbuf[1449];
+                memset(rbuf, 0, 1449);
+                int rlen = HttpRecv(rbuf, 1448);
+                if(rlen > 0)
+                {
+                    m_postdata_ex->bufcat(rbuf, rlen);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+        else
+        {
+            int nRecv = 0;
+            while(1)
+            {
+                if(nRecv == m_content_length)
+                    break;
+                char rbuf[1449];
+                memset(rbuf, 0, 1449);
+                int rlen = HttpRecv(rbuf, (m_content_length - nRecv) > 1448 ? 1448 : ( m_content_length - nRecv));
+                if(rlen > 0)
+                {
+                    nRecv += rlen;
+                    m_postdata_ex->bufcat(rbuf, rlen);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+    }	   
+}
+
+void CHttp::Response()
+{
+    NIU_POST_GET_VARS(m_querystring.c_str(), _GET_VARS_);
+    NIU_POST_GET_VARS(m_postdata.c_str(), _POST_VARS_);
+    NIU_COOKIE_VARS(m_cookie.c_str(), _COOKIE_VARS_);
+    
+    if(_COOKIE_VARS_.size() > 0)
+    {
+        /* Wouldn't save cookie in server side */
+        /* m_cache->reload_cookies(); */
+        map<string, string>::iterator iter_c;
+        for(iter_c = _COOKIE_VARS_.begin(); iter_c != _COOKIE_VARS_.end(); iter_c++)
+        {
+            if(iter_c->first == "__niuhttpd_session__")
+            {
+                m_session_var_uid = iter_c->second;
+                break;
+            }
+            /* Wouldn't save cookie in server side */
+            /* m_cache->access_cookie(iter_c->first.c_str()); */
+        }
+    }
+    
+    if(m_content_type == multipart_form_data)
+    {
+        m_cgi.SetData(m_postdata_ex->c_buffer(), m_postdata_ex->length());
+        char szLen[64];
+        sprintf(szLen, "%d", m_postdata.length());
+        m_cgi.SetMeta("CONTENT_LENGTH", szLen);
+        
+        m_formdata = new formdata(m_postdata_ex->c_buffer(), m_postdata_ex->length(), m_boundary.c_str());
+    }
+    else
+    {
+        char szLen[64];
+        sprintf(szLen, "%d", m_postdata.length());
+        m_cgi.SetMeta("CONTENT_LENGTH", szLen);
+        m_cgi.SetData(m_postdata.c_str(), m_postdata.length());
+    }
+
+    //Extension hook 1
+    BOOL skipAction = FALSE;
+    for(int x = 0; x < m_ext_list->size(); x++)
+    {
+        void* (*ext_request)(CHttp*, const char*);
+        ext_request = (void*(*)(CHttp*, const char*))dlsym((*m_ext_list)[x].handle, "ext_request");
+        const char* errmsg;
+        if((errmsg = dlerror()) == NULL)
+        {
+            ext_request(this, (*m_ext_list)[x].action.c_str());
+            if((*m_ext_list)[x].action == "skip")
+                skipAction = TRUE;
+        }
+    }
+
+    if(!skipAction)
+    {
+        Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), 
+            m_fpm_socktype.c_str(), m_fpm_sockfile.c_str(), 
+            m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str(),
+            m_fastcgi_name.c_str(), m_fastcgi_pgm.c_str(), 
+            m_fastcgi_socktype.c_str(), m_fastcgi_sockfile.c_str(), 
+            m_fastcgi_addr.c_str(), m_fastcgi_port);
+
+        //Extension hook 2
+        for(int x = 0; x < m_ext_list->size(); x++)
+        {
+            void* (*ext_response)(CHttp*, const char*, Htdoc*);
+            ext_response = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_response");
+            const char* errmsg;
+            if((errmsg = dlerror()) == NULL)
+            {
+                ext_response(this, (*m_ext_list)[x].action.c_str(), doc);
+            }
+        }
+        doc->Response();
+        
+        if(m_http2)
+            m_http2->SendEmptyData(m_http2_stream_ind);
+        
+        //Extension hook 3
+        for(int x = 0; x < m_ext_list->size(); x++)
+        {
+            void* (*ext_finish)(CHttp*, const char*, Htdoc*);
+            ext_finish = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_finish");
+            const char* errmsg;
+            if((errmsg = dlerror()) == NULL)
+            {
+                ext_finish(this, (*m_ext_list)[x].action.c_str(), doc);
+            }
+        }
+
+        delete doc;
+    }
 }
 
 Http_Connection CHttp::LineParse(const char* text)
@@ -452,177 +641,14 @@ Http_Connection CHttp::LineParse(const char* text)
 	}
     else if(strcasecmp(strtext.c_str(), "") == 0) /* if true, then http request header finished. */
     {
+        printf("METHOD, %d\n", m_http_method);
         if(m_http_method == hmPost)
         {
-            if(m_content_type == application_x_www_form_urlencoded)
-            {
-                if(m_content_length == 0)
-                {
-                    while(1)
-                    {
-                        if(m_postdata.length() > MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN)
-                            break;
-                        char rbuf[1449];
-                        int rlen = HttpRecv(rbuf, 1448);
-                        if(rlen > 0)
-                        {
-                            rbuf[rlen] = '\0';
-                            m_postdata += rbuf;
-                        }
-                        else
-                            break;
-                    }
-                }
-                else
-                {
-                    if(m_content_length < MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN)
-                    {
-                        char* post_data = (char*)malloc(m_content_length + 1);
-                        int nlen = HttpRecv(post_data, m_content_length);
-                        if( nlen > 0)
-                        {
-                            post_data[nlen] = '\0';
-                            m_postdata += post_data;
-                        }
-                        free(post_data);
-                    }
-                }
-            }
-            else if(m_content_type == multipart_form_data)
-            {
-                m_postdata_ex = new fbuffer(m_private_path.c_str(), m_global_uid);
-                if(m_content_length == 0)
-                {
-                    while(1)
-                    {
-                        char rbuf[1449];
-                        memset(rbuf, 0, 1449);
-                        int rlen = HttpRecv(rbuf, 1448);
-                        if(rlen > 0)
-                        {
-                            m_postdata_ex->bufcat(rbuf, rlen);
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    int nRecv = 0;
-                    while(1)
-                    {
-                        if(nRecv == m_content_length)
-                            break;
-                        char rbuf[1449];
-                        memset(rbuf, 0, 1449);
-                        int rlen = HttpRecv(rbuf, (m_content_length - nRecv) > 1448 ? 1448 : ( m_content_length - nRecv));
-                        if(rlen > 0)
-                        {
-                            nRecv += rlen;
-                            m_postdata_ex->bufcat(rbuf, rlen);
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                }
-            }	
+            RecvPostData();
         }
         
-        NIU_POST_GET_VARS(m_querystring.c_str(), _GET_VARS_);
-        NIU_POST_GET_VARS(m_postdata.c_str(), _POST_VARS_);
-        NIU_COOKIE_VARS(m_cookie.c_str(), _COOKIE_VARS_);
+        Response();
         
-        if(_COOKIE_VARS_.size() > 0)
-        {
-            /* Wouldn't save cookie in server side */
-            /* m_cache->reload_cookies(); */
-            map<string, string>::iterator iter_c;
-	        for(iter_c = _COOKIE_VARS_.begin(); iter_c != _COOKIE_VARS_.end(); iter_c++)
-	        {
-	            if(iter_c->first == "__niuhttpd_session__")
-	            {
-	                m_session_var_uid = iter_c->second;
-	                break;
-	            }
-	            /* Wouldn't save cookie in server side */
-	            /* m_cache->access_cookie(iter_c->first.c_str()); */
-	        }
-	    }
-	    
-        if(m_content_type == multipart_form_data)
-        {
-            m_cgi.SetData(m_postdata_ex->c_buffer(), m_postdata_ex->length());
-            char szLen[64];
-            sprintf(szLen, "%d", m_postdata.length());
-            m_cgi.SetMeta("CONTENT_LENGTH", szLen);
-            
-            m_formdata = new formdata(m_postdata_ex->c_buffer(), m_postdata_ex->length(), m_boundary.c_str());
-        }
-        else
-        {
-            char szLen[64];
-            sprintf(szLen, "%d", m_postdata.length());
-            m_cgi.SetMeta("CONTENT_LENGTH", szLen);
-            m_cgi.SetData(m_postdata.c_str(), m_postdata.length());
-        }
-
-        //Extension hook 1
-        BOOL skipAction = FALSE;
-        for(int x = 0; x < m_ext_list->size(); x++)
-        {
-            void* (*ext_request)(CHttp*, const char*);
-            ext_request = (void*(*)(CHttp*, const char*))dlsym((*m_ext_list)[x].handle, "ext_request");
-            const char* errmsg;
-            if((errmsg = dlerror()) == NULL)
-            {
-                ext_request(this, (*m_ext_list)[x].action.c_str());
-                if((*m_ext_list)[x].action == "skip")
-                    skipAction = TRUE;
-            }
-        }
-
-        if(!skipAction)
-        {
-            Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), 
-                m_fpm_socktype.c_str(), m_fpm_sockfile.c_str(), 
-                m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str(),
-                m_fastcgi_name.c_str(), m_fastcgi_pgm.c_str(), 
-                m_fastcgi_socktype.c_str(), m_fastcgi_sockfile.c_str(), 
-                m_fastcgi_addr.c_str(), m_fastcgi_port);
-
-            //Extension hook 2
-            for(int x = 0; x < m_ext_list->size(); x++)
-            {
-                void* (*ext_response)(CHttp*, const char*, Htdoc*);
-                ext_response = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_response");
-                const char* errmsg;
-                if((errmsg = dlerror()) == NULL)
-                {
-                    ext_response(this, (*m_ext_list)[x].action.c_str(), doc);
-                }
-            }
-            doc->Response();
-            
-            if(m_http2)
-                m_http2->SendContentEOF();
-            //Extension hook 3
-            for(int x = 0; x < m_ext_list->size(); x++)
-            {
-                void* (*ext_finish)(CHttp*, const char*, Htdoc*);
-                ext_finish = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_finish");
-                const char* errmsg;
-                if((errmsg = dlerror()) == NULL)
-                {
-                    ext_finish(this, (*m_ext_list)[x].action.c_str(), doc);
-                }
-            }
-
-            delete doc;
-        }
 		return m_keep_alive ? httpKeepAlive : httpClose;
     }
     else

@@ -39,12 +39,12 @@ void Session::Process()
     
     while(httpConn != httpClose)
     {
-        CHttp * pProtocol;
+        IHttp * pProtocol;
         try
         {
             if(m_st == stHTTP)
             {
-                pProtocol = new CHttp(false, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
+                pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
                     m_clientip.c_str(), m_client_cert, m_cache,
 					CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(),
                     CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
@@ -57,16 +57,32 @@ void Session::Process()
             }
             else if(m_st == stHTTPS)
             {
-                pProtocol = new CHttp(m_http2, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
-                    m_clientip.c_str(), m_client_cert, m_cache,
-					CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
-                    CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
-                    CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
-                    CHttpBase::m_fastcgi_name.c_str(), CHttpBase::m_fastcgi_pgm.c_str(),  
-                    CHttpBase::m_fastcgi_socktype.c_str(), CHttpBase::m_fastcgi_sockfile.c_str(), 
-                    CHttpBase::m_fastcgi_addr.c_str(), CHttpBase::m_fastcgi_port,
-                    CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme, m_ssl);
-                    CHttpBase::m_global_uid++;
+                if(m_http2)
+                {
+                    pProtocol = new CHttp2(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
+                        m_clientip.c_str(), m_client_cert, m_cache,
+                        CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
+                        CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
+                        CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
+                        CHttpBase::m_fastcgi_name.c_str(), CHttpBase::m_fastcgi_pgm.c_str(),  
+                        CHttpBase::m_fastcgi_socktype.c_str(), CHttpBase::m_fastcgi_sockfile.c_str(), 
+                        CHttpBase::m_fastcgi_addr.c_str(), CHttpBase::m_fastcgi_port,
+                        CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme, m_ssl);
+                        CHttpBase::m_global_uid++;
+                }
+                else
+                {
+                    pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
+                        m_clientip.c_str(), m_client_cert, m_cache,
+                        CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
+                        CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
+                        CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
+                        CHttpBase::m_fastcgi_name.c_str(), CHttpBase::m_fastcgi_pgm.c_str(),  
+                        CHttpBase::m_fastcgi_socktype.c_str(), CHttpBase::m_fastcgi_sockfile.c_str(), 
+                        CHttpBase::m_fastcgi_addr.c_str(), CHttpBase::m_fastcgi_port,
+                        CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme, m_ssl);
+                        CHttpBase::m_global_uid++;
+                }
             }
             else
             {
@@ -83,12 +99,11 @@ void Session::Process()
         
         if(m_http2)
         {
-            httpConn = pProtocol->HTTP2Processing();
-            printf("@@@@@@@@@@@@@@@: %d\n", httpConn);
+            httpConn = pProtocol->Processing();
         }
         else
         {
-            httpConn = pProtocol->HTTPProcessing();
+            httpConn = pProtocol->Processing();
         }
         delete pProtocol;
     }

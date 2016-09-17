@@ -29,13 +29,21 @@ enum Http_Connection
 	httpWebSocket
 };
 
+class IHttp
+{
+public:
+    virtual Http_Connection Processing() = 0;
+    virtual int HttpSend(const char* buf, int len) = 0;
+    virtual int HttpRecv(char* buf, int len) = 0;
+};
+
 #include "http2.h"
 class CHttp2;
-class CHttp
+class CHttp : public IHttp
 {
 public:
     friend class CHttp2;
-	CHttp(BOOL http2, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	CHttp(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
         const char* fpm_socktype, const char* fpm_sockfile, 
@@ -44,11 +52,16 @@ public:
         const char* fastcgi_socktype, const char* fastcgi_sockfile,
         const char* fastcgi_addr, unsigned short fastcgi_port,
         const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme = asNone,
-		SSL* ssl = NULL);
+		SSL* ssl = NULL, CHttp2* phttp2 = NULL, uint_32 http2_stream_ind = 0);
+        
 	virtual ~CHttp();
 
 	virtual Http_Connection LineParse(const char* text);
 	virtual int ProtRecv(char* buf, int len);
+    
+    void PushPostData(const char* buf, int len);
+    void RecvPostData();
+    void Response();
     
     void SetCookie(const char* szName, const char* szValue,
         int nMaxAge = -1, const char* szExpires = NULL,
@@ -127,21 +140,23 @@ public:
 	void SetExtensionDate(void* extdata) { m_extdata = extdata; }
 	void* GetExtensionDate() { return m_extdata; }
 	
-	int HttpSend(const char* buf, int len);
-    int HttpRecv(char* buf, int len);
+	virtual int HttpSend(const char* buf, int len);
+    virtual int HttpRecv(char* buf, int len);
 	
     void HelloWorld(int code){ printf("hello world! %d\n", code); }
     
-    Http_Connection HTTPProcessing();
-    Http_Connection HTTP2Processing();
+    virtual Http_Connection Processing();
     
     BOOL GetKeepAlive() { return m_keep_alive; }
+    
+    unsigned int GetContentLength() { return m_content_length; }
     
 private:
     void ParseMethod(const string & strtext);
 protected:
 	SSL* m_ssl;
 	CHttp2 * m_http2;
+    uint_32 m_http2_stream_ind;
 	int m_sockfd;
 	linesock* m_lsockfd;
 	linessl * m_lssl;

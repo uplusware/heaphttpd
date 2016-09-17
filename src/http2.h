@@ -13,7 +13,6 @@
 #include <utility>
 #include <map>
 using namespace std;
-
 /*
           +-------+-----------------------------+---------------+
           | Index | Header Name                 | Header Value  |
@@ -98,29 +97,78 @@ typedef struct
 } http2_msg;
 
 class CHttp;
-class CHttp2
+class CHttp2 : public IHttp
 {
 public:
-	CHttp2(CHttp* pHttp1);
+	CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	    const char* clientip, X509* client_cert, memory_cache* ch,
+		const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
+        const char* fpm_socktype, const char* fpm_sockfile, 
+        const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
+        const char* fastcgi_name, const char* fastcgi_pgm, 
+        const char* fastcgi_socktype, const char* fastcgi_sockfile,
+        const char* fastcgi_addr, unsigned short fastcgi_port,
+        const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme = asNone,
+		SSL* ssl = NULL);
+        
 	virtual ~CHttp2();
 	
-    CHttp* GetHttp1() { return m_pHttp1; }
 	int ProtRecv();
-    Http_Connection Processing();
+    virtual Http_Connection Processing();
     
     void PushMsg(http2_msg_type type, HTTP2_Frame* frame, char* payload);
     void PopMsg(http2_msg* msg);
     
     void ParseHeaders(uint_32 stream_ind, hpack* hdr);
     
-    int ParseHTTP1Header(const char* buf, int len);
-    int ParseHTTP1Content(const char* buf, uint_32 len);
+    int ParseHttp1Header(uint_32 stream_ind, const char* buf, int len);
+    int ParseHttp1Content(uint_32 stream_ind, const char* buf, uint_32 len);
     
-    int SendContentEOF();
+    int SendEmptyData(uint_32 stream_ind);
+    
+    virtual int HttpSend(const char* buf, int len);
+    virtual int HttpRecv(char* buf, int len);
+    
     
     volatile int m_thread_running;
+
 private:
-	CHttp* m_pHttp1;
+    void send_setting_ack(uint_32 stream_ind);
+    void send_window_update(uint_32 stream_ind, uint_32 window_size);
+
+private:
+    ServiceObjMap * m_srvobj;
+    int m_sockfd;
+    string m_servername;
+    unsigned short m_serverport;
+    string m_clientip;
+    X509* m_client_cert;
+    memory_cache* m_ch;
+    string m_work_path;
+    vector<stExtension>* m_ext_list;
+    string m_php_mode;
+    string m_fpm_socktype;
+    string m_fpm_sockfile;
+    string m_fpm_addr;
+    unsigned short m_fpm_port;
+    string m_phpcgi_path;
+    string m_fastcgi_name;
+    string m_fastcgi_pgm;
+    string m_fastcgi_socktype;
+    string m_fastcgi_sockfile;
+    string m_fastcgi_addr;
+    unsigned short m_fastcgi_port;
+    string m_private_path;
+    unsigned int m_global_uid;
+    AUTH_SCHEME m_wwwauth_scheme;
+    SSL* m_ssl;
+
+    linesock* m_lsockfd;
+	linessl * m_lssl;
+    
+	map<uint_32, CHttp*> m_HttpList;
+    map<uint_32, hpack*> m_HpackList;
+    
 	char m_preface[HTTP2_PREFACE_LEN + 1];
 	void init_header_table();
 	pthread_t m_send_pthread_id;
@@ -136,7 +184,7 @@ private:
     
     string m_status;
     
-    uint_32 m_curr_stream_ind;
+    //uint_32 m_curr_stream_ind;
 };
 
 #endif /* _HTTP2_H_ */

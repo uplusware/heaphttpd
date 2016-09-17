@@ -145,8 +145,11 @@ typedef struct
 class hpack
 {
 public:
+    hpack();
     hpack(const HTTP2_Header_Field* field, int len);
     virtual ~hpack();
+    
+    void parse(const HTTP2_Header_Field* field, int len);
     
     vector<HTTP2_Header> m_decoded_headers;
 private:
