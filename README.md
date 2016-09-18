@@ -8,5 +8,6 @@
 * [To implement your own authentication] (https://github.com/uplusware/niuhttpd/wiki/To-implement-your-own-authentication)
 * [Extension] (https://github.com/uplusware/niuhttpd/wiki/Extension)
 * [Generate CA for HTTPS] (https://github.com/uplusware/niuhttpd/wiki/Generate-CA-for-HTTPS)
+* [HTTP2 Enable] (https://github.com/uplusware/niuhttpd/wiki/HTTP2-enable)
 
 ##niu means 钮(niǔ).
