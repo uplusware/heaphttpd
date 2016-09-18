@@ -34,17 +34,29 @@ static void* http2_send_handler(void* arg)
 void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
 {
     //m_curr_stream_ind = stream_ind;
-    m_HttpList[stream_ind]->HelloWorld(stream_ind);
+    //m_HttpList[stream_ind]->HelloWorld(stream_ind);
     string str_line;
     for(int x = 0; x < hdr->m_decoded_headers.size(); x++)
     {
-        if(hdr->m_decoded_headers[x].index_type == type_indexing_new_name)
+        BOOL found_it = FALSE;
+        map<int, pair<string, string> >::iterator it;
+        if(hdr->m_decoded_headers[x].index > 0)
         {
-            m_header_dynamic_table[hdr->m_decoded_headers[x].index] = make_pair(hdr->m_decoded_headers[x].name, hdr->m_decoded_headers[x].value);
+            if(hdr->m_decoded_headers[x].index > m_header_static_table.size())
+            {
+                it = m_header_dynamic_table.find(hdr->m_decoded_headers[x].index);
+                if(it != m_header_dynamic_table.end())
+                    found_it = TRUE;
+            }
+            else
+            {
+                it = m_header_static_table.find(hdr->m_decoded_headers[x].index);
+                if(it != m_header_static_table.end())
+                    found_it = TRUE;
+            }
         }
         
-        map<int, pair<string, string> >::iterator it = m_header_static_table.find(hdr->m_decoded_headers[x].index);
-        if(it != m_header_static_table.end())
+        if(found_it)
         {
             /*printf("%u, %s %s [%s] [%s]\n", hdr->m_decoded_headers[x].index_type, 
             it->second.first.c_str(),  it->second.second.c_str(),
@@ -165,6 +177,24 @@ void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
                     printf(str_line.c_str());
                 }
             }
+        }
+        
+        int stable_size = m_header_static_table.size();
+        if(hdr->m_decoded_headers[x].index_type == type_indexing_new_name && hdr->m_decoded_headers[x].index > stable_size)
+        {
+            //default table element size is 4096 (not octets here)
+            int dtable_size = m_header_dynamic_table.size();
+            
+            for(int x = dtable_size > 4095 ? 4095 : dtable_size; x <= 1; x--)
+            {
+                map<int, pair<string, string> >::iterator it;
+                it = m_header_dynamic_table.find(stable_size + x);
+                if(it != m_header_dynamic_table.end())
+                {
+                    m_header_dynamic_table[x + 1] = m_header_dynamic_table[x];
+                }
+            }
+            m_header_dynamic_table[stable_size + 1] = make_pair(hdr->m_decoded_headers[x].name, hdr->m_decoded_headers[x].value);
         }
     }
     if(m_HttpList[stream_ind]->GetMethod() != hmPost)
