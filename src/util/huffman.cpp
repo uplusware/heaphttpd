@@ -182,7 +182,7 @@ int hf_integer_encode(unsigned int enc_binary, int nprefix, unsigned char *buff)
 	return i;
 }
 
-int hf_integer_decode(char *enc_buff, int nprefix , char *dec_buff){
+int hf_integer_decode(char *enc_buff, int nprefix , char *dec_buff, int* dec_size){
 	int i				= 0;
 	int j				= 0;
 	unsigned int M		= 0;
@@ -202,6 +202,7 @@ int hf_integer_decode(char *enc_buff, int nprefix , char *dec_buff){
 		while(B & 128);
 		dec_buff[j] = ch;
 	}
+    *dec_size = j;
 	return HM_RETURN_SUCCESS;
 }
 

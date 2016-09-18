@@ -131,7 +131,8 @@ enum index_type_e
     type_without_indexing_indexed_name,
     type_without_indexing_new_name,
     type_never_indexed_indexed_name,
-    type_never_indexed_new_name
+    type_never_indexed_new_name,
+    type_error
 };
 
 typedef struct 

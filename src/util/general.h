@@ -356,7 +356,7 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
         else if(len < 0)
         {
             ret = SSL_get_error(ssl, len);
-            if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+            if(ret == SSL_ERROR_WANT_READ)
             {
                 continue;
             }
@@ -480,7 +480,7 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
         else if(len < 0)
         {
             ret = SSL_get_error(ssl, len);
-            if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+            if(ret == SSL_ERROR_WANT_WRITE)
             {
                 continue;
             }

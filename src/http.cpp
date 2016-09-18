@@ -102,7 +102,7 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	if(m_ssl)
 	{
 		int flags = fcntl(m_sockfd, F_GETFL, 0); 
-		fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK); 
+		fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK);
 		
 		m_lssl = new linessl(m_sockfd, m_ssl);
 	}
@@ -461,6 +461,7 @@ void CHttp::Response()
     NIU_POST_GET_VARS(m_postdata.c_str(), _POST_VARS_);
     NIU_COOKIE_VARS(m_cookie.c_str(), _COOKIE_VARS_);
     
+    printf("COOKIE: %s\n", m_cookie.c_str());
     if(_COOKIE_VARS_.size() > 0)
     {
         /* Wouldn't save cookie in server side */
@@ -553,6 +554,7 @@ void CHttp::Response()
 
 Http_Connection CHttp::LineParse(const char* text)
 {
+    //printf("%s", text);
     string strtext;
     m_line_text += text;
     std::size_t new_line = m_line_text.find('\n');
@@ -568,6 +570,21 @@ Http_Connection CHttp::LineParse(const char* text)
 
 	strtrim(strtext);
 	
+    BOOL High = TRUE;
+    for(int c = 0; c < strtext.length(); c++)
+    {
+        if(High)
+        {
+            strtext[c] = HICH(strtext[c]);
+            High = FALSE;
+        }
+        if(strtext[c] == '-')
+            High = TRUE;
+        if(strtext[c] == ':' || strtext[c] == ' ')
+            break;
+    }
+    
+    //printf("^^^^^^^^^^^^^^^^ %s\n", strtext.c_str());
 	if(strncasecmp(strtext.c_str(),"GET ", 4) == 0)
 	{	
 		m_cgi.SetMeta("REQUEST_METHOD", "GET");
@@ -641,7 +658,7 @@ Http_Connection CHttp::LineParse(const char* text)
 	}
     else if(strcasecmp(strtext.c_str(), "") == 0) /* if true, then http request header finished. */
     {
-        printf("METHOD, %d\n", m_http_method);
+        //printf("METHOD, %d\n", m_http_method);
         if(m_http_method == hmPost)
         {
             RecvPostData();
@@ -720,8 +737,11 @@ Http_Connection CHttp::LineParse(const char* text)
         }
         else if(strncasecmp(strtext.c_str(), "Cookie:", 7) == 0)
         {
-            strcut(strtext.c_str(), "Cookie:", NULL, m_cookie);
-            strtrim(m_cookie);
+            string strcookie;
+            strcut(strtext.c_str(), "Cookie:", NULL, strcookie);
+            strtrim(strcookie);
+            m_cookie += strcookie;
+            m_cookie += "; ";
         }
         else if(strncasecmp(strtext.c_str(), "Host:",5) == 0)
         {

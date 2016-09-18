@@ -140,14 +140,12 @@ typedef struct
 
 typedef struct
 {
-    char top[0];
 	uint_8 pad_length;
 	char bottom[0];
 } HTTP2_Frame_Header_Pad;
 
 typedef struct
 {
-    char top[0];
 	uint_32 e : 1;
 	uint_32 dependency : 31;
 	uint_8 weight;
@@ -156,7 +154,6 @@ typedef struct
 
 typedef struct
 {
-    char top[0];
 	unsigned char block_fragment[0];
     char padding[0];
 } HTTP2_Frame_Header_Fragment;
