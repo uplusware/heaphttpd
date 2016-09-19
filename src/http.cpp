@@ -461,7 +461,7 @@ void CHttp::Response()
     NIU_POST_GET_VARS(m_postdata.c_str(), _POST_VARS_);
     NIU_COOKIE_VARS(m_cookie.c_str(), _COOKIE_VARS_);
     
-    printf("COOKIE: %s\n", m_cookie.c_str());
+    /* printf("COOKIE: %s\n", m_cookie.c_str()); */
     if(_COOKIE_VARS_.size() > 0)
     {
         /* Wouldn't save cookie in server side */

@@ -273,7 +273,6 @@ typedef struct
 
 typedef struct
 {
-    char top[0];
 	uint_32 r : 1;
 	uint_32 promised_stream_ind : 31;
 	char block_fragment[0];
@@ -281,7 +280,6 @@ typedef struct
 
 typedef struct
 {
-    char top[0];
 	char block_fragment[0];
     char padding[0];
 } HTTP2_Frame_Push_Promise_Fragment;

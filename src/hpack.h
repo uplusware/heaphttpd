@@ -86,12 +86,17 @@ Literal Header Field Never Indexed -- New Name
    +-------------------------------+
 */
 
+#define MAX_BYTES_OF_LENGTH 256
+
 typedef struct 
 {
-	uint_8 len : 7;
+	uint_8 len_prefix : 7;
 	uint_8 h : 1;
-	char str[0];
+    uint_8 len_value[0];
 } HTTP2_Header_String;
+
+int encode_http2_header_string(HTTP2_Header_String* header_string_buf, int length, char** string_ptr);
+int decode_http2_header_string(HTTP2_Header_String* header_string_buf, int* length, char** string_ptr);
 
 typedef struct 
 {

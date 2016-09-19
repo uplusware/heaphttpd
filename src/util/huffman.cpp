@@ -84,7 +84,7 @@ int hf_byte_encode(unsigned char ch, int remain, unsigned char *buff){
 
 }
 
-int hf_string_encode(char *buff_in, int size, int prefix, unsigned char *buff_out, int *size_out){
+int hf_string_encode(const char *buff_in, int size, int prefix, unsigned char *buff_out, int *size_out){
 	int i		= 0;
 	int remain	= (8-prefix);
 	int j		= 0;		  //j is instead currently index of buff_out and it is size of buff_out after it has been done.
@@ -182,7 +182,7 @@ int hf_integer_encode(unsigned int enc_binary, int nprefix, unsigned char *buff)
 	return i;
 }
 
-int hf_integer_decode(char *enc_buff, int nprefix , char *dec_buff, int* dec_size){
+int hf_integer_decode(const char *enc_buff, int nprefix , char *dec_buff){
 	int i				= 0;
 	int j				= 0;
 	unsigned int M		= 0;
@@ -202,8 +202,7 @@ int hf_integer_decode(char *enc_buff, int nprefix , char *dec_buff, int* dec_siz
 		while(B & 128);
 		dec_buff[j] = ch;
 	}
-    *dec_size = j;
-	return HM_RETURN_SUCCESS;
+	return i;
 }
 
 int hf_string_encode_len(unsigned char *enc, int enc_sz){

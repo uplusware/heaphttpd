@@ -1,5 +1,82 @@
 #include "hpack.h"
 
+int64_t
+decode_integer(uint32_t &dst, const uint8_t *buf_start, const uint8_t *buf_end, uint8_t n)
+{
+  if (buf_start >= buf_end) {
+    return -1;
+  }
+
+  const uint8_t *p = buf_start;
+
+  dst = (*p & ((1 << n) - 1));
+  if (dst == static_cast<uint32_t>(1 << n) - 1) {
+    int m = 0;
+    do {
+      if (++p >= buf_end)
+        return -1;
+
+      uint32_t added_value = *p & 0x7f;
+      if ((UINT32_MAX >> m) < added_value) {
+        // Excessively large integer encodings - in value or octet
+        // length - MUST be treated as a decoding error.
+        return -1;
+      }
+      dst += added_value << m;
+      m += 7;
+    } while (*p & 0x80);
+  }
+
+  return p - buf_start + 1;
+}
+
+int64_t
+encode_integer(uint8_t *buf_start, const uint8_t *buf_end, uint32_t value, uint8_t n)
+{
+  if (buf_start >= buf_end)
+    return -1;
+
+  uint8_t *p = buf_start;
+
+  if (value < (static_cast<uint32_t>(1 << n) - 1)) {
+    *(p++) = value;
+  } else {
+    *(p++) = (1 << n) - 1;
+    value -= (1 << n) - 1;
+    while (value >= 128) {
+      if (p >= buf_end) {
+        return -1;
+      }
+      *(p++) = (value & 0x7F) | 0x80;
+      value = value >> 7;
+    }
+    if (p + 1 >= buf_end) {
+      return -1;
+    }
+    *(p++) = value;
+  }
+  return p - buf_start;
+}
+
+int encode_http2_header_string(HTTP2_Header_String* header_string_buf, int length, char** string_ptr)
+{
+    int integer_len = encode_integer((uint8_t *)header_string_buf, (uint8_t *)header_string_buf + MAX_BYTES_OF_LENGTH, length, 7);
+    *string_ptr = integer_len < 0 ? NULL : (char*)header_string_buf + integer_len;
+    
+    return integer_len;
+}
+
+int decode_http2_header_string(HTTP2_Header_String* header_string_buf, int* length, char** string_ptr)
+{
+    
+    uint32_t dst = 0;
+    int integer_len = decode_integer(dst, (uint8_t *)header_string_buf, (uint8_t *)header_string_buf + MAX_BYTES_OF_LENGTH, 7);
+    *length = dst;
+    *string_ptr = integer_len < 0 ? NULL : (char*)header_string_buf + integer_len;
+    
+    return integer_len;
+}
+
 hpack::hpack()
 {
     
@@ -67,56 +144,67 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
             }
             else
             {
-                printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+                printf("! wrong index type\n");
                 break;
             }
             
             HTTP2_Header_String* header_string = (HTTP2_Header_String*)((char*)m_field + parsed);
-            parsed += sizeof(HTTP2_Header_String) + header_string->len;
+            
+            int string_len = 0;
+            char* string_ptr = NULL;
+            int integer_len = decode_http2_header_string(header_string, &string_len, &string_ptr);
+            
+            parsed += integer_len + string_len;
+            
             if(header.index > 0)
             {
-                printf("STRING 1: LEN: %d H: %d\n", header_string->len, header_string->h);
+                printf("STRING 1: I-LEN: %d, LEN: %d, H: %d\n", integer_len, string_len, header_string->h);
                 if(header_string->h == 1) //Huffman
                 {
                     NODE* h_node;
                     hf_init(&h_node);
-                    char* out_buff = (char*)malloc(header_string->len * 32 + 1);
-                    memset(out_buff, 0, header_string->len * 32 + 1);
-                    int size = hf_string_decode(h_node, (unsigned char*)header_string->str, header_string->len , out_buff, header_string->len * 32);
-                    out_buff[size] = '\0';
+                    char* out_buff = (char*)malloc(MAX_HUFFMAN_BUFF_LEN(string_len));
+                    memset(out_buff, 0, MAX_HUFFMAN_BUFF_LEN(string_len));
+                    int out_size = hf_string_decode(h_node, (unsigned char*)string_ptr, string_len , out_buff, MAX_HUFFMAN_BUFF_LEN(string_len));
+                    out_buff[out_size] = '\0';
                     
-                    //printf("out_buff: %s\n", out_buff);
+                    printf("out_buff: %s\n", out_buff);
+                    
                     header.name = "";
                     header.value = out_buff;
+                    
                     free(out_buff);
-                    //printf("~~~~~~~~~    %s\n", header.value.c_str());
+                    
                     hf_finish(h_node);
             
                 }
                 else
                 {
-                    char* out_buff = (char*)malloc(header_string->len + 1);
-                    memcpy(out_buff, header_string->str, header_string->len);
-                    out_buff[header_string->len] = '\0';
+                    char* out_buff = (char*)malloc(string_len + 1);
+                    memcpy(out_buff, string_ptr, string_len + 1);
+                    out_buff[string_len] = '\0';
                     header.name = "";
                     header.value = out_buff;
                     free(out_buff);
-                    //printf("~~~~~~~~~    %s\n", header.value.c_str());               
+                    
+                    printf("~~~~~~~~~    %s\n", header.value.c_str());               
                 }
             }
             else if(header.index == 0)
             {
-                printf("STRING 2: %d H: %d\n", header_string->len, header_string->h);
+                printf("STRING 2: %d H: %d\n", string_len, header_string->h);
                 
                 if(header_string->h == 1) //Huffman
                 {
                     NODE* h_node;
                     hf_init(&h_node);
+                    char* out_buff = (char*)malloc(MAX_HUFFMAN_BUFF_LEN(string_len));
+                    memset(out_buff, 0, MAX_HUFFMAN_BUFF_LEN(string_len));
+                    int out_size = hf_string_decode(h_node, (unsigned char*)string_ptr, string_len , out_buff, MAX_HUFFMAN_BUFF_LEN(string_len));
+                    out_buff[out_size] = '\0';
                     
-                    char* out_buff = (char*)malloc(header_string->len * 32 + 1);
-                    memset(out_buff, 0, header_string->len * 32 + 1);
-                    int size = hf_string_decode(h_node, (unsigned char*)header_string->str, header_string->len , out_buff, header_string->len * 32);
-                    out_buff[size] = '\0';
+                    printf("out_buff: %s\n", out_buff);
+                    
                     header.name = out_buff;
                     free(out_buff);
                     //printf("------    %s\n", header.name.c_str());
@@ -125,27 +213,37 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                 }
                 else
                 {
-                    char* out_buff = (char*)malloc(header_string->len + 1);
-                    memcpy(out_buff, header_string->str, header_string->len);
-                    out_buff[header_string->len] = '\0';
+                    char* out_buff = (char*)malloc(string_len + 1);
+                    memcpy(out_buff, string_ptr, string_len + 1);
+                    out_buff[string_len] = '\0';
+                    
                     header.name = out_buff;
                     free(out_buff);
-                    //printf("------    %s\n", header.value.c_str());                    
+                    
+                    printf("------    %s\n", header.value.c_str());                    
                 }
                 
                 HTTP2_Header_String* header_string2 = (HTTP2_Header_String*)((char*)m_field + parsed);
-                parsed += sizeof(HTTP2_Header_String) + header_string2->len;
                 
-                printf("STRING 3: %d H: %d\n", header_string2->len, header_string2->h);
+                int string_len2 = 0;
+                char* string_ptr2 = NULL;
+                int integer_len2 = decode_http2_header_string(header_string2, &string_len2, &string_ptr2);
+            
+                parsed += integer_len2 + string_len2;
+                
+                printf("STRING 3: %d H: %d\n", string_len2, header_string2->h);
                 
                 if(header_string2->h == 1) //Huffman
                 {
                     NODE* h_node;
                     hf_init(&h_node);
-                    char* out_buff = (char*)malloc(header_string2->len * 8 + 1);
-                    memset(out_buff, 0, header_string2->len * 8 + 1);
-                    int size = hf_string_decode(h_node, (unsigned char*)header_string2->str, header_string2->len , out_buff, header_string2->len * 8);
-                    out_buff[size] = '\0';
+                    char* out_buff = (char*)malloc(MAX_HUFFMAN_BUFF_LEN(string_len2));
+                    memset(out_buff, 0, MAX_HUFFMAN_BUFF_LEN(string_len2));
+                    int out_size = hf_string_decode(h_node, (unsigned char*)string_ptr2, string_len2, out_buff, MAX_HUFFMAN_BUFF_LEN(string_len2));
+                    out_buff[out_size] = '\0';
+                    
+                    printf("out_buff: %s\n", out_buff);
+                    
                     header.value = out_buff;
                     free(out_buff);
                     //printf("    %s\n", header.value.c_str());
@@ -153,12 +251,13 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                 }
                 else
                 {
-                    char* out_buff = (char*)malloc(header_string2->len + 1);
-                    memcpy(out_buff, header_string2->str, header_string2->len);
-                    out_buff[header_string2->len] = '\0';
+                    char* out_buff = (char*)malloc(string_len2 + 1);
+                    memcpy(out_buff, string_ptr2, string_len2 + 1);
+                    out_buff[string_len2] = '\0';
+                    
                     header.value = out_buff;
                     free(out_buff);
-                    //printf("    %s\n", header.value.c_str());                    
+                    printf("    %s\n", header.value.c_str());                    
                 }
             }
             
