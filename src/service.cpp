@@ -187,7 +187,6 @@ static int alpn_cb(SSL *ssl,
 	return SSL_TLSEXT_ERR_NOACK;
 }
 
-#define TLSV1_2_SUPPORT
 static void SESSION_HANDLING(SESSION_PARAM* session_param)
 {
 	BOOL isHttp2 = FALSE;
