@@ -33,13 +33,13 @@ MDEF = CYGWIN
 else
 MDEF = _LINUX_OS_
 endif
-ifdef TLSV1_2
-TLSV_DEF = TLSV1_2_SUPPORT
+ifdef OPENSSL_V_1_2
+TLSV_DEF = OPENSSL_V_1_2
 else
-TLSV_DEF = SSLV23_SUPPORT
+TLSV_DEF = OPENSSL_V_1_0
 endif
 
-INCDIR =
+INCDIR = -I/usr/local/include
 LDDIRS = -L. -L/usr/local/lib
 LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lniuauth -lniuwebsocket
 LDLIST_SVR = -lstdc++ -lrt -ldl -lssl -lcrypto -lpthread -lniuhttp -lniuauth -lniuwebsocket

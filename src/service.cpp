@@ -199,13 +199,16 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
     if(session_param->svr_type == stHTTPS)
 	{
 		SSL_METHOD* meth;
-#ifdef TLSV1_2_SUPPORT
+#ifdef OPENSSL_V_1_2
 	    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
         meth = (SSL_METHOD*)TLSv1_2_server_method();
 #else
         SSL_load_error_strings();
 		OpenSSL_add_ssl_algorithms();
-        meth = (SSL_METHOD*)SSLv23_server_method();
+        if(session_param->http2)
+            meth = (SSL_METHOD*)SSLv23_server_method();
+        else
+            meth = (SSL_METHOD*)TLSv1_2_server_method();
 #endif /* TLSV1_2_SUPPORT */
 		ssl_ctx = SSL_CTX_new(meth);
 		if(!ssl_ctx)
@@ -238,8 +241,10 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 			fprintf(stderr, "SSL_CTX_check_private_key: %s\n", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
-		
-		ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
+		if(session_param->http2)
+            ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ECDHE-RSA-AES128-GCM-SHA256");
+        else
+            ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
         if(ssl_rc == 0)
         {
             fprintf(stderr, "SSL_CTX_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
@@ -262,7 +267,10 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             fprintf(stderr, "SSL_set_fd: %s\n", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl2;
         }
-        ssl_rc = SSL_set_cipher_list(ssl, "ALL");
+        if(session_param->http2)
+            ssl_rc = SSL_set_cipher_list(ssl, "ECDHE-RSA-AES128-GCM-SHA256");
+        else
+            ssl_rc = SSL_set_cipher_list(ssl, "ALL");
         if(ssl_rc == 0)
         {
             fprintf(stderr, "SSL_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
