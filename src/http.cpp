@@ -702,7 +702,10 @@ Http_Connection CHttp::LineParse(const char* text)
             }
             if(strcasestr(strConnection.c_str(), "Upgrade") != NULL)
             {
-                m_web_socket_handshake = Websocket_Sync;
+                if(m_http2)
+                    m_web_socket_handshake = Websocket_Nak;
+                else
+                    m_web_socket_handshake = Websocket_Sync;
             }
             
         }

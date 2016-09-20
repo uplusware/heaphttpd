@@ -242,7 +242,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 			goto clean_ssl3;
 		}
 		if(session_param->http2)
-            ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ECDHE-RSA-AES128-GCM-SHA256");
+            ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
         else
             ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
         if(ssl_rc == 0)
@@ -268,7 +268,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             goto clean_ssl2;
         }
         if(session_param->http2)
-            ssl_rc = SSL_set_cipher_list(ssl, "ECDHE-RSA-AES128-GCM-SHA256");
+            ssl_rc = SSL_set_cipher_list(ssl, "ALL");
         else
             ssl_rc = SSL_set_cipher_list(ssl, "ALL");
         if(ssl_rc == 0)

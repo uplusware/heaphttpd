@@ -89,9 +89,6 @@ typedef struct
 
 /* Maxximn padding length */
 #define MAX_PADDING_LEN     255
-void http2_set_length(HTTP2_Frame* http2_frame, unsigned int length);
-void http2_set_indentifier(HTTP2_Frame* http2_frame, unsigned int indentifier);
-
 /*
     DATA frames
     +---------------+
@@ -285,5 +282,10 @@ typedef struct
 } HTTP2_Frame_Push_Promise_Fragment;
 
 #pragma pack(pop)
+
+void http2_set_length(HTTP2_Frame* http2_frame, unsigned int length);
+void http2_set_indentifier(HTTP2_Frame* http2_frame, unsigned int indentifier);
+void http2_get_length(HTTP2_Frame* http2_frame, unsigned int& length);
+void http2_get_indentifier(HTTP2_Frame* http2_frame, unsigned int& indentifier);
 
 #endif /* _HTTP2COMM_H_ */

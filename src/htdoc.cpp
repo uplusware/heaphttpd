@@ -83,104 +83,118 @@ void Htdoc::Response()
 
     if(m_session->GetWebSocketHandShake())
     {
-        string strwskey = m_session->GetRequestField("Sec-WebSocket-Key");
-        strtrim(strwskey);
-        if(strwskey != "")
+        if(m_session->GetWebSocketHandShake() == Websocket_Nak)
         {
-            string strwsaccept = strwskey;
-            strwsaccept += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"; //a fixed UUID
-            
-            unsigned char Message_Digest[20];
-			SHA1Context sha;
-            SHA1Reset(&sha);
-            SHA1Input(&sha, (unsigned char*)strwsaccept.c_str(), strwsaccept.length());
-            SHA1Result(&sha, Message_Digest);
-            
-            int outlen = BASE64_ENCODE_OUTPUT_MAX_LEN(sizeof(Message_Digest));
-            char * szwsaccept_b64 = (char*)malloc(outlen);
-            CBase64::Encode((char*)Message_Digest, sizeof(Message_Digest), szwsaccept_b64, &outlen);
-            szwsaccept_b64[outlen] = '\0';
-            string strwsaccept_b64 = szwsaccept_b64;
-            free(szwsaccept_b64);
-            
             CHttpResponseHdr header;
-            header.SetStatusCode(SC101);
-            header.SetField("Upgrade", "websocket");
-            header.SetField("Connection", "Upgrade");
-            header.SetField("Sec-WebSocket-Accept", strwsaccept_b64.c_str());
+            header.SetStatusCode(SC400);
+
+            header.SetField("Content-Type", "text/html");
+            header.SetField("Content-Length", header.GetDefaultHTMLLength());
             m_session->SendHeader(header.Text(), header.Length());
-			
-			m_session->SetWebSocketHandShake(Websocket_Ack);
-			
-            /* - WebSocket handshake finishes, begin to communication -*/
-            
-            string strResource = m_session->GetResource();
-            strtrim(strResource, "/");
-	        //printf("%s\n", strResource.c_str());
-            if(strResource != "")
+            m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            return;
+        }
+        else
+        {
+            string strwskey = m_session->GetRequestField("Sec-WebSocket-Key");
+            strtrim(strwskey);
+            if(strwskey != "")
             {
-                string strWSFunctionName = "ws_";
-                strWSFunctionName += strResource;
-                strWSFunctionName += "_main";
-            
-                string strLibName = m_work_path.c_str();
-				strLibName += "/ws/lib";
-                strLibName += strResource.c_str();
-                strLibName += ".so";
+                string strwsaccept = strwskey;
+                strwsaccept += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"; //a fixed UUID
                 
-                struct stat statbuf;
-                if(stat(strLibName.c_str(), &statbuf) < 0)
+                unsigned char Message_Digest[20];
+                SHA1Context sha;
+                SHA1Reset(&sha);
+                SHA1Input(&sha, (unsigned char*)strwsaccept.c_str(), strwsaccept.length());
+                SHA1Result(&sha, Message_Digest);
+                
+                int outlen = BASE64_ENCODE_OUTPUT_MAX_LEN(sizeof(Message_Digest));
+                char * szwsaccept_b64 = (char*)malloc(outlen);
+                CBase64::Encode((char*)Message_Digest, sizeof(Message_Digest), szwsaccept_b64, &outlen);
+                szwsaccept_b64[outlen] = '\0';
+                string strwsaccept_b64 = szwsaccept_b64;
+                free(szwsaccept_b64);
+                
+                CHttpResponseHdr header;
+                header.SetStatusCode(SC101);
+                header.SetField("Upgrade", "websocket");
+                header.SetField("Connection", "Upgrade");
+                header.SetField("Sec-WebSocket-Accept", strwsaccept_b64.c_str());
+                m_session->SendHeader(header.Text(), header.Length());
+                
+                m_session->SetWebSocketHandShake(Websocket_Ack);
+                
+                /* - WebSocket handshake finishes, begin to communication -*/
+                
+                string strResource = m_session->GetResource();
+                strtrim(strResource, "/");
+                //printf("%s\n", strResource.c_str());
+                if(strResource != "")
                 {
-                    CHttpResponseHdr header;
-		            header.SetStatusCode(SC404);
-		
-                    header.SetField("Content-Type", "text/html");
-            		header.SetField("Content-Length", header.GetDefaultHTMLLength());
-                    m_session->SendHeader(header.Text(), header.Length());
-            		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-                    return;
-                }
-                void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
-                if(!lhandle)
-                {
-                    fprintf(stderr, "dlopen %s\n", dlerror());
-                    CHttpResponseHdr header;
-		            header.SetStatusCode(SC500);
-		
-                    header.SetField("Content-Type", "text/html");
-            		header.SetField("Content-Length", header.GetDefaultHTMLLength());
-                    m_session->SendHeader(header.Text(), header.Length());
-            		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-		
-                }
-                else
-                {
-                    dlerror();
-                    void* (*ws_main)(int, SSL*);
-                    ws_main = (void*(*)(int, SSL*))dlsym(lhandle, strWSFunctionName.c_str());
-                    const char* errmsg;
-                    if((errmsg = dlerror()) == NULL)
+                    string strWSFunctionName = "ws_";
+                    strWSFunctionName += strResource;
+                    strWSFunctionName += "_main";
+                
+                    string strLibName = m_work_path.c_str();
+                    strLibName += "/ws/lib";
+                    strLibName += strResource.c_str();
+                    strLibName += ".so";
+                    
+                    struct stat statbuf;
+                    if(stat(strLibName.c_str(), &statbuf) < 0)
                     {
-                        ws_main(m_session->GetSocket(), m_session->GetSSL());
-                        dlclose(lhandle);
+                        CHttpResponseHdr header;
+                        header.SetStatusCode(SC404);
+            
+                        header.SetField("Content-Type", "text/html");
+                        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                        m_session->SendHeader(header.Text(), header.Length());
+                        m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                        return;
+                    }
+                    void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
+                    if(!lhandle)
+                    {
+                        fprintf(stderr, "dlopen %s\n", dlerror());
+                        CHttpResponseHdr header;
+                        header.SetStatusCode(SC500);
+            
+                        header.SetField("Content-Type", "text/html");
+                        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                        m_session->SendHeader(header.Text(), header.Length());
+                        m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            
                     }
                     else
                     {
-                        fprintf(stderr, "dlsym %s\n", errmsg);
-                        
-                        CHttpResponseHdr header;
-	                    header.SetStatusCode(SC500);
-	
-                        header.SetField("Content-Type", "text/html");
-                		header.SetField("Content-Length", header.GetDefaultHTMLLength());
-                        m_session->SendHeader(header.Text(), header.Length());
-                		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-                		
-                    }
-                }
-            }          
-            return;
+                        dlerror();
+                        void* (*ws_main)(int, SSL*);
+                        ws_main = (void*(*)(int, SSL*))dlsym(lhandle, strWSFunctionName.c_str());
+                        const char* errmsg;
+                        if((errmsg = dlerror()) == NULL)
+                        {
+                            ws_main(m_session->GetSocket(), m_session->GetSSL());
+                            dlclose(lhandle);
+                        }
+                        else
+                        {
+                            fprintf(stderr, "dlsym %s\n", errmsg);
+                            
+                            CHttpResponseHdr header;
+                            header.SetStatusCode(SC500);
         
+                            header.SetField("Content-Type", "text/html");
+                            header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                            m_session->SendHeader(header.Text(), header.Length());
+                            m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                            
+                        }
+                    }
+                }          
+                return;
+            
+            }
         }
     }
 	//printf("%d\n", m_session->GetMethod());

@@ -158,7 +158,7 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
             
             if(header.index > 0)
             {
-                printf("STRING 1: I-LEN: %d, LEN: %d, H: %d\n", integer_len, string_len, header_string->h);
+                //printf("STRING 1: I-LEN: %d, LEN: %d, H: %d\n", integer_len, string_len, header_string->h);
                 if(header_string->h == 1) //Huffman
                 {
                     NODE* h_node;
@@ -168,7 +168,7 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                     int out_size = hf_string_decode(h_node, (unsigned char*)string_ptr, string_len , out_buff, MAX_HUFFMAN_BUFF_LEN(string_len));
                     out_buff[out_size] = '\0';
                     
-                    printf("out_buff: %s\n", out_buff);
+                    //printf("out_buff: %s\n", out_buff);
                     
                     header.name = "";
                     header.value = out_buff;
@@ -186,13 +186,11 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                     header.name = "";
                     header.value = out_buff;
                     free(out_buff);
-                    
-                    printf("~~~~~~~~~    %s\n", header.value.c_str());               
                 }
             }
             else if(header.index == 0)
             {
-                printf("STRING 2: %d H: %d\n", string_len, header_string->h);
+                //printf("STRING 2: %d H: %d\n", string_len, header_string->h);
                 
                 if(header_string->h == 1) //Huffman
                 {
@@ -203,7 +201,7 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                     int out_size = hf_string_decode(h_node, (unsigned char*)string_ptr, string_len , out_buff, MAX_HUFFMAN_BUFF_LEN(string_len));
                     out_buff[out_size] = '\0';
                     
-                    printf("out_buff: %s\n", out_buff);
+                    //printf("out_buff: %s\n", out_buff);
                     
                     header.name = out_buff;
                     free(out_buff);
@@ -220,7 +218,7 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                     header.name = out_buff;
                     free(out_buff);
                     
-                    printf("------    %s\n", header.value.c_str());                    
+                    //printf("------    %s\n", header.value.c_str());                    
                 }
                 
                 HTTP2_Header_String* header_string2 = (HTTP2_Header_String*)((char*)m_field + parsed);
@@ -231,7 +229,7 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
             
                 parsed += integer_len2 + string_len2;
                 
-                printf("STRING 3: %d H: %d\n", string_len2, header_string2->h);
+                //printf("STRING 3: %d H: %d\n", string_len2, header_string2->h);
                 
                 if(header_string2->h == 1) //Huffman
                 {
@@ -242,7 +240,7 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                     int out_size = hf_string_decode(h_node, (unsigned char*)string_ptr2, string_len2, out_buff, MAX_HUFFMAN_BUFF_LEN(string_len2));
                     out_buff[out_size] = '\0';
                     
-                    printf("out_buff: %s\n", out_buff);
+                    //printf("out_buff: %s\n", out_buff);
                     
                     header.value = out_buff;
                     free(out_buff);
@@ -257,11 +255,11 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                     
                     header.value = out_buff;
                     free(out_buff);
-                    printf("    %s\n", header.value.c_str());                    
+                    //printf("    %s\n", header.value.c_str());                    
                 }
             }
             
-            printf("%s %u [%s:%s]\n", index_type_names[header.index_type], header.index, header.name.c_str(), header.value.c_str());
+            //printf("%s %u [%s:%s]\n", index_type_names[header.index_type], header.index, header.name.c_str(), header.value.c_str());
             m_decoded_headers.push_back(header);
             
             
@@ -270,6 +268,5 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
         {
             break;
         }
-        printf("%d %d\n", parsed, m_len);
     }
 }

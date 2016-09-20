@@ -18,7 +18,8 @@ enum WebSocket_HandShake
 {
     Websocket_None = 0,
     Websocket_Sync,
-    Websocket_Ack
+    Websocket_Ack,
+    Websocket_Nak
 };
 
 enum Http_Connection

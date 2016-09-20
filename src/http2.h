@@ -115,9 +115,8 @@ public:
 	
 	int ProtRecv();
     virtual Http_Connection Processing();
-    
-    void PushMsg(http2_msg_type type, HTTP2_Frame* frame, char* payload);
-    void PopMsg(http2_msg* msg);
+    virtual int HttpSend(const char* buf, int len);
+    virtual int HttpRecv(char* buf, int len);
     
     void ParseHeaders(uint_32 stream_ind, hpack* hdr);
     
@@ -125,10 +124,6 @@ public:
     int ParseHttp1Content(uint_32 stream_ind, const char* buf, uint_32 len);
     
     int SendEmptyData(uint_32 stream_ind);
-    
-    virtual int HttpSend(const char* buf, int len);
-    virtual int HttpRecv(char* buf, int len);
-    
     
     volatile int m_thread_running;
 
@@ -171,9 +166,6 @@ private:
     
 	char m_preface[HTTP2_PREFACE_LEN + 1];
 	void init_header_table();
-	pthread_t m_send_pthread_id;
-    pthread_mutex_t m_frame_queue_mutex;
-    queue<http2_msg> m_frame_queue;
 	map<int, pair<string, string> > m_header_static_table;
     map<int, pair<string, string> > m_header_dynamic_table;
     
@@ -181,10 +173,7 @@ private:
     string m_method;
     string m_authority;
     string m_scheme;
-    
     string m_status;
-    
-    //uint_32 m_curr_stream_ind;
 };
 
 #endif /* _HTTP2_H_ */

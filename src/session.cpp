@@ -86,11 +86,12 @@ void Session::Process()
             }
             else
             {
-                throw("wrong protocol type");
+                throw(new string("wrong protocol type"));
             }
         }
         catch(string* e)
         {
+            printf(e->c_str());
             delete e;
             shutdown(m_sockfd, 2);
             m_sockfd = -1;

@@ -15,7 +15,7 @@ void* ws_echo_main(int sockfd, SSL* ssl)
     WebSocket_Buffer wsBuffer;
     WebSocket_Buffer_Alloc(&wsBuffer);
     web_socket.Recv(&wsBuffer);
-    string strRecv = wsBuffer.buf;
+    string strRecv = wsBuffer.buf ? wsBuffer.buf : "";
     WebSocket_Buffer_Free(&wsBuffer);
     
     WebSocket_Buffer_Alloc(&wsBuffer, 1024, false, OPCODE_TEXT);
