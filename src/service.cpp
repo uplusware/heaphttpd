@@ -162,12 +162,13 @@ static int alpn_cb(SSL *ssl,
 	{
 		int len = p[0];
 		p++;
+        /*
 		for(int x = 0; x < len; x++)
 		{
 			printf("%c", p[x]);
 		}
 		printf(" %d %d\n", SSL_TLSEXT_ERR_OK, SSL_TLSEXT_ERR_NOACK);
-		
+		*/
 		if(len == 2)
 		{
 			if(memcmp(p, "h2", 2) == 0)

@@ -1,7 +1,6 @@
 #include "hpack.h"
 
-int64_t
-decode_integer(uint32_t &dst, const uint8_t *buf_start, const uint8_t *buf_end, uint8_t n)
+int64_t decode_integer(uint32_t &dst, const uint8_t *buf_start, const uint8_t *buf_end, uint8_t n)
 {
   if (buf_start >= buf_end) {
     return -1;
@@ -30,8 +29,7 @@ decode_integer(uint32_t &dst, const uint8_t *buf_start, const uint8_t *buf_end, 
   return p - buf_start + 1;
 }
 
-int64_t
-encode_integer(uint8_t *buf_start, const uint8_t *buf_end, uint32_t value, uint8_t n)
+int64_t encode_integer(uint8_t *buf_start, const uint8_t *buf_end, uint32_t value, uint8_t n)
 {
   if (buf_start >= buf_end)
     return -1;
@@ -77,6 +75,22 @@ int decode_http2_header_string(HTTP2_Header_String* header_string_buf, int* leng
     return integer_len;
 }
 
+int encode_http2_header_index(char* header_index_buf, int prefix, int length)
+{
+    int integer_len = encode_integer((uint8_t *)header_index_buf, (uint8_t *)header_index_buf + MAX_BYTES_OF_LENGTH, length, prefix);
+    return integer_len;
+}
+
+int decode_http2_header_index(char* header_index_buf, int prefix, int* length)
+{
+    
+    uint32_t dst = 0;
+    int integer_len = decode_integer(dst, (uint8_t *)header_index_buf, (uint8_t *)header_index_buf + MAX_BYTES_OF_LENGTH, prefix);
+    *length = dst;
+    
+    return integer_len;
+}
+
 hpack::hpack()
 {
     
@@ -92,12 +106,19 @@ hpack::~hpack()
     
 }
 
-static const char* index_type_names[] = { "type_indexed", "type_indexing_indexed_name", "type_indexing_new_name",
-                "type_without_indexing_indexed_name", "type_without_indexing_new_name", "type_never_indexed_indexed_name",
-                "type_never_indexed_new_name", "type_error"};
+static const char* index_type_names[] = {
+    "type_indexed",
+    "type_with_indexing_indexed_name",
+    "type_with_indexing_new_name",
+    "type_without_indexing_indexed_name",
+    "type_without_indexing_new_name",
+    "type_never_indexed_indexed_name",
+    "type_never_indexed_new_name",
+    "type_error_index"
+};
             
             
-void hpack::parse(const HTTP2_Header_Field* field, int len)
+int hpack::parse(const HTTP2_Header_Field* field, int len)
 {
     m_field = field;
     m_len = len;
@@ -110,42 +131,71 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
         header.value = "";
         header.index_type = type_error;
         HTTP2_Header_Field* curret_field = (HTTP2_Header_Field*)((char*)m_field + parsed);
-        parsed += sizeof(curret_field->tag); //tag
+        
         if(curret_field->tag.indexed.code == 1) /* 1xxx xxxx */
         {
+            int f_index = 0;
+            char** header_string_ptr = NULL;
+            int integer_len = decode_http2_header_index((char*)&(curret_field->tag.type), 7,  &f_index);
+            //printf("integer_len: %d\n", integer_len);
+            if(integer_len < 0)
+                return -1;
+            
+            parsed += integer_len;
+            
             header.index_type = type_indexed;
-            header.index = curret_field->tag.indexed.index;
+            //printf("    indexed %d\n", f_index);
+            header.index = f_index;
             header.name = "";
             header.value = "";
             m_decoded_headers.push_back(header);
             //printf("%s %u [%s:%s]\n", index_type_names[header.index_type], header.index, header.name.c_str(), header.value.c_str());
         }
-        else if(curret_field->tag.indexing.code == 1 /* 01xx xxxx */
-             || curret_field->tag.without_indexing.code == 0  /* 0000 xxxx */
-             || curret_field->tag.never_indexed.code == 1  /* 0001 xxxx */)
+        else
         {
-            if(curret_field->tag.indexing.code == 1)
+            if(curret_field->tag.with_indexing.code == 1)
             {
-                header.index_type = curret_field->tag.indexing.index > 0 ? type_indexing_indexed_name : type_indexing_new_name;
-                //printf("    indexing %d\n", curret_field->tag.indexing.index);
-                header.index = curret_field->tag.indexing.index;
-            }
-            else if(curret_field->tag.without_indexing.code == 0)
-            {
-                header.index_type = curret_field->tag.without_indexing.index > 0 ? type_without_indexing_indexed_name : type_without_indexing_new_name;
-                //printf("    without_indexing %d\n", curret_field->tag.without_indexing.index);
-                header.index = curret_field->tag.without_indexing.index;
-            }
-            else if(curret_field->tag.never_indexed.code == 1)
-            {
-                header.index_type = curret_field->tag.never_indexed.index > 0 ? type_never_indexed_indexed_name : type_never_indexed_new_name;
-                //printf("    never_indexed %d\n", curret_field->tag.never_indexed.index);
-                header.index = curret_field->tag.never_indexed.index;
+                int f_index = 0;
+                char** header_string_ptr = NULL;
+                int integer_len = decode_http2_header_index((char*)&(curret_field->tag.type), 6,  &f_index);
+                //printf("integer_len: %d\n", integer_len);
+                if(integer_len < 0)
+                    return -1;
+            
+                parsed += integer_len;
+            
+                header.index_type = curret_field->tag.with_indexing.index > 0 ? type_with_indexing_indexed_name : type_with_indexing_new_name;
+                //printf("    with_indexing %d\n", f_index);
+                header.index = f_index;//curret_field->tag.with_indexing.index;
             }
             else
             {
-                printf("! wrong index type\n");
-                break;
+                int f_index = 0;
+                char** header_string_ptr = NULL;
+                int integer_len = decode_http2_header_index((char*)&(curret_field->tag.type), 4,  &f_index);
+                //printf("integer_len: %d\n", integer_len);
+                if(integer_len < 0)
+                    return -1;
+            
+                parsed += integer_len;
+            
+                if(curret_field->tag.without_indexing.code == 0)
+                {
+                    header.index_type = curret_field->tag.without_indexing.index > 0 ? type_without_indexing_indexed_name : type_without_indexing_new_name;
+                    //printf("    without_indexing %d\n", curret_field->tag.without_indexing.index);
+                    header.index = curret_field->tag.without_indexing.index;
+                }
+                else if(curret_field->tag.never_indexed.code == 1)
+                {
+                    header.index_type = curret_field->tag.never_indexed.index > 0 ? type_never_indexed_indexed_name : type_never_indexed_new_name;
+                    //printf("    never_indexed %d\n", f_index);
+                    header.index = f_index;//curret_field->tag.never_indexed.index;
+                }
+                else
+                {
+                    printf("!! wrong index type\n");
+                    return -1;
+                }
             }
             
             HTTP2_Header_String* header_string = (HTTP2_Header_String*)((char*)m_field + parsed);
@@ -153,7 +203,8 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
             int string_len = 0;
             char* string_ptr = NULL;
             int integer_len = decode_http2_header_string(header_string, &string_len, &string_ptr);
-            
+            if(integer_len < 0)
+                return -1;
             parsed += integer_len + string_len;
             
             if(header.index > 0)
@@ -166,6 +217,11 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                     char* out_buff = (char*)malloc(MAX_HUFFMAN_BUFF_LEN(string_len));
                     memset(out_buff, 0, MAX_HUFFMAN_BUFF_LEN(string_len));
                     int out_size = hf_string_decode(h_node, (unsigned char*)string_ptr, string_len , out_buff, MAX_HUFFMAN_BUFF_LEN(string_len));
+                    if(out_size < 0)
+                    {
+                        free(out_buff);
+                        return -1;
+                    }
                     out_buff[out_size] = '\0';
                     
                     //printf("out_buff: %s\n", out_buff);
@@ -199,6 +255,11 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                     char* out_buff = (char*)malloc(MAX_HUFFMAN_BUFF_LEN(string_len));
                     memset(out_buff, 0, MAX_HUFFMAN_BUFF_LEN(string_len));
                     int out_size = hf_string_decode(h_node, (unsigned char*)string_ptr, string_len , out_buff, MAX_HUFFMAN_BUFF_LEN(string_len));
+                    if(out_size < 0)
+                    {
+                        free(out_buff);
+                        return -1;
+                    }
                     out_buff[out_size] = '\0';
                     
                     //printf("out_buff: %s\n", out_buff);
@@ -226,7 +287,8 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                 int string_len2 = 0;
                 char* string_ptr2 = NULL;
                 int integer_len2 = decode_http2_header_string(header_string2, &string_len2, &string_ptr2);
-            
+                if(integer_len2 < 0)
+                    return -1;
                 parsed += integer_len2 + string_len2;
                 
                 //printf("STRING 3: %d H: %d\n", string_len2, header_string2->h);
@@ -238,6 +300,11 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
                     char* out_buff = (char*)malloc(MAX_HUFFMAN_BUFF_LEN(string_len2));
                     memset(out_buff, 0, MAX_HUFFMAN_BUFF_LEN(string_len2));
                     int out_size = hf_string_decode(h_node, (unsigned char*)string_ptr2, string_len2, out_buff, MAX_HUFFMAN_BUFF_LEN(string_len2));
+                    if(out_size < 0)
+                    {
+                        free(out_buff);
+                        return -1;
+                    }
                     out_buff[out_size] = '\0';
                     
                     //printf("out_buff: %s\n", out_buff);
@@ -261,12 +328,7 @@ void hpack::parse(const HTTP2_Header_Field* field, int len)
             
             //printf("%s %u [%s:%s]\n", index_type_names[header.index_type], header.index, header.name.c_str(), header.value.c_str());
             m_decoded_headers.push_back(header);
-            
-            
-        }
-        else
-        {
-            break;
         }
     }
+    return 0;
 }

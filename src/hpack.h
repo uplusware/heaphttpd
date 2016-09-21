@@ -98,6 +98,9 @@ typedef struct
 int encode_http2_header_string(HTTP2_Header_String* header_string_buf, int length, char** string_ptr);
 int decode_http2_header_string(HTTP2_Header_String* header_string_buf, int* length, char** string_ptr);
 
+int decode_http2_header_index(char* header_index_buf, int prefix, int* length);
+int encode_http2_header_index(char* header_index_buf, int prefix, int length);
+
 typedef struct 
 {
 	union 
@@ -111,8 +114,7 @@ typedef struct
 		{
 			uint_8 index : 6;
 			uint_8 code : 2;
-			
-		} indexing;
+		} with_indexing;
 		struct
 		{
 			uint_8 index : 4;
@@ -131,8 +133,8 @@ typedef struct
 enum index_type_e
 {
     type_indexed = 0,
-    type_indexing_indexed_name,
-    type_indexing_new_name,
+    type_with_indexing_indexed_name,
+    type_with_indexing_new_name,
     type_without_indexing_indexed_name,
     type_without_indexing_new_name,
     type_never_indexed_indexed_name,
@@ -155,7 +157,7 @@ public:
     hpack(const HTTP2_Header_Field* field, int len);
     virtual ~hpack();
     
-    void parse(const HTTP2_Header_Field* field, int len);
+    int parse(const HTTP2_Header_Field* field, int len);
     
     vector<HTTP2_Header> m_decoded_headers;
 private:

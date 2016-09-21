@@ -17,6 +17,8 @@
 #include "http2.h"
 #include "hpack.h"
 
+//#define _http2_debug_    1
+
 #define PRE_MALLOC_SIZE 1024
 
 CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
@@ -82,6 +84,7 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
     
     init_header_table();
     
+    memset(m_preface, 0, HTTP2_PREFACE_LEN);
     int ret = HttpRecv(m_preface, HTTP2_PREFACE_LEN);
 	m_preface[HTTP2_PREFACE_LEN] = '\0';
 	
@@ -91,8 +94,17 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
         return;
     }
     
-    printf("Client Preface: %s\n", m_preface);
-    
+    char client_preface_str[] = {
+        0x50, 0x52, 0x49, 0x20, 0x2a, 0x20, 0x48, 0x54,
+        0x54, 0x50, 0x2f, 0x32, 0x2e, 0x30, 0x0d, 0x0a,
+        0x0d, 0x0a, 0x53, 0x4d, 0x0d, 0x0a, 0x0d, 0x0a,
+        0x00
+        };
+    if(strcmp(client_preface_str, m_preface) != 0)
+    {
+        throw(new string("HTTP2: Wrong client preface."));
+        return;
+    }
     char * server_preface = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Setting));
     
 	HTTP2_Frame* preface_frame = (HTTP2_Frame*)server_preface;
@@ -148,7 +160,9 @@ void CHttp2::send_setting_ack(uint_32 stream_ind)
     setting_ack.r = HTTP2_FRAME_R_UNSET;
     setting_ack.indentifier = htonl(stream_ind) >> 1;
     
+#ifdef _http2_debug_
     printf("  Send SETTING Ack for %d\n", ntohl(setting_ack.indentifier) >> 1);
+#endif /* _http2_debug_ */
     HttpSend((const char*)&setting_ack, sizeof(HTTP2_Frame));
 }
 
@@ -171,10 +185,29 @@ void CHttp2::send_window_update(uint_32 stream_ind, uint_32 window_size)
     HttpSend((const char*)&window_update_frm, sizeof(HTTP2_Frame_Window_Update));
 }
 
+void CHttp2::send_goaway(uint_32 last_stream_ind, uint_32 error_code)
+{
+    HTTP2_Frame go_away;
+    go_away.length.len3b[0] = 0x00;
+    go_away.length.len3b[1] = 0x00;
+    go_away.length.len3b[2] = sizeof(HTTP2_Frame_Goaway); //length is 8
+    go_away.type = HTTP2_FRAME_TYPE_GOAWAY;
+    go_away.flags = HTTP2_FRAME_FLAG_UNSET;
+    go_away.r = HTTP2_FRAME_R_UNSET;
+    go_away.indentifier = 0;
+    
+    HTTP2_Frame_Goaway go_away_frm;
+    go_away_frm.r = 0;
+    go_away_frm.last_stream_id = htonl(last_stream_ind) >> 1;
+    go_away_frm.error_code = htonl(error_code);
+    
+    HttpSend((const char*)&go_away, sizeof(HTTP2_Frame));
+    HttpSend((const char*)&go_away_frm, sizeof(HTTP2_Frame_Goaway));
+}
+
 void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
 {
     string str_line;
-    //printf("decode header size: %d\n", hdr->m_decoded_headers.size());
     for(int x = 0; x < hdr->m_decoded_headers.size(); x++)
     {
         BOOL found_it = FALSE;
@@ -182,40 +215,36 @@ void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
         if(hdr->m_decoded_headers[x].index > 0)
         {
             if(hdr->m_decoded_headers[x].index > m_header_static_table.size())
-            {
-                /*map<int, pair<string, string> >::iterator g;
-                for(g = m_header_dynamic_table.begin(); g!= m_header_dynamic_table.end(); g++)
-                {
-                    printf("%d <%s>:[%s]\n", g->first, g->second.first.c_str(), g->second.second.c_str());
-                }*/
+            {   
                 it = m_header_dynamic_table.find(hdr->m_decoded_headers[x].index);
                 if(it != m_header_dynamic_table.end())
+                {
                     found_it = TRUE;
-                
-                //printf("dynamic: %u\n", hdr->m_decoded_headers[x].index);
+                    hdr->m_decoded_headers[x].name = it->second.first.c_str();
+                    if(hdr->m_decoded_headers[x].index_type == type_indexed)
+                        hdr->m_decoded_headers[x].value = it->second.second.c_str();
+                }
             }
             else
             {
                 it = m_header_static_table.find(hdr->m_decoded_headers[x].index);
-                hdr->m_decoded_headers[x].name = it->second.first.c_str();
-                if(hdr->m_decoded_headers[x].index_type == type_indexed)
-                    hdr->m_decoded_headers[x].value = it->second.second.c_str();
                 if(it != m_header_static_table.end())
+                {
                     found_it = TRUE;
-                //printf("static: %u\n", hdr->m_decoded_headers[x].index);
+                    hdr->m_decoded_headers[x].name = it->second.first.c_str();
+                    if(hdr->m_decoded_headers[x].index_type == type_indexed)
+                        hdr->m_decoded_headers[x].value = it->second.second.c_str();
+                }
             }
         }
         
         if(found_it)
         {
-            /*printf("%u, %s %s [%s] [%s]\n", hdr->m_decoded_headers[x].index_type, 
-            it->second.first.c_str(),  it->second.second.c_str(),
-            hdr->m_decoded_headers[x].name.c_str(), hdr->m_decoded_headers[x].value.c_str());*/
             if(strcasecmp(it->second.first.c_str(), ":method") == 0)
             {
                 if(hdr->m_decoded_headers[x].index_type == type_indexed)
                     m_method = it->second.second.c_str();
-                else if(hdr->m_decoded_headers[x].index_type == type_indexing_indexed_name
+                else if(hdr->m_decoded_headers[x].index_type == type_with_indexing_indexed_name
                     || hdr->m_decoded_headers[x].index_type == type_without_indexing_indexed_name
                     || hdr->m_decoded_headers[x].index_type == type_never_indexed_indexed_name)
                     m_method = hdr->m_decoded_headers[x].value.c_str();
@@ -231,13 +260,13 @@ void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
             }
             else if(strcasecmp(it->second.first.c_str(), ":scheme") == 0)
             {
-                
+                m_scheme = hdr->m_decoded_headers[x].value.c_str();                
             }
             else if(strcasecmp(it->second.first.c_str(), ":path") == 0)
             {
                 if(hdr->m_decoded_headers[x].index_type == type_indexed)
                     m_path = it->second.second.c_str();
-                else if(hdr->m_decoded_headers[x].index_type == type_indexing_indexed_name
+                else if(hdr->m_decoded_headers[x].index_type == type_with_indexing_indexed_name
                     || hdr->m_decoded_headers[x].index_type == type_without_indexing_indexed_name
                     || hdr->m_decoded_headers[x].index_type == type_never_indexed_indexed_name)
                     m_path = hdr->m_decoded_headers[x].value.c_str();
@@ -256,7 +285,7 @@ void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
             {
                 if(hdr->m_decoded_headers[x].index_type == type_indexed)
                     m_authority = it->second.second.c_str();
-                else if(hdr->m_decoded_headers[x].index_type == type_indexing_indexed_name
+                else if(hdr->m_decoded_headers[x].index_type == type_with_indexing_indexed_name
                     || hdr->m_decoded_headers[x].index_type == type_without_indexing_indexed_name
                     || hdr->m_decoded_headers[x].index_type == type_never_indexed_indexed_name)
                     m_authority = hdr->m_decoded_headers[x].value.c_str();
@@ -267,13 +296,12 @@ void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
                 str_line += ": ";
                 if(hdr->m_decoded_headers[x].index_type == type_indexed)
                     str_line += it->second.second.c_str();
-                else if(hdr->m_decoded_headers[x].index_type == type_indexing_indexed_name
+                else if(hdr->m_decoded_headers[x].index_type == type_with_indexing_indexed_name
                     || hdr->m_decoded_headers[x].index_type == type_without_indexing_indexed_name
                     || hdr->m_decoded_headers[x].index_type == type_never_indexed_indexed_name)
                     str_line += hdr->m_decoded_headers[x].value.c_str();
                 str_line += "\r\n";
                 m_HttpList[stream_ind]->LineParse(str_line.c_str());
-                //printf("@@@@: %s", str_line.c_str());
             }
         }
         else
@@ -288,13 +316,13 @@ void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
                     str_line += " ";
                     str_line += m_path;
                     str_line += " HTTP/1.1\r\n";
-                    //printf("%d: %s\n", stream_ind, str_line.c_str());
+                    
                     m_HttpList[stream_ind]->LineParse(str_line.c_str());
                 }
             }
             else if(strcasecmp(hdr->m_decoded_headers[x].name.c_str(), ":scheme") == 0)
             {
-                
+                m_scheme = hdr->m_decoded_headers[x].value.c_str();
             }
             else if(strcasecmp(hdr->m_decoded_headers[x].name.c_str(), ":path") == 0)
             {
@@ -306,7 +334,7 @@ void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
                     str_line += " ";
                     str_line += m_path;
                     str_line += " HTTP/1.1\r\n";
-                    //printf(str_line.c_str());
+                    
                     m_HttpList[stream_ind]->LineParse(str_line.c_str());
                 }
             }
@@ -324,28 +352,27 @@ void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
                     str_line += hdr->m_decoded_headers[x].value.c_str();
                     str_line += "\r\n";
                     m_HttpList[stream_ind]->LineParse(str_line.c_str());
-                    printf(str_line.c_str());
+                    
                 }
             }
         }
         
         int stable_size = m_header_static_table.size();
-        if(hdr->m_decoded_headers[x].index_type == type_indexing_indexed_name || hdr->m_decoded_headers[x].index_type == type_indexing_new_name)
+        
+        if(hdr->m_decoded_headers[x].index_type == type_with_indexing_indexed_name || hdr->m_decoded_headers[x].index_type == type_with_indexing_new_name)
         {
             if(strcmp(hdr->m_decoded_headers[x].name.c_str(), "") != 0)
             {
                 //default table element size is 4096 (not octets here)
                 int dtable_size = m_header_dynamic_table.size();
-                //printf("m_header_dynamic_table size: %u\n", m_header_dynamic_table.size());
+                
                 for(int y = (dtable_size > 4095 ? 4095 : dtable_size); y >= 1; y--)
                 {
-                    //printf("y: %u\n", y);
                     usleep(100);
                     map<int, pair<string, string> >::iterator it_y;
                     it_y = m_header_dynamic_table.find(stable_size + y);
                     if(it_y != m_header_dynamic_table.end())
                     {
-                        //printf(">>>>>>>>>>>>>>>>>>> dynamic table: %d\n", y + 1);
                         m_header_dynamic_table[stable_size + y + 1] = m_header_dynamic_table[stable_size + y];
                     }
                 }
@@ -361,8 +388,7 @@ void CHttp2::ParseHeaders(uint_32 stream_ind, hpack* hdr)
 
 int CHttp2::HttpSend(const char* buf, int len)
 {
-    //printf("%s\n", buf);
-	if(m_ssl)
+    if(m_ssl)
 		return SSLWrite(m_sockfd, m_ssl, buf, len);
 	else
 		return _Send_( m_sockfd, buf, len);
@@ -371,10 +397,8 @@ int CHttp2::HttpSend(const char* buf, int len)
 
 int CHttp2::HttpRecv(char* buf, int len)
 {
-    //printf("%s\n", buf);
-	if(m_ssl)
+    if(m_ssl)
 	{
-		//printf("m_lssl->drecv(%p, %d)\n", buf, len);
 		return m_lssl->drecv(buf, len);
 	}
 	else
@@ -387,7 +411,9 @@ int CHttp2::ProtRecv()
 	memset(frame_hdr, 0, sizeof(HTTP2_Frame));
 	
     char* payload = NULL;
+#ifdef _http2_debug_
     const char*frame_names[]  = {"DATA", "HEADERS", "PRIORITY", "RST_STREAM", "SETTINGS", "PUSH_PROMISE", "PING", "GOAWAY", "WINDOW_UPDATE", "CONTINUATION"};
+#endif /* _http2_debug_ */    
 	int ret = HttpRecv((char*)frame_hdr, sizeof(HTTP2_Frame));
 	if(ret == sizeof(HTTP2_Frame))
 	{
@@ -395,7 +421,9 @@ int CHttp2::ProtRecv()
         payload_len = ntohl(payload_len << 8);
         uint_32 stream_ind = frame_hdr->indentifier;
         stream_ind = ntohl(stream_ind << 1);
+#ifdef _http2_debug_        
 		printf("\r\n\r\n>>>> FRAME(%03d): length(%05d) type(%s)\n", stream_ind, payload_len, frame_names[frame_hdr->type]);
+#endif /* _http2_debug_ */
         
         if(stream_ind > 0)
         {
@@ -463,29 +491,30 @@ int CHttp2::ProtRecv()
             payload = (char*)malloc(payload_len + 1);
             memset(payload, 0, payload_len + 1);
             ret = HttpRecv(payload, payload_len);
-            /* printf("ret %d, payload_len %d\n", ret, payload_len); */
             if(ret != payload_len)
                 goto END_SESSION;;
         }
         
         if(frame_hdr->type == HTTP2_FRAME_TYPE_GOAWAY)
         {
+#ifdef _http2_debug_            
             printf("  Recieved HTTP2_FRAME_TYPE_GOAWAY\n");
+#endif /* _http2_debug_ */            
             HTTP2_Frame_Goaway* frm_goaway = (HTTP2_Frame_Goaway*)payload;
             uint_32 last_stream_id = frm_goaway->last_stream_id;
             last_stream_id = htonl(last_stream_id << 31);
             uint_32 error_code = frm_goaway->error_code;
             error_code = htonl(error_code);
             
-            /* printf("GOAWAY: %u %u", last_stream_id, error_code); */
             goto END_SESSION;
         }
         else if(frame_hdr->type == HTTP2_FRAME_TYPE_PRIORITY)
         {
             HTTP2_Frame_Priority * prority = (HTTP2_Frame_Priority *)payload;
             uint_32 dep = ntohl(prority->dependency << 1);
-            
+#ifdef _http2_debug_            
             printf("  Recv PRIORITY for %d as Weight %d\n", ntohl(prority->dependency << 1), prority->weight);
+#endif /* _http2_debug_ */            
             
         }
         else if(frame_hdr->type == HTTP2_FRAME_TYPE_HEADERS)
@@ -496,17 +525,19 @@ int CHttp2::ProtRecv()
             int offset = 0;
             if( (frame_hdr->flags & HTTP2_FRAME_FLAG_PADDED) == HTTP2_FRAME_FLAG_PADDED)
             {
+#ifdef _http2_debug_                
                 printf("  There's some >> PAD <<!\n");
+#endif /* _http2_debug_ */                
                 HTTP2_Frame_Header_Pad * header1 = (HTTP2_Frame_Header_Pad* )payload;
                 padding_len = header1->pad_length;
                 offset += sizeof(HTTP2_Frame_Header_Pad);
-                
-                /* printf("padding_len: %d\n", padding_len); */
             }
             
             if((frame_hdr->flags & HTTP2_FRAME_FLAG_PRIORITY) == HTTP2_FRAME_FLAG_PRIORITY)
             {
+#ifdef _http2_debug_                
                 printf("  There's >> PRIORITY << !\n");
+#endif /* _http2_debug_ */                
                 HTTP2_Frame_Header_Weight * header2 = (HTTP2_Frame_Header_Weight*)(payload + offset);
                 dep = ntohl(header2->dependency << 1);
                 weight = header2->weight;
@@ -515,16 +546,7 @@ int CHttp2::ProtRecv()
             
             int fragment_len = payload_len - offset - padding_len;
             
-            //printf("padding %u, offset %d, fragment_len %u\n", padding_len, offset, fragment_len);
             HTTP2_Frame_Header_Fragment * header3 = (HTTP2_Frame_Header_Fragment*)(payload + offset);
-
-			/*for(int x = 0; x < fragment_len; x++)
-            {
-                printf("%02x ", header3->block_fragment[x]);
-                if(x%16 == 15)
-                    printf("\n");
-            }
-            printf("\n");*/
             
             if(stream_ind > 0)
             {
@@ -538,11 +560,17 @@ int CHttp2::ProtRecv()
                     m_HpackList[stream_ind] = new hpack();
                 }
                 
-                m_HpackList[stream_ind]->parse((HTTP2_Header_Field*)header3->block_fragment, fragment_len);
+                if(m_HpackList[stream_ind]->parse((HTTP2_Header_Field*)header3->block_fragment, fragment_len) < 0)
+                {
+                    send_goaway(stream_ind, HTTP2_COMPRESSION_ERROR);
+                    return -1;
+                }
                 
                 if((frame_hdr->flags & HTTP2_FRAME_FLAG_END_HEADERS) == HTTP2_FRAME_FLAG_END_HEADERS)
                 {
+#ifdef _http2_debug_                    
                     printf("  Recieved HTTP2_FRAME_FLAG_END_HEADERS\n");
+#endif /* _http2_debug_ */                    
                     ParseHeaders(stream_ind, m_HpackList[stream_ind]);
                     if(m_HpackList[stream_ind] != NULL)
                         delete m_HpackList[stream_ind];
@@ -573,11 +601,16 @@ int CHttp2::ProtRecv()
                     m_HpackList[stream_ind] = new hpack();
                 }
                 
-                m_HpackList[stream_ind]->parse((HTTP2_Header_Field*)continuation->block_fragment, fragment_len);
-                
+                if(m_HpackList[stream_ind]->parse((HTTP2_Header_Field*)continuation->block_fragment, fragment_len) < 0)
+                {
+                    send_goaway(stream_ind, HTTP2_COMPRESSION_ERROR);
+                    return -1;
+                }
                 if((frame_hdr->flags & HTTP2_FRAME_FLAG_END_HEADERS) == HTTP2_FRAME_FLAG_END_HEADERS)
                 {
+#ifdef _http2_debug_                    
                     printf("  Recieved HTTP2_FRAME_FLAG_END_HEADERS\n");
+#endif /* _http2_debug_ */                    
                     ParseHeaders(stream_ind, m_HpackList[stream_ind]);
                     if(m_HpackList[stream_ind] != NULL)
                         delete m_HpackList[stream_ind];
@@ -608,7 +641,6 @@ int CHttp2::ProtRecv()
             }
             
             promised_stream_ind = ntohl(promised_stream_ind << 1);
-            //printf("offset, %d\n", offset);
             
             HTTP2_Frame_Push_Promise_Fragment * push_promise = (HTTP2_Frame_Push_Promise_Fragment*)(payload + offset);
             
@@ -626,11 +658,16 @@ int CHttp2::ProtRecv()
                     m_HpackList[promised_stream_ind] = new hpack();
                 }
                 
-                m_HpackList[promised_stream_ind]->parse((HTTP2_Header_Field*)push_promise->block_fragment, fragment_len);
-                
+                if(m_HpackList[promised_stream_ind]->parse((HTTP2_Header_Field*)push_promise->block_fragment, fragment_len) < 0)
+                {
+                    send_goaway(stream_ind, HTTP2_COMPRESSION_ERROR);
+                    return -1;
+                }
                 if((frame_hdr->flags & HTTP2_FRAME_FLAG_END_HEADERS) == HTTP2_FRAME_FLAG_END_HEADERS)
                 {
+#ifdef _http2_debug_                    
                     printf("  Recieved HTTP2_FRAME_FLAG_END_HEADERS\n");
+#endif /* _http2_debug_ */                    
                     ParseHeaders(promised_stream_ind, m_HpackList[promised_stream_ind]);
                     if(m_HpackList[promised_stream_ind] != NULL)
                         delete m_HpackList[promised_stream_ind];
@@ -641,10 +678,6 @@ int CHttp2::ProtRecv()
         else if(frame_hdr->type == HTTP2_FRAME_TYPE_SETTINGS)
         {
             HTTP2_Setting* client_setting = (HTTP2_Setting*)payload;
-            /*for(int x = 0; x < payload_len/sizeof(HTTP2_Setting); x++)
-            {
-                printf("    client_setting(%d): %d %d\n", x, ntohs(client_setting[x].identifier), ntohl(client_setting[x].value));
-            }*/
             if((frame_hdr->flags & HTTP2_FRAME_FLAG_SETTING_ACK) != HTTP2_FRAME_FLAG_SETTING_ACK) //non setting ack
             {
                 HTTP2_Frame setting_ack;
@@ -655,14 +688,17 @@ int CHttp2::ProtRecv()
                 setting_ack.flags = HTTP2_FRAME_FLAG_SETTING_ACK;
                 setting_ack.r = HTTP2_FRAME_R_UNSET;
                 setting_ack.indentifier = frame_hdr->indentifier;
-                
+#ifdef _http2_debug_                
                 printf("  Send Ack for %d\n", ntohl(setting_ack.indentifier << 1));
+#endif /* _http2_debug_ */                
                 
                 HttpSend((const char*)&setting_ack, sizeof(HTTP2_Frame));
             }
             else
             {
+#ifdef _http2_debug_                
                 printf("  This is a SETTING Ack\n");
+#endif /* _http2_debug_ */                
             }
         }
         else if(frame_hdr->type == HTTP2_FRAME_TYPE_DATA)
@@ -681,6 +717,7 @@ int CHttp2::ProtRecv()
             {
                 HTTP2_Frame_Data2 * data2 = (HTTP2_Frame_Data2* )payload;
                 offset += sizeof(HTTP2_Frame_Data2);
+            
                 m_HttpList[stream_ind]->PushPostData(data2->data, payload_len);
             }
             m_HttpList[stream_ind]->Response();
@@ -695,7 +732,9 @@ int CHttp2::ProtRecv()
         {
             HTTP2_Frame_Window_Update* win_update = (HTTP2_Frame_Window_Update*)payload;
             uint_32 win_size = ntohl(win_update->win_size << 1);
+#ifdef _http2_debug_
             printf("  Window Size: %u\n", win_size);
+#endif /* _http2_debug_ */            
         }
         else if(frame_hdr->type == HTTP2_FRAME_TYPE_RST_STREAM)
         {
@@ -734,13 +773,17 @@ int CHttp2::ProtRecv()
                 HTTP2_Frame_Ping* ping_ack_frm = (HTTP2_Frame_Ping*)((char*)ping_ack + sizeof(HTTP2_Frame));
                 HTTP2_Frame_Ping* ping_frm = (HTTP2_Frame_Ping*)payload;
                 memcpy(ping_ack_frm->data, ping_frm->data, sizeof(HTTP2_Frame_Ping));
+#ifdef _http2_debug_                
                 printf("  Send PING Ack\n");
+#endif /* _http2_debug_ */                
                 HttpSend((const char*)ping_ack, sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Ping));
                 free(ping_ack);
             }
             else
             {
+#ifdef _http2_debug_                
                 printf("  This is a PING Ack\n");
+#endif /* _http2_debug_ */                
             }
         }
         if(payload)
@@ -771,6 +814,8 @@ Http_Connection CHttp2::Processing()
 
 int CHttp2::ParseHttp1Header(uint_32 stream_ind, const char* buf, int len)
 {
+    if(stream_ind == 0)
+        return -1;
     char* response_buf = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame) + PRE_MALLOC_SIZE);
     HTTP2_Frame * http2_frm_hdr = (HTTP2_Frame *)response_buf;
     uint_32 response_len = sizeof(HTTP2_Frame);
@@ -799,50 +844,58 @@ int CHttp2::ParseHttp1Header(uint_32 stream_ind, const char* buf, int len)
         
         HTTP2_Header_Field field;
         
+        int hdr_field_tag_len = 0;
         HTTP2_Header_String* hdr_string = NULL;
         uint_32 hdr_string_len = 0;
         
         index_type_e index_type = type_never_indexed_new_name;
-        field.tag.never_indexed.code = 0x01;
-        field.tag.never_indexed.index = 0x0;
-            
+        
+        hdr_field_tag_len = encode_http2_header_index((char*)&(field.tag.type), 4, 0);
+        if(hdr_field_tag_len < 0)
+            break;
+        field.tag.never_indexed.code = 1;
+                    
         if(strncasecmp(strtext.c_str(), "HTTP/1.1", 8) == 0)
         {
             string strtextlow;
             lowercase(strtext.c_str(), strtextlow);
             char status_code[16];
             memset(status_code, 0, 16);
-            //printf("%s\n", strtextlow.c_str());
             sscanf(strtextlow.c_str(), "http/1.1%*[^0-9]%[0-9]%*[^0-9]", status_code);
+#ifdef _http2_debug_            
             printf("  :status %s\n", status_code);
+#endif /* _http2_debug_ */            
                     
             for(map<int, pair<string, string> >::iterator it = m_header_static_table.begin(); it != m_header_static_table.end(); ++it)
             {
                 if(strcasecmp(it->second.first.c_str(), ":status") == 0)
                 {
-                    index_type = type_indexing_indexed_name;
-                    field.tag.indexing.code = 0x01;
-                    field.tag.indexing.index = it->first;
+                    index_type = type_with_indexing_indexed_name;
+                    
+                    hdr_field_tag_len = encode_http2_header_index((char*)&(field.tag.type), 6, it->first);
+                    if(hdr_field_tag_len < 0)
+                        break;
+                    field.tag.with_indexing.code = 1;
+                    
                     if(strcasecmp(it->second.second.c_str(), status_code) == 0)
                     {
                         index_type = type_indexed;
-                        field.tag.indexed.code = 0x01;
-                        field.tag.indexed.index = it->first;
-                        //printf("!!!!!!!!!!! status found: %s\n", status_code);
+                        hdr_field_tag_len = encode_http2_header_index((char*)&(field.tag.type), 7, it->first);
+                        if(hdr_field_tag_len < 0)
+                            break;
+                        field.tag.indexed.code = 1;
+                        
                         break;
                     }
-                    
-                    //printf("%d %s\n", it->first, it->second.first.c_str());
                 }
             }
-            if(index_type == type_indexing_indexed_name)
+            if(index_type == type_with_indexing_indexed_name)
             {                
                 const char* string_buf = status_code;
                 int string_len = strlen(status_code);
                 
                 hdr_string = (HTTP2_Header_String*)malloc(sizeof(HTTP2_Header_String) + MAX_BYTES_OF_LENGTH + MAX_HUFFMAN_BUFF_LEN(string_len));
                 
-                //printf("!!!!!!!!!! ENCODE1: %s %d\n", string_buf, string_len);
                 int out_len = 0;
                 unsigned char* out_buff = (unsigned char*)malloc(MAX_HUFFMAN_BUFF_LEN(string_len));
                 memset(out_buff, 0, MAX_HUFFMAN_BUFF_LEN(string_len));
@@ -879,28 +932,32 @@ int CHttp2::ParseHttp1Header(uint_32 stream_ind, const char* buf, int len)
             {
                 if(strcasecmp(it->second.first.c_str(), strNameLow.c_str()) == 0)
                 {
-                    index_type = type_indexing_indexed_name;
-                    field.tag.indexing.code = 0x01;
-                    field.tag.indexing.index = it->first;
+                    index_type = type_with_indexing_indexed_name;
+                    
+                    hdr_field_tag_len = encode_http2_header_index((char*)&(field.tag.type), 6, it->first);
+                    if(hdr_field_tag_len < 0)
+                        break;
+                    field.tag.with_indexing.code = 1;
                     if(strcasecmp(it->second.second.c_str(), strValue.c_str()) == 0)
                     {
                         index_type = type_indexed;
-                        field.tag.indexed.code = 0x01;
-                        field.tag.indexed.index = it->first;
+                        hdr_field_tag_len = encode_http2_header_index((char*)&(field.tag.type), 7, it->first);
+                        if(hdr_field_tag_len < 0)
+                            break;
+                        field.tag.indexed.code = 1;
                         break;
                     }
-                    //printf("%d %s\n", it->first, it->second.first.c_str());
+                    
                 }
             }
             
-            if(index_type == type_indexing_indexed_name)
+            if(index_type == type_with_indexing_indexed_name)
             {
                 const char*  string_buf = strValue.c_str();
                 int string_len = strValue.length();
 
                 hdr_string = (HTTP2_Header_String*)malloc(sizeof(HTTP2_Header_String) + MAX_BYTES_OF_LENGTH + MAX_HUFFMAN_BUFF_LEN(string_len));
                 
-                //printf("!!!!!!!!!! ENCODE2: %s %d\n", string_buf, string_len);
                 int out_len = 0;
                 unsigned char* out_buff = (unsigned char*)malloc(MAX_HUFFMAN_BUFF_LEN(string_len));
                 memset(out_buff, 0, MAX_HUFFMAN_BUFF_LEN(string_len));
@@ -919,7 +976,6 @@ int CHttp2::ParseHttp1Header(uint_32 stream_ind, const char* buf, int len)
                 
                 free(out_buff);
                 
-                //printf("integer_len: %d out_len: %d %p %p\n", integer_len, out_len, hdr_string, string_ptr);
                 hdr_string_len = integer_len + out_len;
             }
             else if(index_type == type_never_indexed_new_name)
@@ -932,7 +988,6 @@ int CHttp2::ParseHttp1Header(uint_32 stream_ind, const char* buf, int len)
                 
                 hdr_string = (HTTP2_Header_String*)malloc(sizeof(HTTP2_Header_String) + MAX_BYTES_OF_LENGTH + MAX_HUFFMAN_BUFF_LEN(string_len) + MAX_HUFFMAN_BUFF_LEN(string_len2));
                 
-                //printf("!!!!!!!!!! ENCODE3: %s %d\n", string_buf, string_len);
                 int out_len = 0;
                 unsigned char* out_buff = (unsigned char*)malloc(MAX_HUFFMAN_BUFF_LEN(string_len));
                 memset(out_buff, 0, MAX_HUFFMAN_BUFF_LEN(string_len));
@@ -956,7 +1011,6 @@ int CHttp2::ParseHttp1Header(uint_32 stream_ind, const char* buf, int len)
                 
                 HTTP2_Header_String* hdr_string2 = (HTTP2_Header_String*)((char*)hdr_string + integer_len + out_len);
                 
-                //printf("!!!!!!!!!! ENCODE3: %s %d\n", string_buf2, string_len2);
                 int out_len2 = 0;
                 unsigned char* out_buff2 = (unsigned char*)malloc(MAX_HUFFMAN_BUFF_LEN(string_len2));
                 memset(out_buff2, 0, MAX_HUFFMAN_BUFF_LEN(string_len2));
@@ -979,17 +1033,16 @@ int CHttp2::ParseHttp1Header(uint_32 stream_ind, const char* buf, int len)
             }
         }
         
-        if(response_buff_size < response_len + sizeof(HTTP2_Header_Field) + hdr_string_len)
+        if(response_buff_size < response_len + hdr_field_tag_len + hdr_string_len)
         {
-            char* response_buf_swap = (char*)malloc(response_len + sizeof(HTTP2_Header_Field) + hdr_string_len + PRE_MALLOC_SIZE);
-            response_buff_size = response_len + sizeof(HTTP2_Header_Field) + hdr_string_len + PRE_MALLOC_SIZE;
+            char* response_buf_swap = (char*)malloc(response_len + hdr_field_tag_len + hdr_string_len + PRE_MALLOC_SIZE);
+            response_buff_size = response_len + hdr_field_tag_len + hdr_string_len + PRE_MALLOC_SIZE;
             memcpy(response_buf_swap, response_buf, response_len);
             free(response_buf);
             response_buf = response_buf_swap;
         }
-        memcpy(response_buf + response_len, &field, sizeof(HTTP2_Header_Field));
-        response_len += sizeof(HTTP2_Header_Field);
-        //printf("hdr_string_len: %u\n", hdr_string_len);
+        memcpy(response_buf + response_len, &field, hdr_field_tag_len);
+        response_len += hdr_field_tag_len;
         if(hdr_string && hdr_string_len > 0)
         {
             memcpy(response_buf + response_len, hdr_string, hdr_string_len);
@@ -997,17 +1050,14 @@ int CHttp2::ParseHttp1Header(uint_32 stream_ind, const char* buf, int len)
         }
     }
     uint_32 frame_len = response_len - sizeof(HTTP2_Frame);
-    //printf("frame length: %u, stream_ind:　%d\n", frame_len, stream_ind);
     
     http2_frm_hdr->length.len24 = htonl(frame_len) >> 8;
-    //printf("len: %02x, %02x, %02x\n", http2_frm_hdr->length.len3b[0], http2_frm_hdr->length.len3b[1], http2_frm_hdr->length.len3b[2]);
     http2_frm_hdr->type = HTTP2_FRAME_TYPE_HEADERS;
     http2_frm_hdr->flags = HTTP2_FRAME_FLAG_END_HEADERS;
     http2_frm_hdr->r = HTTP2_FRAME_R_UNSET;
     
     http2_frm_hdr->indentifier = htonl(stream_ind) >> 1;
     
-    //printf("#1: %u\n", response_len);
     if(response_buff_size < response_len + sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data2) + 2)
     {
         char* response_buf_swap = (char*)malloc(response_len + sizeof(HTTP2_Frame_Data2) + 2 + PRE_MALLOC_SIZE);
@@ -1022,27 +1072,26 @@ int CHttp2::ParseHttp1Header(uint_32 stream_ind, const char* buf, int len)
         HTTP2_Frame * http2_frm_data = (HTTP2_Frame *)(response_buf + response_len);
         response_len += sizeof(HTTP2_Frame);
         
-        http2_frm_data->length.len24 = 0;//htonl(2) >> 8;
-        //printf("len: %02x, %02x, %02x\n", http2_frm_data->length.len3b[0], http2_frm_data->length.len3b[1], http2_frm_data->length.len3b[2]);
+        http2_frm_data->length.len24 = 0;
         http2_frm_data->type = HTTP2_FRAME_TYPE_DATA;
         http2_frm_data->flags = HTTP2_FRAME_FLAG_UNSET;
         http2_frm_data->r = HTTP2_FRAME_R_UNSET;
         http2_frm_data->indentifier = htonl(stream_ind) >> 1;
         
-        //printf("stream_ind:　%d\n", stream_ind);
     }
     
-    return /* m_HttpList[stream_ind]->*/HttpSend(response_buf, response_len);
+    return m_HttpList[stream_ind]->HttpSend(response_buf, response_len);
 }
 
 int CHttp2::ParseHttp1Content(uint_32 stream_ind, const char* buf, uint_32 len)
 {
+    if(stream_ind == 0)
+        return -1;
     int response_len;
     char* response_buf = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data2) + len);
     response_len = sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data2) + len;
     HTTP2_Frame * http2_frm_data = (HTTP2_Frame *)response_buf;
     http2_frm_data->length.len24 = htonl(len) >> 8;
-    //printf("@@@@@@@@@HTTP2 Content, len: %02x, %02x, %02x\n", http2_frm_data->length.len3b[0], http2_frm_data->length.len3b[1], http2_frm_data->length.len3b[2]);
     http2_frm_data->type = HTTP2_FRAME_TYPE_DATA;
     http2_frm_data->flags = HTTP2_FRAME_FLAG_UNSET;
     http2_frm_data->r = HTTP2_FRAME_R_UNSET;
@@ -1054,7 +1103,7 @@ int CHttp2::ParseHttp1Content(uint_32 stream_ind, const char* buf, uint_32 len)
     HTTP2_Frame_Data2* data = (HTTP2_Frame_Data2*)(response_buf + sizeof(HTTP2_Frame));
     memcpy(data->data, buf, len);
     
-    return /*m_HttpList[stream_ind]->*/HttpSend(response_buf, response_len);
+    return m_HttpList[stream_ind]->HttpSend(response_buf, response_len);
 }
 
 int CHttp2::SendEmptyData(uint_32 stream_ind)
@@ -1064,16 +1113,13 @@ int CHttp2::SendEmptyData(uint_32 stream_ind)
     response_len = sizeof(HTTP2_Frame);
     HTTP2_Frame * http2_frm_data = (HTTP2_Frame *)response_buf;
     http2_frm_data->length.len24 = 0;
-    //printf("len: %02x, %02x, %02x\n", http2_frm_data->length.len3b[0], http2_frm_data->length.len3b[1], http2_frm_data->length.len3b[2]);
     http2_frm_data->type = HTTP2_FRAME_TYPE_DATA;
     http2_frm_data->flags = HTTP2_FRAME_FLAG_END_STREAM;
     http2_frm_data->r = HTTP2_FRAME_R_UNSET;
     
     http2_frm_data->indentifier = htonl(stream_ind) >> 1;
     
-    //printf("SendEmptyData: stream_ind:　%d\n", stream_ind);
-    
-    return /*m_HttpList[stream_ind]->*/HttpSend(response_buf, response_len);
+    return m_HttpList[stream_ind]->HttpSend(response_buf, response_len);
 }
 
 void CHttp2::init_header_table()

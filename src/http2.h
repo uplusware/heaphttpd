@@ -130,6 +130,7 @@ public:
 private:
     void send_setting_ack(uint_32 stream_ind);
     void send_window_update(uint_32 stream_ind, uint_32 window_size);
+    void send_goaway(uint_32 last_stream_ind, uint_32 error_code);
 
 private:
     ServiceObjMap * m_srvobj;

@@ -740,6 +740,7 @@ Http_Connection CHttp::LineParse(const char* text)
         }
         else if(strncasecmp(strtext.c_str(), "Cookie:", 7) == 0)
         {
+            //printf("%s\n", strtext.c_str());
             string strcookie;
             strcut(strtext.c_str(), "Cookie:", NULL, strcookie);
             strtrim(strcookie);
