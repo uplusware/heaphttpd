@@ -62,7 +62,7 @@
 #define HTTP2_FRAME_R_UNSET               0x0
 #define HTTP2_FRAME_R_SET                 0x1
 
-#define HTTP2_FRAME_INDENTIFIER_WHOLE     0x00
+#define HTTP2_FRAME_IDENTIFIER_WHOLE     0x00
 
 #define HTTP2_SETTINGS_HEADER_TABLE_SIZE        0x01
 #define HTTP2_SETTINGS_ENABLE_PUSH              0x02
@@ -83,7 +83,7 @@ typedef struct
 	uint_8 type;
 	uint_8 flags;
 	uint_32 r : 1;
-	uint_32 indentifier : 31;
+	uint_32 identifier : 31;
 	char payload[0];
 } HTTP2_Frame;
 
@@ -284,8 +284,8 @@ typedef struct
 #pragma pack(pop)
 
 void http2_set_length(HTTP2_Frame* http2_frame, unsigned int length);
-void http2_set_indentifier(HTTP2_Frame* http2_frame, unsigned int indentifier);
+void http2_set_identifier(HTTP2_Frame* http2_frame, unsigned int identifier);
 void http2_get_length(HTTP2_Frame* http2_frame, unsigned int& length);
-void http2_get_indentifier(HTTP2_Frame* http2_frame, unsigned int& indentifier);
+void http2_get_identifier(HTTP2_Frame* http2_frame, unsigned int& identifier);
 
 #endif /* _HTTP2COMM_H_ */

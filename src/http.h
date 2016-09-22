@@ -57,9 +57,13 @@ public:
         
 	virtual ~CHttp();
 
-	virtual Http_Connection LineParse(const char* text);
-	virtual int ProtRecv(char* buf, int len);
+	Http_Connection LineParse(const char* text);
     
+	virtual int HttpSend(const char* buf, int len);
+    virtual int HttpRecv(char* buf, int len);
+	virtual Http_Connection Processing();
+    
+    int ProtRecv(char* buf, int len);
     void PushPostData(const char* buf, int len);
     void RecvPostData();
     void Response();
@@ -140,13 +144,6 @@ public:
 	
 	void SetExtensionDate(void* extdata) { m_extdata = extdata; }
 	void* GetExtensionDate() { return m_extdata; }
-	
-	virtual int HttpSend(const char* buf, int len);
-    virtual int HttpRecv(char* buf, int len);
-	
-    void HelloWorld(int code){ printf("hello world! %d\n", code); }
-    
-    virtual Http_Connection Processing();
     
     BOOL GetKeepAlive() { return m_keep_alive; }
     

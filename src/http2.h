@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include "http.h"
 #include "http2comm.h"
+#include "http2stream.h"
 #include "hpack.h"
 #include <queue>
 #include <utility>
@@ -97,6 +98,7 @@ typedef struct
 } http2_msg;
 
 class CHttp;
+class http2_stream;
 class CHttp2 : public IHttp
 {
 public:
@@ -120,10 +122,10 @@ public:
     
     void ParseHeaders(uint_32 stream_ind, hpack* hdr);
     
-    int ParseHttp1Header(uint_32 stream_ind, const char* buf, int len);
-    int ParseHttp1Content(uint_32 stream_ind, const char* buf, uint_32 len);
+    int TransHttp1SendHttp2Header(uint_32 stream_ind, const char* buf, int len);
+    int TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint_32 len);
     
-    int SendEmptyData(uint_32 stream_ind);
+    int SendEmptyHttp2Content(uint_32 stream_ind);
     
     volatile int m_thread_running;
 
@@ -162,8 +164,7 @@ private:
     linesock* m_lsockfd;
 	linessl * m_lssl;
     
-	map<uint_32, CHttp*> m_HttpList;
-    map<uint_32, hpack*> m_HpackList;
+    map<uint_32, http2_stream*> m_stream_list;
     
 	char m_preface[HTTP2_PREFACE_LEN + 1];
 	void init_header_table();
@@ -175,6 +176,14 @@ private:
     string m_authority;
     string m_scheme;
     string m_status;
+    
+    //Setting
+    uint_32 m_header_table_size;
+    BOOL m_enable_push;
+    uint_32 m_max_concurrent_streams;
+    uint_32 m_initial_window_size;
+    uint_32 m_max_frame_size;
+    uint_32 m_max_header_list_size;
 };
 
 #endif /* _HTTP2_H_ */

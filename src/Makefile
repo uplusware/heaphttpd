@@ -13,7 +13,7 @@ WSLIBOBJS = websocket.o
 
 HTTPLIB = libniuhttp.so
 HTTPLIBOBJS =   httpsessionvar.o httpservervar.o cookie.o   \
-                http.o httpcomm.o cache.o htdoc.o http2.o http2comm.o hpack.o   \
+                http.o httpcomm.o cache.o htdoc.o http2.o http2comm.o hpack.o http2stream.o   \
                 fstring.o webdoc.o webcgi.o niuapi.o wwwauth.o fastcgi.o	\
                 util/digcalc.o	            \
                 util/sha1.o                 \
@@ -47,7 +47,7 @@ LDLIST_TOOL = -lstdc++
 LDLIST_AUTH = -lstdc++
 LDLIST_WS = -lstdc++ -lssl -lcrypto
 
-FLAGS = -O2 -fPIC -w
+FLAGS = -g -fPIC -w
 
 all: libws libauth libhttp websrv pgmtool
 

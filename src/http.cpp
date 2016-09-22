@@ -310,7 +310,7 @@ int CHttp::SendHeader(const char* buf, int len)
     strHeader += "\r\n";
     if(m_http2)
     {
-        m_http2->ParseHttp1Header(m_http2_stream_ind, strHeader.c_str(), strHeader.length());
+        m_http2->TransHttp1SendHttp2Header(m_http2_stream_ind, strHeader.c_str(), strHeader.length());
     }
     else
         return HttpSend(strHeader.c_str(), strHeader.length());
@@ -318,11 +318,9 @@ int CHttp::SendHeader(const char* buf, int len)
 
 int CHttp::SendContent(const char* buf, int len)
 {   
-    //printf("Content: %d, %s\n", len, buf);
-        
     if(m_http2)
     {
-        return m_http2->ParseHttp1Content(m_http2_stream_ind, buf, len);
+        return m_http2->TransHttp1SendHttp2Content(m_http2_stream_ind, buf, len);
     }
     else
         return HttpSend(buf, len);
@@ -534,7 +532,7 @@ void CHttp::Response()
         doc->Response();
         
         if(m_http2)
-            m_http2->SendEmptyData(m_http2_stream_ind);
+            m_http2->SendEmptyHttp2Content(m_http2_stream_ind);
         
         //Extension hook 3
         for(int x = 0; x < m_ext_list->size(); x++)

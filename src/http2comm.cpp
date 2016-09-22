@@ -14,9 +14,9 @@ void http2_set_length(HTTP2_Frame* http2_frame, unsigned int length)
     http2_frame->length.len24 = htonl(length) >> 8;
 }
 
-void http2_set_indentifier(HTTP2_Frame* http2_frame, unsigned int indentifier)
+void http2_set_identifier(HTTP2_Frame* http2_frame, unsigned int identifier)
 {
-    http2_frame->indentifier = htonl(indentifier) >> 1;
+    http2_frame->identifier = htonl(identifier) >> 1;
 }
 
 void http2_get_length(HTTP2_Frame* http2_frame, unsigned int &length)
@@ -24,7 +24,7 @@ void http2_get_length(HTTP2_Frame* http2_frame, unsigned int &length)
     length = htonl(http2_frame->length.len24 << 8);
 }
 
-void http2_get_indentifier(HTTP2_Frame* http2_frame, unsigned int &indentifier)
+void http2_get_identifier(HTTP2_Frame* http2_frame, unsigned int &identifier)
 {
-    indentifier = htonl(http2_frame->indentifier << 1);
+    identifier = htonl(http2_frame->identifier << 1);
 }
