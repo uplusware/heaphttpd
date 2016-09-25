@@ -190,7 +190,7 @@ void CHttp2::send_window_update(uint_32 stream_ind, uint_32 window_size)
 #endif /* _http2_debug_ */
 }
 
-void CHttp2::send_push_promise(uint_32 stream_ind)
+void CHttp2::send_push_promise_request(uint_32 stream_ind)
 {
     for(int x = 0; x < m_ch->m_http2_push_list.size(); x++)
     {
@@ -263,8 +263,7 @@ void CHttp2::send_push_promise(uint_32 stream_ind)
     printf("  Send PUSH_PROMISE for %s, and will on %d\n", m_ch->m_http2_push_list[x].path.c_str(), promised_stream_ind);
 #endif /* _http2_debug_ */
 
-        m_stream_list[promised_stream_ind]->send_push_promise(m_stream_list[stream_ind], m_ch->m_http2_push_list[x].path.c_str());
-        //break;
+        m_stream_list[promised_stream_ind]->SendPushPromiseResponse(m_stream_list[stream_ind], m_ch->m_http2_push_list[x].path.c_str());
     }
 }
 
@@ -978,12 +977,12 @@ int CHttp2::SendHttp2EmptyContent(uint_32 stream_ind)
     return ret;
 }
 
-void CHttp2::SendHttp2PushPromise(uint_32 stream_ind)
+void CHttp2::SendHttp2PushPromiseRequest(uint_32 stream_ind)
 {
     if(m_pushed == FALSE)
     {
         m_pushed = TRUE;
-        send_push_promise(stream_ind);
+        send_push_promise_request(stream_ind);
     }
 }
 

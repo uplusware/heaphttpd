@@ -87,7 +87,7 @@ http2_stream::~http2_stream()
     m_hpack = NULL;
 }
 
-void http2_stream::send_push_promise(http2_stream* host_stream, const char* path)
+void http2_stream::SendPushPromiseResponse(http2_stream* host_stream, const char* path)
 {
     string str_http1_header = "GET ";
     str_http1_header += path;

@@ -35,7 +35,7 @@ public:
     
     void ClearHpack();
     
-    void send_push_promise(http2_stream* host_stream, const char* path);
+    void SendPushPromiseResponse(http2_stream* host_stream, const char* path);
     
     string m_path;
     string m_method;

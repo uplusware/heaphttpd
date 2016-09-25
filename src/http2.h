@@ -126,13 +126,13 @@ public:
     int TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint_32 len);
     
     int SendHttp2EmptyContent(uint_32 stream_ind);
-    void SendHttp2PushPromise(uint_32 stream_ind);
+    void SendHttp2PushPromiseRequest(uint_32 stream_ind);
 
 private:
     void send_setting_ack(uint_32 stream_ind);
     void send_window_update(uint_32 stream_ind, uint_32 window_size);
     void send_goaway(uint_32 last_stream_ind, uint_32 error_code);
-    void send_push_promise(uint_32 stream_ind);
+    void send_push_promise_request(uint_32 stream_ind);
 
 private:
     ServiceObjMap * m_srvobj;
