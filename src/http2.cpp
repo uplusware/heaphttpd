@@ -205,7 +205,6 @@ void CHttp2::send_push_promise_request(uint_32 stream_ind)
                 break;
             }
         }
-        printf("promised_stream_ind: %d\n", promised_stream_ind);
         m_stream_list[promised_stream_ind] = new http2_stream(promised_stream_ind, this, m_srvobj,
             m_sockfd,
             m_servername.c_str(),
