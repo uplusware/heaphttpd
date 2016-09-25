@@ -1060,7 +1060,75 @@ void memory_cache::load()
 	m_type_table.insert(map<string, string>::value_type("xwd", "image/x-xwindowdump"));
 	m_type_table.insert(map<string, string>::value_type("z", "application/x-compress"));
 	m_type_table.insert(map<string, string>::value_type("zip", "application/zip"));
+    
+    load_http2_push_list("/");
 }
 
+void memory_cache::load_http2_push_list(const char* dir_path)
+{
+    string full_path = m_dirpath.c_str();
+    full_path += "/html/";
+    full_path += dir_path;
+    
+    struct dirent * dirp;
+    DIR *dp = opendir(full_path.c_str());
+    if(dp)
+    {
+	    while( (dirp = readdir(dp)) != NULL)
+	    {
+	        /* variable file name should have postfix as ".server" */
+		    if(dirp->d_type == DT_REG)
+		    {
+		    	int name_len = strlen(dirp->d_name);
+	            int css_len = strlen(".css");
+                int js_len = strlen(".js");
+	            
+                BOOL is_pushed = FALSE;
+                if(name_len > css_len 
+	                && (dirp->d_name[name_len - 1] == 's' || dirp->d_name[name_len - 1] == 'S')
+	                && (dirp->d_name[name_len - 2] == 's' || dirp->d_name[name_len - 2] == 'S')
+                    && (dirp->d_name[name_len - 3] == 'c' || dirp->d_name[name_len - 2] == 'C')
+	                && dirp->d_name[name_len - 4] == '.')
+                {
+                    is_pushed = TRUE;   
+                }
+	            else if(name_len > js_len 
+	                && (dirp->d_name[name_len - 1] == 's' || dirp->d_name[name_len - 1] == 'S')
+	                && (dirp->d_name[name_len - 2] == 'j' || dirp->d_name[name_len - 2] == 'J')
+	                && dirp->d_name[name_len - 3] == '.')
+	            {
+                    is_pushed = TRUE;
+			        
+			    }
+                if(is_pushed)
+                {
+                    http2_push_file_t push_file;
+                    push_file.path = dir_path;
+                    push_file.path += "/";
+                    push_file.path += dirp->d_name;
+                    
+                    push_file.full_path = m_dirpath.c_str();
+                    push_file.full_path += "/html/";
+                    push_file.full_path += push_file.path;
+                   
+                    GlobalReplace(push_file.path, "//", "/");
+                    GlobalReplace(push_file.full_path, "//", "/");
+                    //printf("PUSH FILE: %s %s\n", push_file.path.c_str(), push_file.full_path.c_str());
+                    m_http2_push_list.push_back(push_file);
+                }
+		    }
+            else if(dirp->d_type == DT_DIR)
+            {
+                if(strcmp(dirp->d_name, ".") != 0 && strcmp(dirp->d_name, "..") != 0)
+                {
+                    string next_path = dir_path;
+                    next_path += "/";
+                    next_path += dirp->d_name;
 
-
+                    load_http2_push_list(next_path.c_str());
+                }
+            }
+	    }
+	    closedir(dp);
+    }
+}

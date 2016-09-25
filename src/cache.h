@@ -93,6 +93,12 @@ public:
     }  
 };
 
+typedef struct
+{
+    string path;
+    string full_path;
+} http2_push_file_t;
+
 class memory_cache
 {
 public:
@@ -101,6 +107,8 @@ public:
 	virtual ~memory_cache();
 
 	map<string, file_cache*> m_file_cache;
+    vector<http2_push_file_t> m_http2_push_list;
+    
 	volatile unsigned long long m_file_cache_size;
 	
 	map<string, string> m_type_table;
@@ -159,6 +167,9 @@ public:
 	{
 	    pthread_rwlock_unlock(&m_file_rwlock);
 	}
+    
+    void load_http2_push_list(const char* dir_path);
+    
 private:
     int m_process_seq;
     string m_service_name;

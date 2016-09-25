@@ -14,6 +14,11 @@ http2_stream::http2_stream(uint_32 stream_ind, CHttp2* phttp2, ServiceObjMap* sr
         const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme,
 		SSL* ssl)
 {
+    m_path = "";
+    m_method = "";
+    m_authority = "";
+    m_scheme = "";
+    
     m_stream_ind = stream_ind;
     m_srvobj = srvobj;
     m_sockfd = sockfd;
@@ -69,6 +74,7 @@ http2_stream::http2_stream(uint_32 stream_ind, CHttp2* phttp2, ServiceObjMap* sr
                             m_wwwauth_scheme,
                             m_ssl, m_http2, m_stream_ind);
     m_hpack = NULL;
+   
 }
 
 http2_stream::~http2_stream()
@@ -81,7 +87,29 @@ http2_stream::~http2_stream()
     m_hpack = NULL;
 }
 
-int http2_stream::hpack_parse(const HTTP2_Header_Field* field, int len)
+void http2_stream::send_push_promise(http2_stream* host_stream, const char* path)
+{
+    string str_http1_header = "GET ";
+    str_http1_header += path;
+    str_http1_header += " HTTP/1.1\r\n";
+    
+    str_http1_header += "Accept: ";
+    str_http1_header += host_stream->GetHttp1()->GetRequestField("Accept");
+    str_http1_header += "\r\n";
+    
+    str_http1_header += "Accept-Encoding: ";
+    str_http1_header += host_stream->GetHttp1()->GetRequestField("Accept-Encoding");
+    str_http1_header += "\r\n";
+    
+    str_http1_header += "User-Agent: ";
+    str_http1_header += host_stream->GetHttp1()->GetRequestField("User-Agent");
+    str_http1_header += "\r\n";
+    str_http1_header += "\r\n";
+        
+    http1_parse(str_http1_header.c_str());
+}
+
+int http2_stream::hpack_parse(HTTP2_Header_Field* field, int len)
 {
     if(!m_hpack)
         m_hpack = new hpack();

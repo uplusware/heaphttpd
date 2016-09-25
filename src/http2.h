@@ -122,17 +122,17 @@ public:
     
     void ParseHeaders(uint_32 stream_ind, hpack* hdr);
     
-    int TransHttp1SendHttp2Header(uint_32 stream_ind, const char* buf, int len);
+    int TransHttp1SendHttp2Header(uint_32 stream_ind, const char* buf, int len, uint_8 frame_type = HTTP2_FRAME_TYPE_HEADERS, uint_32 promised_stream_ind = 0);
     int TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint_32 len);
     
-    int SendEmptyHttp2Content(uint_32 stream_ind);
-    
-    volatile int m_thread_running;
+    int SendHttp2EmptyContent(uint_32 stream_ind);
+    void SendHttp2PushPromise(uint_32 stream_ind);
 
 private:
     void send_setting_ack(uint_32 stream_ind);
     void send_window_update(uint_32 stream_ind, uint_32 window_size);
     void send_goaway(uint_32 last_stream_ind, uint_32 error_code);
+    void send_push_promise(uint_32 stream_ind);
 
 private:
     ServiceObjMap * m_srvobj;
@@ -171,12 +171,6 @@ private:
 	map<int, pair<string, string> > m_header_static_table;
     map<int, pair<string, string> > m_header_dynamic_table;
     
-    string m_path;
-    string m_method;
-    string m_authority;
-    string m_scheme;
-    string m_status;
-    
     //Setting
     uint_32 m_header_table_size;
     BOOL m_enable_push;
@@ -184,6 +178,8 @@ private:
     uint_32 m_initial_window_size;
     uint_32 m_max_frame_size;
     uint_32 m_max_header_list_size;
+    
+    BOOL m_pushed;
 };
 
 #endif /* _HTTP2_H_ */

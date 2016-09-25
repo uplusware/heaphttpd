@@ -4,6 +4,7 @@
 #include "util/general.h"
 #include "util/huffman.h"
 #include <string>
+#include <map>
 using namespace std;
 
 /*
@@ -154,14 +155,20 @@ class hpack
 {
 public:
     hpack();
-    hpack(const HTTP2_Header_Field* field, int len);
+    hpack(HTTP2_Header_Field* field, int len);
     virtual ~hpack();
+
+    int parse(HTTP2_Header_Field* field, int len);
+    int build(const char* headers, int len, map<int, pair<string, string> > & header_static_table);
     
-    int parse(const HTTP2_Header_Field* field, int len);
+    HTTP2_Header_Field* get_field();
+    int get_length();
     
     vector<HTTP2_Header> m_decoded_headers;
 private:
-    const HTTP2_Header_Field* m_field;
+    HTTP2_Header_Field* m_field;
     int m_len;
+    
+    BOOL m_need_free;
 };
 #endif /* _HPACK_H_ */

@@ -580,6 +580,16 @@ void __inline__ Replace(string& src, const char* dst, const char* rpl)
 	
 }
 
+void __inline__ GlobalReplace(string& src, const char* dst, const char* rpl)
+{
+	string::size_type pos = 0 - strlen(rpl);
+	while( (pos = src.find(dst, 0) ) != string::npos )
+	{
+		src.replace(pos, strlen(dst), rpl);
+	}
+	
+}
+
 void __inline__ _strdelete_(string& src, const char* str)
 {
 	int slen = strlen(str);

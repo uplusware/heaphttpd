@@ -24,7 +24,7 @@ public:
 		SSL* ssl = NULL);
     virtual ~http2_stream();
     
-    int hpack_parse(const HTTP2_Header_Field* field, int len);
+    int hpack_parse(HTTP2_Header_Field* field, int len);
     Http_Connection http1_parse(const char* text);
     
     CHttp* GetHttp1();
@@ -34,6 +34,15 @@ public:
     void Response();
     
     void ClearHpack();
+    
+    void send_push_promise(http2_stream* host_stream, const char* path);
+    
+    string m_path;
+    string m_method;
+    string m_authority;
+    string m_scheme;
+    string m_status;
+    
 private:
     CHttp2* m_http2;
     CHttp* m_http1;
@@ -65,7 +74,6 @@ private:
     unsigned int m_global_uid;
     AUTH_SCHEME m_wwwauth_scheme;
     SSL* m_ssl;
-
 };
 
 #endif /*_HTTP2_STREAM_H_*/

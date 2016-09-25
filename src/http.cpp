@@ -532,7 +532,10 @@ void CHttp::Response()
         doc->Response();
         
         if(m_http2)
-            m_http2->SendEmptyHttp2Content(m_http2_stream_ind);
+        {
+            //m_http2->SendHttp2PushPromise(m_http2_stream_ind);
+            m_http2->SendHttp2EmptyContent(m_http2_stream_ind);
+        }
         
         //Extension hook 3
         for(int x = 0; x < m_ext_list->size(); x++)
@@ -552,247 +555,240 @@ void CHttp::Response()
 
 Http_Connection CHttp::LineParse(const char* text)
 {
-    //printf("%s", text);
     string strtext;
     m_line_text += text;
-    std::size_t new_line = m_line_text.find('\n');
-    if( new_line == std::string::npos)
-    {
-        return httpContinue;
-    }
-    else
+    std::size_t new_line;
+    while((new_line = m_line_text.find('\n')) != std::string::npos)
     {
         strtext = m_line_text.substr(0, new_line + 1);
         m_line_text = m_line_text.substr(new_line + 1);
-    }
 
-	strtrim(strtext);
-	
-    BOOL High = TRUE;
-    for(int c = 0; c < strtext.length(); c++)
-    {
-        if(High)
+        strtrim(strtext);
+        /* printf("<<<< %s\r\n", strtext.c_str()); */
+        BOOL High = TRUE;
+        for(int c = 0; c < strtext.length(); c++)
         {
-            strtext[c] = HICH(strtext[c]);
-            High = FALSE;
-        }
-        if(strtext[c] == '-')
-            High = TRUE;
-        if(strtext[c] == ':' || strtext[c] == ' ')
-            break;
-    }
-    
-    //printf("^^^^^^^^^^^^^^^^ %s\n", strtext.c_str());
-	if(strncasecmp(strtext.c_str(),"GET ", 4) == 0)
-	{	
-		m_cgi.SetMeta("REQUEST_METHOD", "GET");
-				
-		m_http_method = hmGet;
-        m_request_hdr.SetMethod(m_http_method);
-        ParseMethod(strtext);
-	}
-	else if(strncasecmp(strtext.c_str(), "POST ", 5) == 0)
-	{
-		m_cgi.SetMeta("REQUEST_METHOD", "POST");
-		
-		m_http_method = hmPost;
-        m_request_hdr.SetMethod(m_http_method);
-
-        ParseMethod(strtext);
-	}
-	else if(strncasecmp(strtext.c_str(), "PUT ", 4) == 0)
-	{
-		m_cgi.SetMeta("REQUEST_METHOD", "PUT");
-				
-		m_http_method = hmPut;
-        m_request_hdr.SetMethod(m_http_method);
-
-        ParseMethod(strtext);
-	}
-	else if(strncasecmp(strtext.c_str(), "HEAD ", 5) == 0)
-	{
-		m_cgi.SetMeta("REQUEST_METHOD", "HEAD");
-				
-		m_http_method = hmHead;
-        m_request_hdr.SetMethod(m_http_method);
-
-        ParseMethod(strtext);
-	}
-	else if(strncasecmp(strtext.c_str(), "DELETE ", 7) == 0)
-	{
-		m_cgi.SetMeta("REQUEST_METHOD", "DELETE");
-				
-		m_http_method = hmDelete;
-        m_request_hdr.SetMethod(m_http_method);
-
-        ParseMethod(strtext);
-	}
-	else if(strncasecmp(strtext.c_str(), "OPTIONS ", 8) == 0)
-	{
-		m_cgi.SetMeta("REQUEST_METHOD", "OPTIONS");
-				
-		m_http_method = hmOptions;
-        m_request_hdr.SetMethod(m_http_method);
-
-        ParseMethod(strtext);
-	}
-	else if(strncasecmp(strtext.c_str(), "TRACE ", 6) == 0)
-	{
-		m_cgi.SetMeta("REQUEST_METHOD", "TRACE");
-				
-		m_http_method = hmTrace;
-        m_request_hdr.SetMethod(m_http_method);
-
-        ParseMethod(strtext);
-	}
-	else if(strncasecmp(strtext.c_str(), "CONNECT ", 8) == 0)
-	{
-		m_cgi.SetMeta("REQUEST_METHOD", "CONNECT");
-				
-		m_http_method = hmConnect;
-        m_request_hdr.SetMethod(m_http_method);
-
-        ParseMethod(strtext);
-	}
-    else if(strcasecmp(strtext.c_str(), "") == 0) /* if true, then http request header finished. */
-    {
-        //printf("METHOD, %d\n", m_http_method);
-        if(m_http_method == hmPost)
-        {
-            RecvPostData();
-        }
-        
-        Response();
-        
-		return m_keep_alive ? httpKeepAlive : httpClose;
-    }
-    else
-    {
-        /* Protocol-Specific Meta-Variables for CGI */
-        string strSpecVarName, strSpecVarValue;
-        strcut(strtext.c_str(), NULL, ":", strSpecVarName);
-        strtrim(strSpecVarName);
-        if(strSpecVarName != "")
-        {
-            strcut(strtext.c_str(), ":", NULL, strSpecVarValue);
-            strtrim(strSpecVarValue);
-            
-            m_request_hdr.SetField(strSpecVarName.c_str(), strSpecVarValue.c_str());
-            
-            /* For CGI Env Val*/
-            strSpecVarName = "HTTP_" + strSpecVarName;
-            Replace(strSpecVarName, "-", "_");
-            Toupper(strSpecVarName);
-            m_cgi.SetMeta(strSpecVarName.c_str(), strSpecVarValue.c_str());
-        }
-        if(strncasecmp(strtext.c_str(),"Connection:", 11) == 0)
-        {
-            string strConnection;
-            strcut(strtext.c_str(), "Connection:", NULL, strConnection);
-            strtrim(strConnection);
-            if(strcasestr(strConnection.c_str(), "Close") != NULL)
+            if(High)
             {
-                m_keep_alive = FALSE;
+                strtext[c] = HICH(strtext[c]);
+                High = FALSE;
             }
-            if(strcasestr(strConnection.c_str(), "Keep-Alive") != NULL)
+            if(strtext[c] == '-')
+                High = TRUE;
+            if(strtext[c] == ':' || strtext[c] == ' ')
+                break;
+        }
+        if(strncasecmp(strtext.c_str(),"GET ", 4) == 0)
+        {	
+            m_cgi.SetMeta("REQUEST_METHOD", "GET");
+                    
+            m_http_method = hmGet;
+            m_request_hdr.SetMethod(m_http_method);
+            ParseMethod(strtext);
+        }
+        else if(strncasecmp(strtext.c_str(), "POST ", 5) == 0)
+        {
+            m_cgi.SetMeta("REQUEST_METHOD", "POST");
+            
+            m_http_method = hmPost;
+            m_request_hdr.SetMethod(m_http_method);
+
+            ParseMethod(strtext);
+        }
+        else if(strncasecmp(strtext.c_str(), "PUT ", 4) == 0)
+        {
+            m_cgi.SetMeta("REQUEST_METHOD", "PUT");
+                    
+            m_http_method = hmPut;
+            m_request_hdr.SetMethod(m_http_method);
+
+            ParseMethod(strtext);
+        }
+        else if(strncasecmp(strtext.c_str(), "HEAD ", 5) == 0)
+        {
+            m_cgi.SetMeta("REQUEST_METHOD", "HEAD");
+                    
+            m_http_method = hmHead;
+            m_request_hdr.SetMethod(m_http_method);
+
+            ParseMethod(strtext);
+        }
+        else if(strncasecmp(strtext.c_str(), "DELETE ", 7) == 0)
+        {
+            m_cgi.SetMeta("REQUEST_METHOD", "DELETE");
+                    
+            m_http_method = hmDelete;
+            m_request_hdr.SetMethod(m_http_method);
+
+            ParseMethod(strtext);
+        }
+        else if(strncasecmp(strtext.c_str(), "OPTIONS ", 8) == 0)
+        {
+            m_cgi.SetMeta("REQUEST_METHOD", "OPTIONS");
+                    
+            m_http_method = hmOptions;
+            m_request_hdr.SetMethod(m_http_method);
+
+            ParseMethod(strtext);
+        }
+        else if(strncasecmp(strtext.c_str(), "TRACE ", 6) == 0)
+        {
+            m_cgi.SetMeta("REQUEST_METHOD", "TRACE");
+                    
+            m_http_method = hmTrace;
+            m_request_hdr.SetMethod(m_http_method);
+
+            ParseMethod(strtext);
+        }
+        else if(strncasecmp(strtext.c_str(), "CONNECT ", 8) == 0)
+        {
+            m_cgi.SetMeta("REQUEST_METHOD", "CONNECT");
+                    
+            m_http_method = hmConnect;
+            m_request_hdr.SetMethod(m_http_method);
+
+            ParseMethod(strtext);
+        }
+        else if(strcasecmp(strtext.c_str(), "") == 0) /* if true, then http request header finished. */
+        {
+            //printf("METHOD, %d\n", m_http_method);
+            if(m_http_method == hmPost)
             {
-                m_keep_alive = TRUE;
+                RecvPostData();
             }
-            if(strcasestr(strConnection.c_str(), "Upgrade") != NULL)
+            
+            Response();
+            
+            return m_keep_alive ? httpKeepAlive : httpClose;
+        }
+        else
+        {
+            /* Protocol-Specific Meta-Variables for CGI */
+            string strSpecVarName, strSpecVarValue;
+            strcut(strtext.c_str(), NULL, ":", strSpecVarName);
+            strtrim(strSpecVarName);
+            if(strSpecVarName != "")
             {
-                if(m_http2)
-                    m_web_socket_handshake = Websocket_Nak;
+                strcut(strtext.c_str(), ":", NULL, strSpecVarValue);
+                strtrim(strSpecVarValue);
+                
+                m_request_hdr.SetField(strSpecVarName.c_str(), strSpecVarValue.c_str());
+                
+                /* For CGI Env Val*/
+                strSpecVarName = "HTTP_" + strSpecVarName;
+                Replace(strSpecVarName, "-", "_");
+                Toupper(strSpecVarName);
+                m_cgi.SetMeta(strSpecVarName.c_str(), strSpecVarValue.c_str());
+            }
+            if(strncasecmp(strtext.c_str(),"Connection:", 11) == 0)
+            {
+                string strConnection;
+                strcut(strtext.c_str(), "Connection:", NULL, strConnection);
+                strtrim(strConnection);
+                if(strcasestr(strConnection.c_str(), "Close") != NULL)
+                {
+                    m_keep_alive = FALSE;
+                }
+                if(strcasestr(strConnection.c_str(), "Keep-Alive") != NULL)
+                {
+                    m_keep_alive = TRUE;
+                }
+                if(strcasestr(strConnection.c_str(), "Upgrade") != NULL)
+                {
+                    if(m_http2)
+                        m_web_socket_handshake = Websocket_Nak;
+                    else
+                        m_web_socket_handshake = Websocket_Sync;
+                }
+                
+            }
+            else if(strncasecmp(strtext.c_str(),"Content-Length:", 15) == 0)
+            {
+                string strLen;
+                strcut(strtext.c_str(), "Content-Length:", NULL, strLen);
+                strtrim(strLen);	
+                m_content_length = atoi(strLen.c_str());
+            }
+            else if(strncasecmp(strtext.c_str(),"Content-Type:", 13) == 0)
+            {
+                string strType;
+                strcut(strtext.c_str(), "Content-Type:", NULL, strType);
+                strtrim(strType);
+                m_cgi.SetMeta("CONTENT_TYPE", strType.c_str());
+                
+                if(strtext.find("application/x-www-form-urlencoded", 0, strlen("application/x-www-form-urlencoded")) != string::npos)
+                {
+                    m_content_type = application_x_www_form_urlencoded;
+                }
+                else if(strtext.find("multipart/form-data", 0, strlen("multipart/form-data")) != string::npos) 
+                {
+                    m_content_type = multipart_form_data;
+                    strcut(strtext.c_str(), "boundary=", NULL, m_boundary);
+                    strtrim(m_boundary);
+                }
                 else
-                    m_web_socket_handshake = Websocket_Sync;
+                {
+                    m_content_type = application_x_www_form_urlencoded;
+                }
             }
-            
-        }
-        else if(strncasecmp(strtext.c_str(),"Content-Length:", 15) == 0)
-        {
-            string strLen;
-            strcut(strtext.c_str(), "Content-Length:", NULL, strLen);
-            strtrim(strLen);	
-            m_content_length = atoi(strLen.c_str());
-        }
-        else if(strncasecmp(strtext.c_str(),"Content-Type:", 13) == 0)
-        {
-            string strType;
-            strcut(strtext.c_str(), "Content-Type:", NULL, strType);
-            strtrim(strType);
-            m_cgi.SetMeta("CONTENT_TYPE", strType.c_str());
-            
-            if(strtext.find("application/x-www-form-urlencoded", 0, strlen("application/x-www-form-urlencoded")) != string::npos)
+            else if(strncasecmp(strtext.c_str(), "Cookie:", 7) == 0)
             {
-                m_content_type = application_x_www_form_urlencoded;
+                //printf("%s\n", strtext.c_str());
+                string strcookie;
+                strcut(strtext.c_str(), "Cookie:", NULL, strcookie);
+                strtrim(strcookie);
+                m_cookie += strcookie;
+                m_cookie += "; ";
             }
-            else if(strtext.find("multipart/form-data", 0, strlen("multipart/form-data")) != string::npos) 
+            else if(strncasecmp(strtext.c_str(), "Host:",5) == 0)
             {
-                m_content_type = multipart_form_data;
-                strcut(strtext.c_str(), "boundary=", NULL, m_boundary);
-                strtrim(m_boundary);
+                string host_port;
+                strcut(strtext.c_str(), "Host: ", NULL, host_port);
+                strcut(host_port.c_str(), NULL, ":", host_port);
+                m_host_addr = host_port;
+                strcut(host_port.c_str(), ":", NULL, host_port);
+                m_host_port = (unsigned short)atoi(host_port.c_str());
             }
-            else
+            else if(strncasecmp(strtext.c_str(), "Authorization: Basic", 20) == 0)
             {
-                m_content_type = application_x_www_form_urlencoded;
+                string strauth;
+                strcut(strtext.c_str(), "Authorization: Basic ", NULL, strauth);
+
+                m_cgi.SetMeta("AUTH_TYPE", "Basic");
+                
+                if(WWW_Auth(asBasic, strauth.c_str(), m_username))
+                    m_passed_wwwauth = TRUE;
+                
+                m_cgi.SetMeta("REMOTE_USER", m_username.c_str());
             }
-        }
-        else if(strncasecmp(strtext.c_str(), "Cookie:", 7) == 0)
-        {
-            //printf("%s\n", strtext.c_str());
-            string strcookie;
-            strcut(strtext.c_str(), "Cookie:", NULL, strcookie);
-            strtrim(strcookie);
-            m_cookie += strcookie;
-            m_cookie += "; ";
-        }
-        else if(strncasecmp(strtext.c_str(), "Host:",5) == 0)
-        {
-            string host_port;
-            strcut(strtext.c_str(), "Host: ", NULL, host_port);
-            strcut(host_port.c_str(), NULL, ":", host_port);
-            m_host_addr = host_port;
-            strcut(host_port.c_str(), ":", NULL, host_port);
-            m_host_port = (unsigned short)atoi(host_port.c_str());
-        }
-        else if(strncasecmp(strtext.c_str(), "Authorization: Basic", 20) == 0)
-        {
-            string strauth;
-            strcut(strtext.c_str(), "Authorization: Basic ", NULL, strauth);
+            else if(strncasecmp(strtext.c_str(), "Authorization: Digest", 21) == 0)
+            {
+                string strauth;
+                strcut(strtext.c_str(), "Authorization: Digest ", NULL, strauth);
+                
+                m_cgi.SetMeta("AUTH_TYPE", "Digest");
+                
+                if(WWW_Auth(asDigest, strauth.c_str(), m_username, HTTP_METHOD_NAME[m_http_method]))
+                    m_passed_wwwauth = TRUE;
+                
+                m_cgi.SetMeta("REMOTE_USER", m_username.c_str());
+            }
+            else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Key", 17) == 0)
+            {
+               //Web-socket
+            }
+            else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Extensions", 24) == 0)
+            {
 
-            m_cgi.SetMeta("AUTH_TYPE", "Basic");
-            
-            if(WWW_Auth(asBasic, strauth.c_str(), m_username))
-                m_passed_wwwauth = TRUE;
-            
-            m_cgi.SetMeta("REMOTE_USER", m_username.c_str());
-        }
-        else if(strncasecmp(strtext.c_str(), "Authorization: Digest", 21) == 0)
-        {
-            string strauth;
-            strcut(strtext.c_str(), "Authorization: Digest ", NULL, strauth);
-            
-            m_cgi.SetMeta("AUTH_TYPE", "Digest");
-            
-            if(WWW_Auth(asDigest, strauth.c_str(), m_username, HTTP_METHOD_NAME[m_http_method]))
-                m_passed_wwwauth = TRUE;
-            
-            m_cgi.SetMeta("REMOTE_USER", m_username.c_str());
-        }
-        else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Key", 17) == 0)
-        {
-           //Web-socket
-        }
-        else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Extensions", 24) == 0)
-        {
+            }
+            else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Protocol", 22) == 0)
+            {
 
-        }
-		else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Protocol", 22) == 0)
-        {
+            }
+            else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Version", 21) == 0)
+            {
 
-        }
-		else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Version", 21) == 0)
-        {
-
+            }
         }
     }
 	return httpContinue;
