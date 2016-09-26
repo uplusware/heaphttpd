@@ -3,8 +3,9 @@
 	uplusware@gmail.com
 */
 
-#ifndef _ERISE_GENERAL_H_
-#define _ERISE_GENERAL_H_
+#ifndef _NIUHTTPD_GENERAL_H_
+#define _NIUHTTPD_GENERAL_H_
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <string.h>
@@ -39,12 +40,13 @@
 using namespace std;
 
 typedef unsigned int BOOL;
-#define FALSE   0
-#define TRUE   1
 
-#define uint_32 unsigned int
-#define uint_16 unsigned short
-#define uint_8 unsigned char
+#define FALSE   0
+#define TRUE    1
+
+typedef  unsigned int uint_32;
+typedef  unsigned short uint_16;
+typedef  unsigned char uint_8;
 
 typedef unsigned char BYTE;
 typedef unsigned short WORD;
@@ -1483,6 +1485,6 @@ time_t __inline__ ParseCookieDateTimeString(const char* szDateTime)
 	
 	return mktime(&tm1);
 }
-#endif /* _ERISE_GENERAL_H_ */
+#endif /* _NIUHTTPD_GENERAL_H_ */
 
 

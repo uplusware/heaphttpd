@@ -533,8 +533,8 @@ void CHttp::Response()
         
         if(m_http2)
         {
-            //m_http2->SendHttp2PushPromise(m_http2_stream_ind);
             m_http2->SendHttp2EmptyContent(m_http2_stream_ind);
+            m_http2->SendHttp2PushPromiseResponse();
         }
         
         //Extension hook 3
@@ -695,10 +695,7 @@ Http_Connection CHttp::LineParse(const char* text)
                 }
                 if(strcasestr(strConnection.c_str(), "Upgrade") != NULL)
                 {
-                    if(m_http2)
-                        m_web_socket_handshake = Websocket_Nak;
-                    else
-                        m_web_socket_handshake = Websocket_Sync;
+                    m_web_socket_handshake = Websocket_Sync;
                 }
                 
             }
@@ -937,4 +934,10 @@ void CHttp::SetServiceObject(const char * objname, SERVICE_OBJECT_HANDLE objptr)
 void* CHttp::GetServiceObject(const char * objname)
 {
    return m_srvobj->GetObj(objname);
+}
+
+void CHttp::Http2PushPromise(const char * path)
+{
+    if(m_http2)
+        m_http2->PushPromise(m_http2_stream_ind, path);
 }

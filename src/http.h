@@ -149,6 +149,8 @@ public:
     
     unsigned int GetContentLength() { return m_content_length; }
     
+    void Http2PushPromise(const char * path);
+    
 private:
     void ParseMethod(const string & strtext);
 protected:

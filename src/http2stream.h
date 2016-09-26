@@ -8,6 +8,14 @@
 class CHttp;
 class CHttp2;
 
+enum stream_state_e
+{
+        stream_idle = 0,
+        stream_open,
+        stream_half_closed_remote,
+        stream_half_closed_local,
+        stream_closed
+};
 class http2_stream
 {
 public:
@@ -35,8 +43,16 @@ public:
     
     void ClearHpack();
     
-    void SendPushPromiseResponse(http2_stream* host_stream, const char* path);
+    void BuildPushPromiseResponse(http2_stream* host_stream, const char* path);
+    void SendPushPromiseResponse();
     
+    void SetPriorityWeight(uint_32 weight);
+    void SetStreamState(stream_state_e state);
+    stream_state_e GetStreamState();
+    
+    void SetDependencyStream(uint_32 dependency_stream);
+    uint_32 GetDependencyStream();
+
     string m_path;
     string m_method;
     string m_authority;
@@ -74,6 +90,13 @@ private:
     unsigned int m_global_uid;
     AUTH_SCHEME m_wwwauth_scheme;
     SSL* m_ssl;
+    
+    string m_push_promise_trigger_header;
+    
+    uint_32 m_dependency_stream;
+    uint_32 m_priority_weight;
+    
+    stream_state_e m_stream_state;
 };
 
 #endif /*_HTTP2_STREAM_H_*/

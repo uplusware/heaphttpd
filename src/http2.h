@@ -120,14 +120,16 @@ public:
     virtual int HttpSend(const char* buf, int len);
     virtual int HttpRecv(char* buf, int len);
     
-    void ParseHeaders(uint_32 stream_ind, hpack* hdr);
+    void PushPromise(uint_32 stream_ind, const char * path);
+    
+    void TransHttp2ParseHttp1Header(uint_32 stream_ind, hpack* hdr);
     
     int TransHttp1SendHttp2Header(uint_32 stream_ind, const char* buf, int len, uint_8 frame_type = HTTP2_FRAME_TYPE_HEADERS, uint_32 promised_stream_ind = 0);
     int TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint_32 len);
     
     int SendHttp2EmptyContent(uint_32 stream_ind);
     void SendHttp2PushPromiseRequest(uint_32 stream_ind);
-
+    void SendHttp2PushPromiseResponse();
 private:
     void send_setting_ack(uint_32 stream_ind);
     void send_window_update(uint_32 stream_ind, uint_32 window_size);
@@ -179,7 +181,8 @@ private:
     uint_32 m_max_frame_size;
     uint_32 m_max_header_list_size;
     
-    BOOL m_pushed;
+    BOOL m_pushed_request;
+    BOOL m_pushed_response;
 };
 
 #endif /* _HTTP2_H_ */

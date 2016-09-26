@@ -74,11 +74,17 @@ http2_stream::http2_stream(uint_32 stream_ind, CHttp2* phttp2, ServiceObjMap* sr
                             m_wwwauth_scheme,
                             m_ssl, m_http2, m_stream_ind);
     m_hpack = NULL;
-   
+    
+    m_push_promise_trigger_header = "";
+    
+    m_dependency_stream = 0;
+    m_stream_state = stream_idle;
 }
 
 http2_stream::~http2_stream()
 {
+    m_stream_state = stream_closed;
+    
     if(m_http1)
         delete m_http1;
     if(m_hpack)
@@ -87,26 +93,44 @@ http2_stream::~http2_stream()
     m_hpack = NULL;
 }
 
-void http2_stream::SendPushPromiseResponse(http2_stream* host_stream, const char* path)
+void http2_stream::BuildPushPromiseResponse(http2_stream* host_stream, const char* path)
 {
-    string str_http1_header = "GET ";
-    str_http1_header += path;
-    str_http1_header += " HTTP/1.1\r\n";
+    m_push_promise_trigger_header = "GET ";
+    m_push_promise_trigger_header += path;
+    m_push_promise_trigger_header += " HTTP/1.1\r\n";
     
-    str_http1_header += "Accept: ";
-    str_http1_header += host_stream->GetHttp1()->GetRequestField("Accept");
-    str_http1_header += "\r\n";
-    
-    str_http1_header += "Accept-Encoding: ";
-    str_http1_header += host_stream->GetHttp1()->GetRequestField("Accept-Encoding");
-    str_http1_header += "\r\n";
-    
-    str_http1_header += "User-Agent: ";
-    str_http1_header += host_stream->GetHttp1()->GetRequestField("User-Agent");
-    str_http1_header += "\r\n";
-    str_http1_header += "\r\n";
-        
-    http1_parse(str_http1_header.c_str());
+    if(strcmp(host_stream->GetHttp1()->GetRequestField("Accept"), "") != 0)
+    {
+        m_push_promise_trigger_header += "Accept: ";
+        m_push_promise_trigger_header += host_stream->GetHttp1()->GetRequestField("Accept");
+        m_push_promise_trigger_header += "\r\n";
+    }
+    if(strcmp(host_stream->GetHttp1()->GetRequestField("Accept-Encoding"), "") != 0)
+    {
+        m_push_promise_trigger_header += "Accept-Encoding: ";
+        m_push_promise_trigger_header += host_stream->GetHttp1()->GetRequestField("Accept-Encoding");
+        m_push_promise_trigger_header += "\r\n";
+    }
+    if(strcmp(host_stream->GetHttp1()->GetRequestField("Accept-Language"), "") != 0)
+    {
+        m_push_promise_trigger_header += "Accept-Language: ";
+        m_push_promise_trigger_header += host_stream->GetHttp1()->GetRequestField("Accept-Language");
+        m_push_promise_trigger_header += "\r\n";
+    }
+    if(strcmp(host_stream->GetHttp1()->GetRequestField("User-Agent"), "") != 0)
+    {
+        m_push_promise_trigger_header += "User-Agent: ";
+        m_push_promise_trigger_header += host_stream->GetHttp1()->GetRequestField("User-Agent");
+        m_push_promise_trigger_header += "\r\n";
+    }
+    m_push_promise_trigger_header += "\r\n";
+}
+
+void http2_stream::SendPushPromiseResponse()
+{
+    if(m_push_promise_trigger_header != "")
+        http1_parse(m_push_promise_trigger_header.c_str());
+    m_push_promise_trigger_header = "";
 }
 
 int http2_stream::hpack_parse(HTTP2_Header_Field* field, int len)
@@ -151,4 +175,29 @@ void http2_stream::ClearHpack()
     if(m_hpack)
         delete m_hpack;
     m_hpack = NULL;
+}
+
+void http2_stream::SetPriorityWeight(uint_32 weight)
+{
+    m_priority_weight = weight;
+}
+
+void http2_stream::SetStreamState(stream_state_e state)
+{
+    m_stream_state = state;
+}
+
+stream_state_e http2_stream::GetStreamState()
+{
+    return m_stream_state;
+}
+
+void http2_stream::SetDependencyStream(uint_32 dependency_stream)
+{
+    m_dependency_stream = dependency_stream;
+}
+
+uint_32 http2_stream::GetDependencyStream()
+{
+    return m_dependency_stream;
 }
