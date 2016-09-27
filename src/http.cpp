@@ -130,7 +130,7 @@ CHttp::~CHttp()
 	{
 		if(m_sockfd > 0)
 		{
-			shutdown(m_sockfd, 2);
+			shutdown(m_sockfd, SHUT_RDWR);
 			m_sockfd = -1;
 		}
 	}

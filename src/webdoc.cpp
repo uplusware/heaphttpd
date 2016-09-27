@@ -259,6 +259,11 @@ void doc::Response()
     flag = false;
     while(szHttpRequestRanges != NULL)
     {
+        if(strcmp(szHttpRequestRanges, "") == 0)
+        {
+            nRangeLength = nResourceLength;
+            break;
+        }
         if(!flag)
         {
             if(szHttpRequestRanges[x] == '=' || szHttpRequestRanges[x] != '\0')

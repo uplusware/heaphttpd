@@ -91,9 +91,9 @@ void Session::Process()
         }
         catch(string* e)
         {
-            printf(e->c_str());
+            printf("%s\n", e->c_str());
             delete e;
-            shutdown(m_sockfd, 2);
+            shutdown(m_sockfd, SHUT_RDWR);
             m_sockfd = -1;
             return;
         }

@@ -62,6 +62,9 @@
 #define HTTP2_FRAME_R_UNSET               0x0
 #define HTTP2_FRAME_R_SET                 0x1
 
+#define HTTP2_STREAM_DEPENDENCY_E_UNSET   0x0
+#define HTTP2_STREAM_DEPENDENCY_E_SET     0x1
+
 #define HTTP2_FRAME_IDENTIFIER_WHOLE     0x00
 
 #define HTTP2_SETTINGS_HEADER_TABLE_SIZE        0x01
@@ -280,6 +283,17 @@ typedef struct
 	char block_fragment[0];
     char padding[0];
 } HTTP2_Frame_Push_Promise_Fragment;
+
+/*
+    RST_STREAM Frame Payload
+    +---------------------------------------------------------------+
+    | Error Code (32)                                               |
+    +---------------------------------------------------------------+
+*/
+typedef struct
+{
+	uint_32 error_code;
+} HTTP2_Frame_Rst_Stream;
 
 #pragma pack(pop)
 

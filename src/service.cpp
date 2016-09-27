@@ -157,35 +157,43 @@ static int alpn_cb(SSL *ssl,
 				unsigned int inlen,
 				void *arg)
 {
+    int ret = SSL_TLSEXT_ERR_NOACK;
+    *out = NULL;
+	*outlen = 0;
+    
 	unsigned char* p = (unsigned char*)in;
 	while(inlen > 0 && in && (p - in) < inlen)
 	{
 		int len = p[0];
 		p++;
-        /*
-		for(int x = 0; x < len; x++)
+        
+		/*for(int x = 0; x < len; x++)
 		{
 			printf("%c", p[x]);
 		}
-		printf(" %d %d\n", SSL_TLSEXT_ERR_OK, SSL_TLSEXT_ERR_NOACK);
-		*/
-		if(len == 2)
+		printf("\n");*/
+		
+		if(len == 2 && memcmp(p, "h2", 2) == 0)
 		{
-			if(memcmp(p, "h2", 2) == 0)
-			{
-				BOOL* pIsHttp2 = (BOOL*)arg;
-				*pIsHttp2 = TRUE;
-				*out = p;
-				*outlen = len;
-				return SSL_TLSEXT_ERR_OK;
-			}
+            BOOL* pIsHttp2 = (BOOL*)arg;
+            *pIsHttp2 = TRUE;
+            *out = p;
+            *outlen = len;
+            ret = SSL_TLSEXT_ERR_OK;
+            break;
 		}
+        else if(len == 8 && memcmp(p, "http/1.1", 8) == 0)
+        {
+            BOOL* pIsHttp2 = (BOOL*)arg;
+            *pIsHttp2 = FALSE;
+            *out = p;
+            *outlen = len;
+            ret = SSL_TLSEXT_ERR_OK;
+            break;
+        }
 		p = p + len;
 	}
-	
-	*out = NULL;
-	*outlen = 0;
-	return SSL_TLSEXT_ERR_NOACK;
+	return ret;
 }
 
 static void SESSION_HANDLING(SESSION_PARAM* session_param)
@@ -243,7 +251,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 			goto clean_ssl3;
 		}
 		if(session_param->http2)
-            ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ECDHE-RSA-AES128-GCM-SHA256");
+            ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ECDHE-RSA-AES128-GCM-SHA256:ALL");
         else
             ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
         if(ssl_rc == 0)
@@ -269,7 +277,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             goto clean_ssl2;
         }
         if(session_param->http2)
-            ssl_rc = SSL_set_cipher_list(ssl, "ECDHE-RSA-AES128-GCM-SHA256");
+            ssl_rc = SSL_set_cipher_list(ssl, "ECDHE-RSA-AES128-GCM-SHA256:ALL");
         else
             ssl_rc = SSL_set_cipher_list(ssl, "ALL");
         if(ssl_rc == 0)
@@ -288,7 +296,8 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		    fprintf(stderr, "SSL_accept(%d): %s\n", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl1;
 		}
-
+        
+        /* printf("HTTP Version: %s\n", isHttp2 ? "HTTP/2" : "HTTP/1.1"); */
         bSSLAccepted = TRUE;
         if(session_param->client_cer_check)
         {

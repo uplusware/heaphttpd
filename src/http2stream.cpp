@@ -78,7 +78,10 @@ http2_stream::http2_stream(uint_32 stream_ind, CHttp2* phttp2, ServiceObjMap* sr
     m_push_promise_trigger_header = "";
     
     m_dependency_stream = 0;
+    m_priority_weight = 16;
     m_stream_state = stream_idle;
+    
+    m_last_used_time = time(NULL);
 }
 
 http2_stream::~http2_stream()
@@ -200,4 +203,17 @@ void http2_stream::SetDependencyStream(uint_32 dependency_stream)
 uint_32 http2_stream::GetDependencyStream()
 {
     return m_dependency_stream;
+}
+
+void http2_stream::RefreshLastUsedTime()
+{
+    m_last_used_time = time(NULL);
+#ifdef _http2_debug_
+    printf("  Refresh stream(%u) as %u\n", m_stream_ind, m_last_used_time);
+#endif /* _http2_debug_ */     
+}
+
+time_t http2_stream::GetLastUsedTime()
+{
+    return m_last_used_time;
 }

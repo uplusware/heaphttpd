@@ -19,8 +19,16 @@ void* ws_echo_main(int sockfd, SSL* ssl)
     WebSocket_Buffer_Free(&wsBuffer);
     
     WebSocket_Buffer_Alloc(&wsBuffer, 1024, false, OPCODE_TEXT);
-    strcpy(wsBuffer.buf, "You sent: ");
-    strcat(wsBuffer.buf, strRecv.c_str());
+    if(strRecv == "")
+    {
+        strcpy(wsBuffer.buf, "Oops, received empty message via WebSocket.");
+    }
+    else
+    {
+        strcpy(wsBuffer.buf, "Received your message\"");
+        strcat(wsBuffer.buf, strRecv.c_str());
+        strcat(wsBuffer.buf, "\" via WebSocket.");
+    }
     wsBuffer.len = strlen(wsBuffer.buf);
     wsBuffer.opcode = OPCODE_TEXT;
     wsBuffer.mask = false;

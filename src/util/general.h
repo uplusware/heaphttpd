@@ -245,14 +245,14 @@ int __inline__ _Recv_(int sockfd, char* buf, unsigned int buf_len)
 			len = recv(sockfd, buf + nRecv, buf_len - nRecv, 0);
 			if(len == 0)
             {
-                shutdown(sockfd, 2);
+                shutdown(sockfd, SHUT_RDWR);
                 return nRecv; 
             }
 			else if(len < 0)
 			{
                 if( errno == EAGAIN)
                     continue;
-				shutdown(sockfd, 2);
+				shutdown(sockfd, SHUT_RDWR);
 				return nRecv;
 			}
 			nRecv = nRecv + len;
@@ -265,14 +265,14 @@ int __inline__ _Recv_(int sockfd, char* buf, unsigned int buf_len)
 			taketime = taketime + WAIT_TIME_INTERVAL;
 			if(taketime > MAX_TRY_TIMEOUT)
 			{
-				shutdown(sockfd, 2);
+				shutdown(sockfd, SHUT_RDWR);
 				return -1;
 			}
 			continue;
 		}
 		else
 		{
-			shutdown(sockfd, 2);
+			shutdown(sockfd, SHUT_RDWR);
 			return -1;
 		}
 		
@@ -305,14 +305,14 @@ int __inline__ _Send_(int sockfd, const char * buf, unsigned int buf_len)
 			int len = send(sockfd, buf + nSend, buf_len - nSend, 0);
             if(len == 0)
 			{
-				shutdown(sockfd, 2);
+				shutdown(sockfd, SHUT_RDWR);
 				return -1;
 			}
 			else if(len <= 0)
 			{
                 if( errno == EAGAIN)
                     continue;
-				shutdown(sockfd, 2);
+				shutdown(sockfd, SHUT_RDWR);
 				return -1;
 			}
 			nSend = nSend + len;
@@ -324,14 +324,14 @@ int __inline__ _Send_(int sockfd, const char * buf, unsigned int buf_len)
 			taketime = taketime + WAIT_TIME_INTERVAL;
 			if(taketime > MAX_TRY_TIMEOUT)
 			{
-				shutdown(sockfd, 2);
+				shutdown(sockfd, SHUT_RDWR);
 				return -1;
 			}
 			continue;
 		}
 		else
 		{
-			shutdown(sockfd, 2);
+			shutdown(sockfd, SHUT_RDWR);
 			return -1;
 		}
 	}
@@ -353,7 +353,11 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
             {
                 printf("SSL_read: shutdown by the peer\n");
             }
-            shutdown(sockfd, 2);
+            else if(ret == SSL_ERROR_SYSCALL)
+            {
+                printf("SSL_read: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            }
+            shutdown(sockfd, SHUT_RDWR);
             return -1;
         }
         else if(len < 0)
@@ -365,7 +369,7 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
             }
             else
             {
-                shutdown(sockfd, 2);
+                shutdown(sockfd, SHUT_RDWR);
                 return -1;
             }
         }
@@ -397,7 +401,11 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
             {
                 printf("SSL_read: shutdown by the peer\n");
             }
-            shutdown(sockfd, 2);
+            else if(ret == SSL_ERROR_SYSCALL)
+            {
+                printf("SSL_read: SSL_ERROR_SYSCALL, %s\n", ERR_error_string(ERR_get_error(),NULL));
+            }
+            shutdown(sockfd, SHUT_RDWR);
             return -1;
         }
         else if(len < 0)
@@ -424,14 +432,14 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
                         taketime = taketime + WAIT_TIME_INTERVAL;
                         if(taketime > MAX_TRY_TIMEOUT)
                         {
-                            shutdown(sockfd, 2);
+                            shutdown(sockfd, SHUT_RDWR);
                             return -1;
                         }
                         continue;
                     }
                     else
                     {
-                        shutdown(sockfd, 2);
+                        shutdown(sockfd, SHUT_RDWR);
                         return -1;
                     }
                 }
@@ -439,7 +447,7 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
             }
             else
             {
-                shutdown(sockfd, 2);
+                shutdown(sockfd, SHUT_RDWR);
                 return -1;
             }
         }
@@ -480,7 +488,7 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
 		len = SSL_write(ssl, buf + nSend, buf_len - nSend);
 		if(len == 0)
         {
-            shutdown(sockfd, 2);
+            shutdown(sockfd, SHUT_RDWR);
             return -1;
         }
         else if(len < 0)
@@ -492,7 +500,7 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
             }
             else
             {
-                shutdown(sockfd, 2);
+                shutdown(sockfd, SHUT_RDWR);
                 return -1;
             }
 
@@ -518,7 +526,7 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
         int len = SSL_write(ssl, buf + nSend, buf_len - nSend);
         if(len == 0)
         {
-            shutdown(sockfd, 2);
+            shutdown(sockfd, SHUT_RDWR);
             return -1;
         }
         else if(len < 0)
@@ -544,14 +552,14 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
                         taketime = taketime + WAIT_TIME_INTERVAL;
                         if(taketime > MAX_TRY_TIMEOUT)
                         {
-                            shutdown(sockfd, 2);
+                            shutdown(sockfd, SHUT_RDWR);
                             return -1;
                         }
                         continue;
                     }
                     else
                     {
-                        shutdown(sockfd, 2);
+                        shutdown(sockfd, SHUT_RDWR);
                         return -1;
                     }
                 }
@@ -559,7 +567,7 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
             }
             else
             {
-                shutdown(sockfd, 2);
+                shutdown(sockfd, SHUT_RDWR);
                 return -1;
             }
 

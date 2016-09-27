@@ -135,7 +135,8 @@ private:
     void send_window_update(uint_32 stream_ind, uint_32 window_size);
     void send_goaway(uint_32 last_stream_ind, uint_32 error_code);
     void send_push_promise_request(uint_32 stream_ind);
-
+    void send_rst_stream(uint_32 stream_ind);
+    
 private:
     ServiceObjMap * m_srvobj;
     int m_sockfd;

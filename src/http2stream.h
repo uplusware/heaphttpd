@@ -52,7 +52,10 @@ public:
     
     void SetDependencyStream(uint_32 dependency_stream);
     uint_32 GetDependencyStream();
-
+    
+    void RefreshLastUsedTime();
+    time_t GetLastUsedTime();
+    
     string m_path;
     string m_method;
     string m_authority;
@@ -97,6 +100,8 @@ private:
     uint_32 m_priority_weight;
     
     stream_state_e m_stream_state;
+    
+    time_t m_last_used_time;
 };
 
 #endif /*_HTTP2_STREAM_H_*/
