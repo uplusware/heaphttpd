@@ -150,6 +150,11 @@ OpenSSL example:
 	unsigned int length = sizeof(vector);
 */
 
+typedef struct{
+    char* ptr;
+    int len;
+}tls_alpn;
+
 static int alpn_cb(SSL *ssl,
 				const unsigned char **out,
 				unsigned char *outlen,
@@ -172,7 +177,7 @@ static int alpn_cb(SSL *ssl,
 			printf("%c", p[x]);
 		}
 		printf("\n");*/
-		
+        
 		if(len == 2 && memcmp(p, "h2", 2) == 0)
 		{
             BOOL* pIsHttp2 = (BOOL*)arg;
@@ -193,6 +198,7 @@ static int alpn_cb(SSL *ssl,
         }
 		p = p + len;
 	}
+    
 	return ret;
 }
 
@@ -285,10 +291,30 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             fprintf(stderr, "SSL_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl2;
         }
+re_ssl_accept:        
         ssl_rc = SSL_accept(ssl);
 		if(ssl_rc < 0)
 		{
-            fprintf(stderr, "SSL_accept(%d): %s\n", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
+            int ret = SSL_get_error(ssl, ssl_rc);
+            if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+            {
+                goto re_ssl_accept;
+            }
+            else if(ret == SSL_ERROR_SYSCALL)
+            {
+                if(ERR_get_error() == 0)
+                {
+                    fprintf(stderr, "SSL_accept(%d): shutdown by peer\n", ssl_rc);
+                }
+                else
+                {
+                    fprintf(stderr, "SSL_accept(%d): SSL_ERROR_SYSCALL %s\n", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
+                }
+            }
+            else
+            {
+                fprintf(stderr, "SSL_accept(%d): %s, SSL_get_error: %d\n", ssl_rc, ERR_error_string(ERR_get_error(),NULL), ret);
+            }
 			goto clean_ssl2;
 		}
         else if(ssl_rc = 0)

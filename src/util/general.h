@@ -355,7 +355,12 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
             }
             else if(ret == SSL_ERROR_SYSCALL)
             {
-                printf("SSL_read: %s\n", ERR_error_string(ERR_get_error(),NULL));
+                if(ERR_get_error() == 0)
+                {
+                    printf("SSL_read: shutdown by the peer\n");
+                }
+                else
+                    printf("SSL_read: %s\n", ERR_error_string(ERR_get_error(),NULL));
             }
             shutdown(sockfd, SHUT_RDWR);
             return -1;
@@ -403,7 +408,12 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
             }
             else if(ret == SSL_ERROR_SYSCALL)
             {
-                printf("SSL_read: SSL_ERROR_SYSCALL, %s\n", ERR_error_string(ERR_get_error(),NULL));
+                if(ERR_get_error() == 0)
+                {
+                    printf("SSL_read: shutdown by the peer\n");
+                }
+                else
+                    printf("SSL_read: SSL_ERROR_SYSCALL, %s\n", ERR_error_string(ERR_get_error(),NULL));
             }
             shutdown(sockfd, SHUT_RDWR);
             return -1;

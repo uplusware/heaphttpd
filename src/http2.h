@@ -127,7 +127,7 @@ public:
     int TransHttp1SendHttp2Header(uint_32 stream_ind, const char* buf, int len, uint_8 frame_type = HTTP2_FRAME_TYPE_HEADERS, uint_32 promised_stream_ind = 0);
     int TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint_32 len);
     
-    int SendHttp2EmptyContent(uint_32 stream_ind);
+    int SendHttp2EmptyContent(uint_32 stream_ind, uint_8 flags = HTTP2_FRAME_FLAG_END_STREAM);
     void SendHttp2PushPromiseRequest(uint_32 stream_ind);
     void SendHttp2PushPromiseResponse();
 private:
@@ -136,7 +136,7 @@ private:
     void send_goaway(uint_32 last_stream_ind, uint_32 error_code);
     void send_push_promise_request(uint_32 stream_ind);
     void send_rst_stream(uint_32 stream_ind);
-    
+    http2_stream* create_stream(uint_32 stream_ind);
 private:
     ServiceObjMap * m_srvobj;
     int m_sockfd;

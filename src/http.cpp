@@ -941,3 +941,8 @@ void CHttp::Http2PushPromise(const char * path)
     if(m_http2)
         m_http2->PushPromise(m_http2_stream_ind, path);
 }
+
+BOOL CHttp::IsHttp2()
+{
+    return m_http2 ? TRUE : FALSE;
+}
