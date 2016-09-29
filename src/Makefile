@@ -39,8 +39,13 @@ else
 TLSV_DEF = OPENSSL_V_1_0
 endif
 
+ifdef OPENSSL_V_1_2
 INCDIR = -I/usr/local/include
 LDDIRS = -L. -L/usr/local/lib
+else
+INCDIR = 
+LDDIRS = -L.
+endif
 LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lniuauth -lniuwebsocket
 LDLIST_SVR = -lstdc++ -lrt -ldl -lssl -lcrypto -lpthread -lniuhttp -lniuauth -lniuwebsocket
 LDLIST_TOOL = -lstdc++
