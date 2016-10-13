@@ -30,7 +30,7 @@ public:
         const char* fastcgi_name, const char* fastcgi_pgm, 
         const char* fastcgi_socktype, const char* fastcgi_sockfile,
         const char* fastcgi_addr, unsigned short fastcgi_port,
-        const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme = asNone,
+        const char* private_path, AUTH_SCHEME wwwauth_scheme = asNone,
 		SSL* ssl = NULL);
     virtual ~http2_stream();
     
@@ -92,7 +92,6 @@ private:
     string m_fastcgi_addr;
     unsigned short m_fastcgi_port;
     string m_private_path;
-    unsigned int m_global_uid;
     AUTH_SCHEME m_wwwauth_scheme;
     SSL* m_ssl;
     

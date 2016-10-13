@@ -52,7 +52,7 @@ public:
         const char* fastcgi_name, const char* fastcgi_pgm, 
         const char* fastcgi_socktype, const char* fastcgi_sockfile,
         const char* fastcgi_addr, unsigned short fastcgi_port,
-        const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme = asNone,
+        const char* private_path, AUTH_SCHEME wwwauth_scheme = asNone,
 		SSL* ssl = NULL, CHttp2* phttp2 = NULL, uint_32 http2_stream_ind = 0);
         
 	virtual ~CHttp();
@@ -203,8 +203,6 @@ protected:
     string m_fastcgi_sockfile;
 	string m_fastcgi_addr;
 	unsigned short m_fastcgi_port;
-    
-    unsigned int m_global_uid;
     
     CHttpRequestHdr m_request_hdr;
 	

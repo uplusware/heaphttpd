@@ -93,8 +93,8 @@ int WebSocket::Send(WebSocket_Buffer * data)
 	
 	if(websocket_framing.base_hdr.h.hstruct.mask == 1)
 	{
-		srand(time(NULL));
-		unsigned int mkey = rand();
+		srandom(time(NULL));
+		unsigned int mkey = random();
 		memcpy(websocket_framing.masking_key, (char*)&mkey, 4);
 	
 		for (int i = 0; i < websocket_framing.payload_len && websocket_framing.base_hdr.h.hstruct.mask == 1; i++)

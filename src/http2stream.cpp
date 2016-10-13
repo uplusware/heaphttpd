@@ -11,7 +11,7 @@ http2_stream::http2_stream(uint_32 stream_ind, CHttp2* phttp2, ServiceObjMap* sr
         const char* fastcgi_name, const char* fastcgi_pgm, 
         const char* fastcgi_socktype, const char* fastcgi_sockfile,
         const char* fastcgi_addr, unsigned short fastcgi_port,
-        const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme,
+        const char* private_path, AUTH_SCHEME wwwauth_scheme,
 		SSL* ssl)
 {
     m_path = "";
@@ -42,7 +42,6 @@ http2_stream::http2_stream(uint_32 stream_ind, CHttp2* phttp2, ServiceObjMap* sr
     m_fastcgi_addr = fastcgi_addr;
     m_fastcgi_port = fastcgi_port;
     m_private_path = private_path;
-    m_global_uid = global_uid;
     m_wwwauth_scheme = wwwauth_scheme;
     m_ssl = ssl;
     
@@ -70,7 +69,6 @@ http2_stream::http2_stream(uint_32 stream_ind, CHttp2* phttp2, ServiceObjMap* sr
                             m_fastcgi_addr.c_str(),
                             m_fastcgi_port,
                             m_private_path.c_str(),
-                            m_global_uid,
                             m_wwwauth_scheme,
                             m_ssl, m_http2, m_stream_ind);
     m_hpack = NULL;

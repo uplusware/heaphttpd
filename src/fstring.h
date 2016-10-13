@@ -15,7 +15,7 @@ using namespace std;
 class fpool
 {
 public:
-	fpool(const char* srcfile, const char* private_path, unsigned int global_uid);
+	fpool(const char* srcfile, const char* private_path);
 	fpool(const char* buf, int len);
 	virtual ~fpool();
 
@@ -31,7 +31,6 @@ protected:
 
 	string m_srcfile;
     string m_private_path;
-    unsigned int m_global_uid;
 };
 
 class fstring
@@ -52,7 +51,7 @@ protected:
 class fbuffer
 {
 public:
-	fbuffer(const char* private_path, unsigned int global_uid);
+	fbuffer(const char* private_path);
 	virtual ~fbuffer();
 
 	void bufcat(const char* buf, int len);
@@ -72,8 +71,6 @@ protected:
 	unsigned int m_buf_len;
 	unsigned int m_buf_real_len;
     string m_private_path;
-    unsigned int m_global_uid;
-
 };
 
 class fbufseg

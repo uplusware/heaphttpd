@@ -10,11 +10,11 @@
 #include <stdlib.h>
 #include "fstring.h"
 #include <pthread.h>
-fpool::fpool(const char* srcfile, const char* private_path, unsigned int global_uid)
+fpool::fpool(const char* srcfile, const char* private_path)
 {
 	m_srcfile = srcfile;
     m_private_path = private_path;
-    m_global_uid = global_uid;
+    srandom(time(NULL));
     
 	m_fd = 0;
 	m_string = NULL;
@@ -48,14 +48,15 @@ fpool::fpool(const char* srcfile, const char* private_path, unsigned int global_
 
 fpool::fpool(const char* buf, int len)
 {
+    srandom(time(NULL));
 	m_srcfile = "";
 	m_length = len;
 	if(len > MAX_MEMORY_THRESHOLD)
 	{
 		char srcfile[1024];
-		srand(time(NULL));
-		sprintf(srcfile, "%08x_%08x_%016lx_%08x.fpl", time(NULL), getpid(), pthread_self(), m_global_uid);
-		m_global_uid++;
+		
+		sprintf(srcfile, "%08x_%08x_%016lx_%08x.fpl", time(NULL), getpid(), pthread_self(), random());
+		
 		m_srcfile = srcfile;
 		ofstream* srcfd =  new ofstream(m_srcfile.c_str(), ios_base::binary|ios::out|ios::trunc);
 		srcfd->write(buf, len);
@@ -147,7 +148,7 @@ const char* fstring::c_str(string& dststr)
 
 //////////////////////////////////////////////////////////////////////////////////////
 //buffer based on filesystem
-fbuffer::fbuffer(const char* private_path, unsigned int global_uid)
+fbuffer::fbuffer(const char* private_path)
 {
 	m_tmpfd = NULL;
 	m_buf = NULL;
@@ -155,7 +156,6 @@ fbuffer::fbuffer(const char* private_path, unsigned int global_uid)
 	m_mapfd = -1;
 	m_buf_real_len = 0;
     m_private_path = m_private_path;
-    m_global_uid = m_global_uid;
 }
 
 fbuffer::~fbuffer()
@@ -246,7 +246,7 @@ void fbuffer::bufcat(const char* buf, int len)
 		else
 		{
 			char tfile[256];
-			sprintf(tfile, "%s/tmp/%08x_%08x_%016lx_%08x.fbf", m_private_path.c_str(), time(NULL), getpid(), pthread_self(), m_global_uid);
+			sprintf(tfile, "%s/tmp/%08x_%08x_%016lx_%08x.fbf", m_private_path.c_str(), time(NULL), getpid(), pthread_self(), random());
 			m_tmpfile = tfile;
 			
 			m_tmpfd =  new ofstream(m_tmpfile.c_str(), ios_base::binary|ios::out|ios::trunc);

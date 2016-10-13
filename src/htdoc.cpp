@@ -53,13 +53,13 @@ void Htdoc::Response()
 			struct timezone tzone;
 		    gettimeofday(&tval, &tzone);
 			char szNonce[35];
-			srand(time(NULL));
+			srandom(time(NULL));
             unsigned long long thisp64 = (unsigned long long)this;
             thisp64 <<= 32;
             thisp64 >>= 32;
             unsigned long thisp32 = (unsigned long)thisp64;
             
-			sprintf(szNonce, "%08x%016lx%08x%02x", tval.tv_sec, tval.tv_usec + 0x01B21DD213814000ULL, thisp32, rand()%255);
+			sprintf(szNonce, "%08x%016lx%08x%02x", tval.tv_sec, tval.tv_usec + 0x01B21DD213814000ULL, thisp32, random()%255);
 			
 			strVal = "Digest realm=\"";
 			strVal += strRealm;

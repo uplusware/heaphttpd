@@ -190,12 +190,12 @@ static unsigned16 true_random(void)
     if (!inited) {
         get_system_time(&time_now);
         time_now = time_now / UUIDS_PER_TICK;
-        srand((unsigned int)
+        srandom((unsigned int)
                (((time_now >> 32) ^ time_now) & 0xffffffff));
         inited = 1;
     }
 
-    return rand();
+    return random();
 }
 
 /* uuid_create_md5_from_name -- create a version 3 (MD5) UUID using a

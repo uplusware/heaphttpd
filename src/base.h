@@ -536,8 +536,6 @@ public:
 	static string	m_fastcgi_addr;
 	static unsigned short m_fastcgi_port;
     static string   m_fastcgi_sockfile;
-
-	static volatile unsigned int	m_global_uid;
 	
 	static unsigned int 	m_relaytasknum;
 	

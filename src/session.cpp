@@ -52,8 +52,7 @@ void Session::Process()
                     CHttpBase::m_fastcgi_name.c_str(), CHttpBase::m_fastcgi_pgm.c_str(), 
                     CHttpBase::m_fastcgi_socktype.c_str(), CHttpBase::m_fastcgi_sockfile.c_str(), 
                     CHttpBase::m_fastcgi_addr.c_str(), CHttpBase::m_fastcgi_port,
-                    CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme);
-                    CHttpBase::m_global_uid++;
+                    CHttpBase::m_private_path.c_str(), wwwauth_scheme);
             }
             else if(m_st == stHTTPS)
             {
@@ -67,8 +66,7 @@ void Session::Process()
                         CHttpBase::m_fastcgi_name.c_str(), CHttpBase::m_fastcgi_pgm.c_str(),  
                         CHttpBase::m_fastcgi_socktype.c_str(), CHttpBase::m_fastcgi_sockfile.c_str(), 
                         CHttpBase::m_fastcgi_addr.c_str(), CHttpBase::m_fastcgi_port,
-                        CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme, m_ssl);
-                        CHttpBase::m_global_uid++;
+                        CHttpBase::m_private_path.c_str(), wwwauth_scheme, m_ssl);
                 }
                 else
                 {
@@ -80,8 +78,7 @@ void Session::Process()
                         CHttpBase::m_fastcgi_name.c_str(), CHttpBase::m_fastcgi_pgm.c_str(),  
                         CHttpBase::m_fastcgi_socktype.c_str(), CHttpBase::m_fastcgi_sockfile.c_str(), 
                         CHttpBase::m_fastcgi_addr.c_str(), CHttpBase::m_fastcgi_port,
-                        CHttpBase::m_private_path.c_str(), CHttpBase::m_global_uid, wwwauth_scheme, m_ssl);
-                        CHttpBase::m_global_uid++;
+                        CHttpBase::m_private_path.c_str(), wwwauth_scheme, m_ssl);
                 }
             }
             else

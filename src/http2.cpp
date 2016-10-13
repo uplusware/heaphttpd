@@ -82,7 +82,7 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
         const char* fastcgi_name, const char* fastcgi_pgm, 
         const char* fastcgi_socktype, const char* fastcgi_sockfile,
         const char* fastcgi_addr, unsigned short fastcgi_port,
-        const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme,
+        const char* private_path, AUTH_SCHEME wwwauth_scheme,
 		SSL* ssl)
 {
     m_header_table_size = 4096;
@@ -117,7 +117,6 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
     m_fastcgi_addr = fastcgi_addr;
     m_fastcgi_port = fastcgi_port;
     m_private_path = private_path;
-    m_global_uid = global_uid;
     m_wwwauth_scheme = wwwauth_scheme;
     m_ssl = ssl;
     
@@ -336,7 +335,6 @@ http2_stream* CHttp2::create_stream(uint_32 stream_ind)
                                                 m_fastcgi_addr.c_str(),
                                                 m_fastcgi_port,
                                                 m_private_path.c_str(),
-                                                m_global_uid,
                                                 m_wwwauth_scheme,
                                                 m_ssl);
     }

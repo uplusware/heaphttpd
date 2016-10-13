@@ -55,8 +55,6 @@ string	CHttpBase::m_fastcgi_addr = "127.0.0.1";
 unsigned short CHttpBase::m_fastcgi_port = 9001;
 string CHttpBase::m_fastcgi_sockfile = "/var/run/webpy-fcgi.sock";
 
-volatile unsigned int CHttpBase::m_global_uid = 0;
-
 unsigned int CHttpBase::m_max_instance_num = 10;
 unsigned int CHttpBase::m_max_instance_thread_num = 1024;
 

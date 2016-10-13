@@ -37,7 +37,7 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
     const char* fastcgi_name, const char* fastcgi_pgm,  
     const char* fastcgi_socktype, const char* fastcgi_sockfile,
     const char* fastcgi_addr, unsigned short fastcgi_port,
-	const char* private_path, unsigned int global_uid, AUTH_SCHEME wwwauth_scheme, 
+	const char* private_path, AUTH_SCHEME wwwauth_scheme, 
 	SSL* ssl, CHttp2* phttp2, uint_32 http2_stream_ind)
 {	
     m_srvobj = srvobj;
@@ -94,7 +94,6 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	m_fastcgi_port = fastcgi_port;
 
     m_private_path = private_path;
-    m_global_uid = global_uid;
     
     m_lsockfd = NULL;
     m_lssl = NULL;
@@ -233,8 +232,8 @@ void CHttp::SetSessionVar(const char* szName, const char* szValue)
     char szuid[33];
     if(m_session_var_uid == "")
     {
-        srand(time(NULL));
-        sprintf(szuid_seed, "%08x-%08x-%p-%08x", time(NULL), getpid(), this, rand());
+        srandom(time(NULL));
+        sprintf(szuid_seed, "%08x-%08x-%p-%08x", time(NULL), getpid(), this, random());
         
         unsigned char HA[16];
         MD5_CTX_OBJ Md5Ctx;
@@ -367,7 +366,7 @@ void CHttp::PushPostData(const char* buf, int len)
     else if(m_content_type == multipart_form_data)
     {
         if(!m_postdata_ex)
-            m_postdata_ex = new fbuffer(m_private_path.c_str(), m_global_uid);
+            m_postdata_ex = new fbuffer(m_private_path.c_str());
         m_postdata_ex->bufcat(buf, len);
     }
 }
@@ -411,7 +410,7 @@ void CHttp::RecvPostData()
     else if(m_content_type == multipart_form_data)
     {
         if(!m_postdata_ex)
-            m_postdata_ex = new fbuffer(m_private_path.c_str(), m_global_uid);
+            m_postdata_ex = new fbuffer(m_private_path.c_str());
         if(m_content_length == 0)
         {
             while(1)

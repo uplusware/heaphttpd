@@ -33,18 +33,15 @@ MDEF = CYGWIN
 else
 MDEF = _LINUX_OS_
 endif
-ifdef OPENSSL_V_1_2
-TLSV_DEF = OPENSSL_V_1_2
-else
-TLSV_DEF = OPENSSL_V_1_0
-endif
 
 ifdef OPENSSL_V_1_2
-INCDIR = -I/usr/local/include
-LDDIRS = -L. -L/usr/local/lib
+    TLSV_DEF = OPENSSL_V_1_2
+    INCDIR = -I/usr/local/include
+    LDDIRS = -L. -L/usr/local/lib
 else
-INCDIR = 
-LDDIRS = -L.
+    TLSV_DEF = OPENSSL_V_1_0
+    INCDIR = 
+    LDDIRS = -L.
 endif
 LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lniuauth -lniuwebsocket
 LDLIST_SVR = -lstdc++ -lrt -ldl -lssl -lcrypto -lpthread -lniuhttp -lniuauth -lniuwebsocket
