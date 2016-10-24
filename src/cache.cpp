@@ -2,11 +2,15 @@
 	Copyright (c) openheap, uplusware
 	uplusware@gmail.com
 */
-
 #include "cache.h"
 #include "util/general.h"
+#include "util/md5.h"
 
-memory_cache::memory_cache(const char* service_name, int process_seq, const char* dirpath)
+#ifdef _WITH_MEMCACHED_
+    memory_cache::memory_cache(const char* service_name, int process_seq, const char* dirpath, map<string, int> &memcached_list)
+#else
+    memory_cache::memory_cache(const char* service_name, int process_seq, const char* dirpath)
+#endif /* _WITH_MEMCACHED_ */
 {
     m_process_seq = process_seq;
     m_service_name = service_name;
@@ -33,6 +37,19 @@ memory_cache::memory_cache(const char* service_name, int process_seq, const char
 	m_server_vars.clear();
 	m_type_table.clear();
 	m_file_cache_size = 0;
+    
+#ifdef _WITH_MEMCACHED_      
+        memcached_server_st * memcached_servers = NULL;
+        memcached_return rc;
+        m_memcached = NULL;
+        for (map<string, int>::iterator iter = memcached_list.begin( ); iter != memcached_list.end( ); ++iter)
+        {
+            if(!m_memcached)
+                m_memcached = memcached_create(NULL);
+            memcached_servers = memcached_server_list_append(memcached_servers, (*iter).first.c_str(), (*iter).second, &rc);
+            rc = memcached_server_push(m_memcached, memcached_servers);
+        }
+#endif /* _WITH_MEMCACHED_ */  
 }
 
 memory_cache::~memory_cache()
@@ -43,6 +60,12 @@ memory_cache::~memory_cache()
 	pthread_rwlock_destroy(&m_cookie_rwlock);
 	pthread_rwlock_destroy(&m_session_var_rwlock);
 	pthread_rwlock_destroy(&m_server_var_rwlock);
+    
+#ifdef _WITH_MEMCACHED_          
+        	if(m_memcached)
+                memcached_free(m_memcached);
+            m_memcached = NULL;
+#endif /* _WITH_MEMCACHED_ */
 }
 
 //Cookie
@@ -89,6 +112,40 @@ int memory_cache::get_cookie(const char * name, Cookie* ck)
 //Session variable
 void memory_cache::push_session_var( const char* uid, const char* name, const char* value)
 {
+#ifdef _WITH_MEMCACHED_    
+    if(m_memcached)
+    {
+        string keyname;
+        keyname = uid;
+        keyname += "#";
+        keyname += name;
+        char szMD5dst[41];
+        MD5_CTX_OBJ context;
+        context.MD5Update ((unsigned char*)keyname.c_str(), keyname.length());
+        unsigned char digest[16];
+        context.MD5Final (digest);
+        sprintf(szMD5dst,
+            "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+            digest[8], digest[9], digest[10], digest[11], digest[12], digest[13], digest[14], digest[15]);
+        szMD5dst[32] = '.';
+        szMD5dst[33] = 's';
+        szMD5dst[34] = 'e';
+        szMD5dst[35] = 's';
+        szMD5dst[36] = 's';
+        szMD5dst[37] = 'i';
+        szMD5dst[38] = 'o';
+        szMD5dst[39] = 'n';
+        szMD5dst[40] = '\0';
+        memcached_return memc_rc = memcached_set(m_memcached, szMD5dst, 40, value, strlen(value), (time_t)0, (uint32_t)0);
+        /* if(memc_rc == MEMCACHED_SUCCESS)
+        {
+            
+        }*/
+        
+        /* continue to set to local */
+    }
+#endif /* _WITH_MEMCACHED_ */    
     pthread_rwlock_wrlock(&m_session_var_rwlock);
     session_var* pVar = new session_var(uid, name, value);
     
@@ -102,7 +159,7 @@ void memory_cache::push_session_var( const char* uid, const char* name, const ch
     //Save session vars for other process for synchronization
     /* Comment it since the server will balance the connect to the same process via IP*/
     /* _save_session_vars_(); */
-    pthread_rwlock_unlock(&m_session_var_rwlock);
+    pthread_rwlock_unlock(&m_session_var_rwlock);    
 }
 
 void memory_cache::save_session_vars()
@@ -114,6 +171,47 @@ void memory_cache::save_session_vars()
 
 int  memory_cache::get_session_var(const char* uid, const char * name, string& value)
 {
+#ifdef _WITH_MEMCACHED_    
+    if(m_memcached)
+    {
+        string keyname;
+        keyname = uid;
+        keyname += "#";
+        keyname += name;
+        char szMD5dst[41];
+        MD5_CTX_OBJ context;
+        
+        context.MD5Update ((unsigned char*)keyname.c_str(), keyname.length());
+        unsigned char digest[16];
+        context.MD5Final (digest);
+        sprintf(szMD5dst,
+            "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+            digest[8], digest[9], digest[10], digest[11], digest[12], digest[13], digest[14], digest[15]);
+        szMD5dst[32] = '.';
+        szMD5dst[33] = 's';
+        szMD5dst[34] = 'e';
+        szMD5dst[35] = 's';
+        szMD5dst[36] = 's';
+        szMD5dst[37] = 'i';
+        szMD5dst[38] = 'o';
+        szMD5dst[39] = 'n';
+        szMD5dst[40] = '\0';
+        
+        memcached_return memc_rc;
+        size_t memc_value_length;
+        uint32_t memc_flags = 0;
+        char* value_buf = memcached_get(m_memcached, szMD5dst, 40, &memc_value_length, &memc_flags, &memc_rc);
+        if(memc_rc == MEMCACHED_SUCCESS && value_buf)
+        {
+            value = value_buf;
+            free(value_buf);
+            return 0;
+        }
+        /* else: continue to get it from local */
+    }
+#endif /* _WITH_MEMCACHED_ */
+
     int ret = -1;
     /* reload_session_vars(); */
     pthread_rwlock_rdlock(&m_session_var_rwlock);
@@ -325,6 +423,37 @@ void memory_cache::clear_session_vars()
 //Server variable
 void memory_cache::push_server_var(const char* name, const char* value)
 {
+#ifdef _WITH_MEMCACHED_    
+    if(m_memcached)
+    {
+        string keyname;
+        keyname = name;
+        char szMD5dst[40];
+        MD5_CTX_OBJ context;
+        context.MD5Update ((unsigned char*)keyname.c_str(), keyname.length());
+        unsigned char digest[16];
+        context.MD5Final (digest);
+        sprintf(szMD5dst,
+            "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+            digest[8], digest[9], digest[10], digest[11], digest[12], digest[13], digest[14], digest[15]);
+        szMD5dst[32] = '.';
+        szMD5dst[33] = 's';
+        szMD5dst[34] = 'e';
+        szMD5dst[35] = 'r';
+        szMD5dst[36] = 'v';
+        szMD5dst[37] = 'e';
+        szMD5dst[38] = 'r';
+        szMD5dst[39] = '\0';
+        memcached_return memc_rc = memcached_set(m_memcached, szMD5dst, 39, value, strlen(value), (time_t)0, (uint32_t)0);
+        /*if(memc_rc == MEMCACHED_SUCCESS)
+        {
+            
+        } */
+        
+        /* continue to set to local */
+    }
+#endif /* _WITH_MEMCACHED_ */     
     pthread_rwlock_wrlock(&m_server_var_rwlock);
     server_var* pVar = new server_var(name, value);
     map<string, server_var*>::iterator iter = m_server_vars.find(name);
@@ -349,6 +478,43 @@ void memory_cache::save_server_vars()
 
 int  memory_cache::get_server_var(const char * name, string& value)
 {
+#ifdef _WITH_MEMCACHED_    
+    if(m_memcached)
+    {
+        string keyname;
+        keyname = name;
+        char szMD5dst[40];
+        MD5_CTX_OBJ context;
+        
+        context.MD5Update ((unsigned char*)keyname.c_str(), keyname.length());
+        unsigned char digest[16];
+        context.MD5Final (digest);
+        sprintf(szMD5dst,
+            "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+            digest[8], digest[9], digest[10], digest[11], digest[12], digest[13], digest[14], digest[15]);
+        szMD5dst[32] = '.';
+        szMD5dst[33] = 's';
+        szMD5dst[34] = 'e';
+        szMD5dst[35] = 'r';
+        szMD5dst[36] = 'v';
+        szMD5dst[37] = 'e';
+        szMD5dst[38] = 'r';
+        szMD5dst[39] = '\0';
+        
+        memcached_return memc_rc;
+        size_t memc_value_length;
+        uint32_t memc_flags = 0;
+        char* value_buf = memcached_get(m_memcached, szMD5dst, 39, &memc_value_length, &memc_flags, &memc_rc);
+        if(memc_rc == MEMCACHED_SUCCESS && value_buf)
+        {
+            value = value_buf;
+            free(value_buf);
+            return 0;
+        }
+        /* else: continue to get it from local */   
+    }
+#endif /* _WITH_MEMCACHED_ */
     int ret = -1;
     reload_server_vars();
     
@@ -1113,7 +1279,7 @@ void memory_cache::load_http2_push_list(const char* dir_path)
                    
                     GlobalReplace(push_file.path, "//", "/");
                     GlobalReplace(push_file.full_path, "//", "/");
-                    //printf("PUSH FILE: %s %s\n", push_file.path.c_str(), push_file.full_path.c_str());
+                    
                     m_http2_push_list.push_back(push_file);
                 }
 		    }

@@ -65,10 +65,10 @@ string	CHttpBase::m_reject_list_file = REJECT_FILE_PATH;
 
 vector<stReject> CHttpBase::m_reject_list;
 vector<string> CHttpBase::m_permit_list;
+#ifdef _WITH_MEMCACHED_
+    map<string, int> CHttpBase::m_memcached_list;
+#endif /* _WITH_MEMCACHED_ */
 
-/*unsigned char CHttpBase::m_rsa_pub_key[128];
-unsigned char CHttpBase::m_rsa_pri_key[128];
-*/
 CHttpBase::CHttpBase()
 {
 
@@ -308,7 +308,27 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, m_fastcgi_sockfile);
 				strtrim(m_fastcgi_sockfile);
 			}
-			
+#ifdef _WITH_MEMCACHED_
+            else if(strncasecmp(strline.c_str(), "MEMCACHEDList", strlen("MEMCACHEDList")) == 0)
+			{
+				string memc_list;
+				strcut(strline.c_str(), "=", NULL, memc_list );
+				strtrim(memc_list);
+				
+				string memc_addr, memc_port_str;
+				int memc_port;
+				
+				strcut(memc_list.c_str(), NULL, ":", memc_addr );
+				strcut(memc_list.c_str(), ":", NULL, memc_port_str );
+				
+				strtrim(memc_addr);
+				strtrim(memc_port_str);
+
+				memc_port = atoi(memc_port_str.c_str());
+				
+				m_memcached_list.insert(make_pair<string, int>(memc_addr.c_str(), memc_port));
+			}
+#endif /* _WITH_MEMCACHED_ */			
 			else
 			{
 				printf("%s\n", strline.c_str());

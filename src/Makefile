@@ -43,7 +43,15 @@ else
     INCDIR = 
     LDDIRS = -L.
 endif
-LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lniuauth -lniuwebsocket
+
+ifdef MEMCACHED
+    LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lmemcached -lniuauth -lniuwebsocket
+    MEMCACHED_DEF = _WITH_MEMCACHED_
+else
+    LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lniuauth -lniuwebsocket
+    MEMCACHED_DEF = _WITHOUT_MEMCACHED_
+endif
+
 LDLIST_SVR = -lstdc++ -lrt -ldl -lssl -lcrypto -lpthread -lniuhttp -lniuauth -lniuwebsocket
 LDLIST_TOOL = -lstdc++
 LDLIST_AUTH = -lstdc++
@@ -76,7 +84,7 @@ $(WSLIB): $(WSLIBOBJS)
 	$(CC) -shared -W -fPIC -o $@ $(WSLIBOBJS) $(LDDIRS) $(LDLIST_WS)
     
 %.o : %.cpp
-	$(CC) -D$(MDEF) -D$(TLSV_DEF) $(INCDIR) $(FLAGS) -c $< -o $@
+	$(CC) -D$(MDEF) -D$(MEMCACHED_DEF) -D$(TLSV_DEF) $(INCDIR) $(FLAGS) -c $< -o $@
 
 clean:
 	-rm -f  $(HTTPSRV) $(HTTPLIB) $(WSLIB) $(AUTHLIB) $(NIUTOOL) $(WSLIBOBJS) $(HTTPSRVOBJS) $(NIUTOOLOBJS) $(HTTPLIBOBJS) $(AUTHLIBOBJS) *.elf *.gdb *.o *.a *.so

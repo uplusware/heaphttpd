@@ -553,9 +553,10 @@ public:
 	static vector<stReject> m_reject_list;
 	static vector<string> m_permit_list;
 
-	/*static unsigned char m_rsa_pub_key[128];
-	static unsigned char m_rsa_pri_key[128];*/
-	
+#ifdef _WITH_MEMCACHED_
+    static map<string, int> m_memcached_list;
+#endif /* _WITH_MEMCACHED_ */
+
 public:	
 	CHttpBase();
 	virtual ~CHttpBase();

@@ -20,6 +20,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#ifdef _WITH_MEMCACHED_
+    #include <libmemcached/memcached.h>
+#endif /* _WITH_MEMCACHED_ */
 #include "cookie.h"
 #include "httpsessionvar.h"
 #include "httpservervar.h"
@@ -102,8 +105,11 @@ typedef struct
 class memory_cache
 {
 public:
-	
-	memory_cache(const char* service_name, int process_seq, const char* dirpath);
+#ifdef _WITH_MEMCACHED_
+    memory_cache(const char* service_name, int process_seq, const char* dirpath, map<string, int> &memcached_list);
+#else
+    memory_cache(const char* service_name, int process_seq, const char* dirpath);
+#endif /* _WITH_MEMCACHED_ */
 	virtual ~memory_cache();
 
 	map<string, file_cache*> m_file_cache;
@@ -186,6 +192,9 @@ private:
     map<string, unsigned long> m_server_vars_file_versions;
     map<string, unsigned long> m_session_vars_file_versions;
     string m_localhostname;
+#ifdef _WITH_MEMCACHED_  
+    memcached_st * m_memcached;
+#endif /* _WITH_MEMCACHED_ */    
 };
 
 class cache_instance
@@ -193,12 +202,12 @@ class cache_instance
 private:
     memory_cache* m_cache;
     CACHE_DATA * m_cache_data;
-    file_cache* m_file_cache;
+    file_cache* m_file_cache;  
 public:
     cache_instance(memory_cache* cache, const char * name)
     {
         m_cache = cache;
-        m_file_cache = m_cache->lock_file(name, &m_cache_data);
+        m_file_cache = m_cache->lock_file(name, &m_cache_data);      
     }
     
     virtual ~cache_instance()

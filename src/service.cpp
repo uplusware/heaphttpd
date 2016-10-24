@@ -469,7 +469,11 @@ Worker::Worker(const char* service_name, int process_seq, int thread_num, int so
 	m_thread_num = thread_num;
 	m_process_seq = process_seq;
 	m_service_name = service_name;
-	m_cache = new memory_cache(m_service_name.c_str(), m_process_seq, CHttpBase::m_work_path.c_str());
+#ifdef _WITH_MEMCACHED_    
+	m_cache = new memory_cache(m_service_name.c_str(), m_process_seq, CHttpBase::m_work_path.c_str(), CHttpBase::m_memcached_list);
+#else
+    m_cache = new memory_cache(m_service_name.c_str(), m_process_seq, CHttpBase::m_work_path.c_str());
+#endif /* _WITH_MEMCACHED_ */    
 	m_cache->load();
 }
 
