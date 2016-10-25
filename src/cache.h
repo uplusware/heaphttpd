@@ -194,6 +194,7 @@ private:
     string m_localhostname;
 #ifdef _WITH_MEMCACHED_  
     memcached_st * m_memcached;
+    map<int, memcached_st *> m_memcached_map;
 #endif /* _WITH_MEMCACHED_ */    
 };
 

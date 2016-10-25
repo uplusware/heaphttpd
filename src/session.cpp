@@ -5,7 +5,8 @@
 
 #include "session.h"
 
-Session::Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, Service_Type st, BOOL http2, memory_cache* ch)
+Session::Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert,
+    Service_Type st, BOOL http2, memory_cache* ch)
 {
     m_srvobj = srvobj;
 	m_sockfd = sockfd;

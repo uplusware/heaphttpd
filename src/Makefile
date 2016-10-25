@@ -34,7 +34,7 @@ else
 MDEF = _LINUX_OS_
 endif
 
-ifdef OPENSSL_V_1_2
+ifdef openssl_v_1_2
     TLSV_DEF = OPENSSL_V_1_2
     INCDIR = -I/usr/local/include
     LDDIRS = -L. -L/usr/local/lib
@@ -44,13 +44,16 @@ else
     LDDIRS = -L.
 endif
 
-ifdef MEMCACHED
+ifdef memcached
     LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lmemcached -lniuauth -lniuwebsocket
     MEMCACHED_DEF = _WITH_MEMCACHED_
 else
     LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lniuauth -lniuwebsocket
     MEMCACHED_DEF = _WITHOUT_MEMCACHED_
 endif
+
+
+
 
 LDLIST_SVR = -lstdc++ -lrt -ldl -lssl -lcrypto -lpthread -lniuhttp -lniuauth -lniuwebsocket
 LDLIST_TOOL = -lstdc++
