@@ -27,8 +27,8 @@
 #include "httpsessionvar.h"
 #include "httpservervar.h"
 
-#define FILE_MAX_SIZE 	(1024*1024*4)   /* 4M */
-#define MAX_CACHE_SIZE	(1024*1024*512) /* 512M */
+#define FILE_MAX_SIZE 	(1024*512)   /* 512k */
+#define MAX_CACHE_SIZE	(1024*1024*64) /* 64M */
 
 #define FILE_ETAG_LEN 32
 
@@ -194,7 +194,7 @@ private:
     string m_localhostname;
 #ifdef _WITH_MEMCACHED_  
     memcached_st * m_memcached;
-    map<int, memcached_st *> m_memcached_map;
+    map<pthread_t, memcached_st *> m_memcached_map;
 #endif /* _WITH_MEMCACHED_ */    
 };
 

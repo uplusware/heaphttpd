@@ -65,7 +65,7 @@ memory_cache::~memory_cache()
     if(m_memcached)
         memcached_free(m_memcached);
     m_memcached = NULL;
-    map<int, memcached_st *>::iterator iter_st;
+    map<pthread_t, memcached_st *>::iterator iter_st;
     
     for(iter_st = m_memcached_map.begin(); iter_st != m_memcached_map.end(); iter_st++)
     {
@@ -166,7 +166,6 @@ void memory_cache::push_session_var( const char* uid, const char* name, const ch
             m_memcached_map[pthread_self()] = memcached_clone(NULL, m_memcached);
         memcached_return memc_rc = memcached_set(m_memcached_map[pthread_self()], szMD5dst, 40, value, strlen(value) + 1, (time_t)0, (uint32_t)0);
         
-        printf("memcached_set: %s %s: %s\n", memc_rc == MEMCACHED_SUCCESS ? "OK" : "Error", szMD5dst, value);
     }
 #endif /* _WITH_MEMCACHED_ */     
 }
@@ -237,7 +236,6 @@ int  memory_cache::get_session_var(const char* uid, const char * name, string& v
                 
                 ret = 0;
             }
-            printf("memcached_get: %s %s: %s\n", memc_rc == MEMCACHED_SUCCESS ? "OK" : "Error", szMD5dst, value.c_str());
         }
 #endif /* _WITH_MEMCACHED_ */
     }
