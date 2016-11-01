@@ -29,8 +29,8 @@
 static char LOGNAME[256] = "/var/log/niuhttpd/service.log";
 static char LCKNAME[256] = "/.niuhttpd_sys.lock";
 
-static const char* SVR_NAME_TBL[] = {NULL, "HTTP", "HTTPS", NULL};
-static const char* SVR_DESP_TBL[] = {NULL, "HTTP", "HTTPS", NULL};
+static const char* SVR_NAME_TBL[] = {NULL, "HTTP", NULL};
+static const char* SVR_DESP_TBL[] = {NULL, "HTTP", NULL};
 
 #define write_lock(fd, offset, whence, len) lock_reg(fd, F_SETLK, F_WRLCK, offset, whence, len)   
 
@@ -180,7 +180,7 @@ class Service
 public:
 	Service(Service_Type st);
 	virtual ~Service();
-	int Run(int fd, const char* hostip, unsigned short nPort);
+	int Run(int fd, const char* hostip, unsigned short http_port, unsigned short https_port);
 	void Stop();
 	void ReloadConfig();
 	void ReloadAccess();
@@ -188,10 +188,13 @@ public:
 	void AppendReject(const char* data);
 
 protected:
+    int Accept(int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_addr, socklen_t clt_size);
+
 	mqd_t m_service_qid;
 	sem_t* m_service_sid;
 	string m_service_name;
 	int m_sockfd;
+    int m_sockfd_ssl;
 	int m_ctrl_fd;
 	Service_Type m_st;
 	list<pid_t> m_child_list;

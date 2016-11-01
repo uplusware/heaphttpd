@@ -3,12 +3,15 @@ CC = gcc
 HTTPAPI = libsample.so
 HTTPAPIOBJS = sample.o
 
+PERFAPI = libperf.so
+PERFAPIOBJS = perf.o
+
 ifdef MONGODB
     DB_DEF = _MONGODB_
 else
 ifdef MYSQLDB
     DB_DEF = _MARIADB_
-    DB_INCDIR = -I/usr/include/mysql/
+    DB_INCDIR = -I/usr/include/mariadb/
 else
 	DB_DEF = _SAMPLE_
 endif
@@ -35,9 +38,15 @@ all: apimysqldemo
 install: all
 	cp libmysqldemo.so /var/niuhttpd/api/
 else
+ifdef PERF
+all: apiperf
+install: all
+	cp libperf.so /var/niuhttpd/api/
+else
 all: apisample
 install: all
 	cp libsample.so /var/niuhttpd/api/
+endif
 endif
 endif
 
@@ -45,12 +54,16 @@ endif
 apisample: $(HTTPAPI)
 apimysqldemo: $(MYSQLDEMOAPI)
 apimongodemo: $(MONGODEMOAPI)
+apiperf: $(PERFAPI)
 
+$(PERFAPI): $(PERFAPIOBJS)
+	$(CC) -shared -W -fPIC -o $@ $(PERFAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp 
+    
 $(HTTPAPI): $(HTTPAPIOBJS)
 	$(CC) -shared -W -fPIC -o $@ $(HTTPAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp 
 
 $(MYSQLDEMOAPI): $(MYSQLDEMOAPIOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(MYSQLDEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp -lmariadbclient_r
+	$(CC) -shared -W -fPIC -o $@ $(MYSQLDEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp -lmariadb
 
 $(MONGODEMOAPI): $(MONGODEMOAPIOBJS)
 	$(CC) -shared -W -fPIC -o $@ $(MONGODEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp `pkg-config --libs-only-l libmongoc-1.0`
@@ -64,4 +77,3 @@ else
 endif
 clean:
 	-rm -f $(HTTPAPI) $(HTTPAPIOBJS) $(MYSQLDEMOAPI) $(MYSQLDEMOAPIOBJS) $(MONGODEMOAPI) $(MONGODEMOAPIOBJS)  *.elf *.gdb *.o *.a *.so
-

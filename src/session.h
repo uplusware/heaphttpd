@@ -20,7 +20,6 @@
 typedef enum
 {
 	stHTTP = 1,
-	stHTTPS,
 } Service_Type;
 
 class Session
@@ -29,12 +28,12 @@ protected:
 	int m_sockfd;
     SSL * m_ssl;
 	string m_clientip;
-	Service_Type m_st;
+	BOOL m_https;
 	BOOL m_http2;
     ServiceObjMap * m_srvobj;
     X509* m_client_cert;
 public:
-	Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, Service_Type st, BOOL http2, memory_cache* ch);
+	Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, BOOL https, BOOL http2, memory_cache* ch);
 	virtual ~Session();
 	
 	void Process();

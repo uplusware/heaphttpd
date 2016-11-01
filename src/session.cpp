@@ -6,13 +6,13 @@
 #include "session.h"
 
 Session::Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert,
-    Service_Type st, BOOL http2, memory_cache* ch)
+    BOOL https, BOOL http2, memory_cache* ch)
 {
     m_srvobj = srvobj;
 	m_sockfd = sockfd;
     m_ssl = ssl;
 	m_clientip = clientip;
-	m_st = st;
+	m_https = https;
 	m_http2 = http2;
 	m_client_cert = client_cert;
 	m_cache = ch;
@@ -43,7 +43,7 @@ void Session::Process()
         IHttp * pProtocol;
         try
         {
-            if(m_st == stHTTP)
+            if(!m_https)
             {
                 pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
                     m_clientip.c_str(), m_client_cert, m_cache,
@@ -55,7 +55,7 @@ void Session::Process()
                     CHttpBase::m_fastcgi_addr.c_str(), CHttpBase::m_fastcgi_port,
                     CHttpBase::m_private_path.c_str(), wwwauth_scheme);
             }
-            else if(m_st == stHTTPS)
+            else if(m_https)
             {
                 if(m_http2)
                 {

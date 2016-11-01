@@ -317,8 +317,6 @@ void memory_cache::_save_session_vars_()
 
 void memory_cache::_reload_session_vars_()
 {
-    /* m_session_vars.clear(); */
-    
     char szVarFolder[256];
 	sprintf(szVarFolder, "%s/variable", m_dirpath.c_str());
 	
@@ -392,11 +390,6 @@ void memory_cache::_reload_session_vars_()
                             if(iter->second)
                                 delete iter->second; /* Remove the older one */
                             iter->second = session_var_instance;
-                            /*
-                            m_session_vars.erase(iter);
-					        m_session_vars.insert(map<session_var_key, session_var*>::value_type(
-					            session_var_key(session_var_instance->getUID(), session_var_instance->getName()),
-					            session_var_instance)); */
 					    }
 					    else
 					    {

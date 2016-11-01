@@ -66,7 +66,7 @@ static int Run()
 		int pfd[2];
 		pipe(pfd);
 		
-		if(CHttpBase::m_enablehttp)
+		if(CHttpBase::m_enablehttp || CHttpBase::m_enablehttps)
 		{
 			pipe(pfd);
 			http_pid = fork();
@@ -83,7 +83,9 @@ static int Run()
 				close(pfd[0]);
 				daemon_init();
 				Service http_svr(stHTTP);
-				http_svr.Run(pfd[1], CHttpBase::m_hostip.c_str(), (unsigned short)CHttpBase::m_httpport);
+				http_svr.Run(pfd[1], CHttpBase::m_hostip.c_str(), 
+                    CHttpBase::m_enablehttp ? (unsigned short)CHttpBase::m_httpport : 0,
+                    CHttpBase::m_enablehttps ? (unsigned short)CHttpBase::m_httpsport : 0);
 				exit(0);
 			}
 			else if(http_pid > 0)
@@ -109,50 +111,6 @@ static int Run()
 			}
 		}
 		
-		if(CHttpBase::m_enablehttps)
-		{
-			pipe(pfd);
-			https_pid = fork();
-			if(https_pid == 0)
-			{
-				char szFlag[128];
-				sprintf(szFlag, "/tmp/niuhttpd/%s.pid", SVR_NAME_TBL[stHTTPS]);
-				if(lock_pid_file(szFlag) == false)    
-				{   
-					printf("%s is aready runing.\n", SVR_DESP_TBL[stHTTPS]);   
-					exit(-1);  
-				}
-				
-				close(pfd[0]);
-				
-				daemon_init();
-				Service https_svr(stHTTPS);
-				https_svr.Run(pfd[1], CHttpBase::m_hostip.c_str(), (unsigned short)CHttpBase::m_httpsport);
-				exit(0);
-			}
-			else if(https_pid > 0)
-			{
-				unsigned int result;
-				close(pfd[1]);
-				read(pfd[0], &result, sizeof(unsigned int));
-				if(result == 0)
-					printf("Start HTTPS Service OK \t\t[%u]\n", https_pid);
-				else
-				{
-					uTrace.Write(Trace_Error, "%s", "Start HTTPS Service Failed.");
-					printf("Start HTTPS Service Failed. \t\t[Error]\n");
-				}
-				close(pfd[0]);
-			}
-			else
-			{
-				close(pfd[0]);
-				close(pfd[1]);
-
-				retVal = -1;
-				break;
-			}
-		}
 	}while(0);
 	
 	CHttpBase::UnLoadConfig();
@@ -166,9 +124,6 @@ static int Stop()
 	
 	Service http_svr(stHTTP);
 	http_svr.Stop();	
-
-	Service https_svr(stHTTPS);
-	https_svr.Stop();
 }
 
 static void Version()
@@ -182,9 +137,6 @@ static int Reload()
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadConfig();
-
-	Service https_svr(stHTTPS);
-	https_svr.ReloadConfig();
 }
 
 static int ReloadAccess()
@@ -193,9 +145,6 @@ static int ReloadAccess()
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadAccess();
-
-	Service https_svr(stHTTPS);
-	https_svr.ReloadAccess();
 }
 
 static int AppendReject(const char* data)
@@ -204,9 +153,6 @@ static int AppendReject(const char* data)
 
 	Service http_svr(stHTTP);
 	http_svr.AppendReject(data);
-
-	Service https_svr(stHTTPS);
-	https_svr.AppendReject(data);
 }
 
 static int ReloadExtension()
@@ -215,9 +161,6 @@ static int ReloadExtension()
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadExtension();
-
-	Service https_svr(stHTTPS);
-	https_svr.ReloadExtension();
 }
 static int processcmd(const char* cmd, const char* conf, const char* permit, const char* reject, const char* data)
 {
@@ -263,16 +206,6 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 		else
 		{
 			printf("%s stopped.\n", SVR_DESP_TBL[stHTTP]);   
-		}
-
-		sprintf(szFlag, "/tmp/niuhttpd/%s.pid", SVR_NAME_TBL[stHTTPS]);
-		if(check_pid_file(szFlag) == false)    
-		{   
-			printf("%s is runing.\n", SVR_DESP_TBL[stHTTPS]);   
-		}
-		else
-		{
-			printf("%s stopped.\n", SVR_DESP_TBL[stHTTPS]);   
 		}
 		
 	}

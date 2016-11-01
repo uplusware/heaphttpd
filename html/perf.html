@@ -1,0 +1,85 @@
+<html>
+<head>
+<script>
+    function initxmlhttp()
+    {
+        var xmlhttp
+        
+        try
+        {
+            xmlhttp=new ActiveXObject("Msxml2.XMLHTTP");
+        }
+        catch(e)
+        {
+            try
+            {
+                xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+            }
+            catch (E)
+            {
+                xmlhttp=false;
+            }
+        }
+        
+        if(!xmlhttp && typeof XMLHttpRequest!='undefined')
+        {
+            try
+            {
+                xmlhttp = new XMLHttpRequest();
+            }
+            catch (e)
+            {
+
+                xmlhttp=false;
+            }
+        }
+        if (!xmlhttp && window.createRequest) 
+        {
+            try 
+            {
+                xmlhttp = window.createRequest();
+            }
+            catch(e)
+            {
+                xmlhttp=false;
+            }
+        }
+        return xmlhttp;
+    }
+    
+	function perf_test()
+	{
+		var xmlHttp = initxmlhttp();
+		if(!xmlHttp)
+			return;
+		
+		var qUrl = "/api/perf";
+		
+	    xmlHttp.onreadystatechange = function()
+		{
+			if (xmlHttp.readyState == 4)
+			{
+				if(xmlHttp.status== 200)
+				{
+					document.getElementById('RESPONSE').innerHTML = xmlHttp.responseText;
+				}
+			}
+		}
+		xmlHttp.open("GET", qUrl , true);
+		xmlHttp.send("");
+	}
+
+	function ontimer()
+	{
+		
+		perf_test();
+		setTimeout('ontimer()',10);
+	}
+</script>
+<title>Performace Test</title>
+</head>
+<body onLoad="ontimer();">
+<h1>Performace Test(depends on api/perf)</h1>
+<div id="RESPONSE"></div>
+</body>
+</html>

@@ -331,7 +331,7 @@ BOOL CHttpBase::LoadConfig()
 #endif /* _WITH_MEMCACHED_ */			
 			else
 			{
-				printf("%s\n", strline.c_str());
+				/* printf("%s\n", strline.c_str()); */
 			}
 			strline = "";
 		}

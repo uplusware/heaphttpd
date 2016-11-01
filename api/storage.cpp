@@ -123,9 +123,10 @@ int DBStorage::Connect(const char * host, const char* username, const char* pass
 		}
 		else
 		{
+            printf("mysql_real_connect %s\n", mysql_error(m_hMySQL));
+			
 			m_bOpened = FALSE;
             m_hMySQL = NULL;
-			printf("mysql_real_connect %s\n", mysql_error(m_hMySQL));
 			return -1;	
 		}        
 #endif /* _MONGODB_ */

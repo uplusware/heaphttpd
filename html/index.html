@@ -7,8 +7,12 @@
     {
       if ("WebSocket" in window)
       {
+         var ws;
          // Let us open a web socket
-         var ws = new WebSocket("ws://"+window.location.host+"/echo");
+         if("https:" == document.location.protocol)
+              ws = new WebSocket("wss://"+window.location.host+"/echo");
+         else
+              ws = new WebSocket("ws://"+window.location.host+"/echo");
          ws.onopen = function()
          {
             ws.send(document.getElementById("ghi").value, document.getElementById("ghi").value.length);
@@ -16,12 +20,12 @@
          ws.onmessage = function (evt)
          {
             var received_msg = evt.data;
-            alert(received_msg);
+            document.getElementById("ghi_reply").innerHTML = "<font color=\"blue\">" + received_msg + "</font>";
          };
          ws.onclose = function()
          {
             // websocket is closed.
-            alert("Connection is closed...");
+            console.log("Connection is closed...");
          };
       }
       else
@@ -36,6 +40,9 @@
 	<h1>niuhttpd web server/0.3</h1>
 	<hr>
 	<image src="niuhttpd.png" />
+    <p>
+    <a href="perf.html">Performance Test</a>
+    </p>
 	<p>API DEMO:</p>
 	<form method="post" action="/api/sample" >
 	<table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
@@ -83,7 +90,8 @@
         </table>
         </form>	
 	<p>WebSocket DEMO:</p>
-	<input type="text" name="ghi" id="ghi">
- 	<a href="javascript:WebSocketSample()">Send</a>
+    <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
+    <tr><td><input type="text" name="ghi" id="ghi"></td><td><a href="javascript:WebSocketSample()">Send</a></td><td>Replied by Web Server:</td><td><div name="ghi_reply" id="ghi_reply"></div></td></tr>
+    </table>
 </body>
 </html>

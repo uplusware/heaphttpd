@@ -28,7 +28,7 @@ ThreadPool::ThreadPool(unsigned int size, void(*init_pthread_handler)(), void*(*
 			
 			if(pthread_create(&m_pthread_list[i], &m_pthread_attr_list[i], pthread_handler, pArg) != 0)
 			{
-				fprintf(stderr, "Fail to create thread worker: %d\n", i);
+				fprintf(stderr, "Fail to create thread worker: %d/%d\n", i, m_size);
 				break;
 			}
 		}

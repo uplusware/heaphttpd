@@ -26,8 +26,8 @@ typedef struct
     
 	int sockfd;
 	string client_ip;
-	Service_Type svr_type;
-	BOOL   http2;
+	BOOL https;
+	BOOL http2;
     string ca_crt_root;
     string ca_crt_server;
     string ca_password;
@@ -46,7 +46,7 @@ enum CLIENT_PARAM_CTRL{
 typedef struct {
 	CLIENT_PARAM_CTRL ctrl;
 	char client_ip[128];
-    Service_Type svr_type;
+    BOOL https;
 	BOOL http2;
     char ca_crt_root[256];
     char ca_crt_server[256];
@@ -211,7 +211,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
     BOOL bSSLAccepted;
 	SSL_CTX* ssl_ctx = NULL;
 	X509* client_cert = NULL;
-    if(session_param->svr_type == stHTTPS)
+    if(session_param->https == TRUE)
 	{
 		SSL_METHOD* meth;
 #ifdef OPENSSL_V_1_2
@@ -346,7 +346,7 @@ re_ssl_accept:
 	}
 	
 	pSession = new Session(session_param->srvobjmap, session_param->sockfd, ssl,
-        session_param->client_ip.c_str(), client_cert, session_param->svr_type, isHttp2, session_param->cache);
+        session_param->client_ip.c_str(), client_cert, session_param->https, isHttp2, session_param->cache);
 	if(pSession != NULL)
 	{
 		pSession->Process();
@@ -523,7 +523,7 @@ void Worker::Working()
 			session_param->cache = m_cache;
 			session_param->sockfd = clt_sockfd;
 			session_param->client_ip = client_param.client_ip;
-			session_param->svr_type = client_param.svr_type;
+			session_param->https = client_param.https;
 			session_param->http2 = client_param.http2;
 		    session_param->ca_crt_root = client_param.ca_crt_root;
        		session_param->ca_crt_server = client_param.ca_crt_server;
@@ -544,6 +544,7 @@ void Worker::Working()
 Service::Service(Service_Type st)
 {
 	m_sockfd = -1;
+    m_sockfd_ssl = -1;
 	m_st = st;
 	m_service_name = SVR_NAME_TBL[m_st];
 }
@@ -700,7 +701,145 @@ void Service::ReloadExtension()
 		sem_close(m_service_sid);
 }
 
-int Service::Run(int fd, const char* hostip, unsigned short nPort)
+int Service::Accept(int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_addr, socklen_t clt_size)
+{
+    struct sockaddr_in * v4_addr;
+    struct sockaddr_in6 * v6_addr;
+        
+    char szclientip[INET6_ADDRSTRLEN];
+    if (clt_addr.ss_family == AF_INET)
+    {
+        v4_addr = (struct sockaddr_in*)&clt_addr;
+        if(inet_ntop(AF_INET, (void*)&v4_addr->sin_addr, szclientip, INET6_ADDRSTRLEN) == NULL)
+        {    
+            close(clt_sockfd);
+            return 0;
+        }
+        m_next_process = ntohl(v4_addr->sin_addr.s_addr) % m_work_processes.size();
+
+    }
+    else if(clt_addr.ss_family == AF_INET6)
+    {
+        v6_addr = (struct sockaddr_in6*)&clt_addr;
+        if(inet_ntop(AF_INET6, (void*)&v6_addr->sin6_addr, szclientip, INET6_ADDRSTRLEN) == NULL)
+        {    
+            close(clt_sockfd);
+            return 0;
+        }
+        m_next_process = ntohl(v6_addr->sin6_addr.s6_addr32[3]) % m_work_processes.size(); 
+
+    }
+    else
+    {
+        m_next_process = 0; 
+    }
+    
+    string client_ip = szclientip;
+    int access_result;
+    if(CHttpBase::m_permit_list.size() > 0)
+    {
+        access_result = FALSE;
+        for(int x = 0; x < CHttpBase::m_permit_list.size(); x++)
+        {
+            if(strlike(CHttpBase::m_permit_list[x].c_str(), client_ip.c_str()) == TRUE)
+            {
+                access_result = TRUE;
+                break;
+            }
+        }
+        
+        for(int x = 0; x < CHttpBase::m_reject_list.size(); x++)
+        {
+            if( (strlike(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE)
+                && (time(NULL) < CHttpBase::m_reject_list[x].expire) )
+            {
+                access_result = FALSE;
+                break;
+            }
+        }
+    }
+    else
+    {
+        access_result = TRUE;
+        for(int x = 0; x < CHttpBase::m_reject_list.size(); x++)
+        {
+            if( (strlike(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE)
+                && (time(NULL) < CHttpBase::m_reject_list[x].expire) )
+            {
+                access_result = FALSE;
+                break;
+            }
+        }
+    }
+    
+    if(access_result == FALSE)
+    {
+        close(clt_sockfd);
+        return 0;
+    }
+    else
+    {					                    
+        char pid_file[1024];
+        sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid",
+            m_service_name.c_str(), m_next_process);
+        if(check_pid_file(pid_file) == true) /* The related process had crashed */
+        {
+            WORK_PROCESS_INFO  wpinfo;
+            if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
+                fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
+            
+            int work_pid = fork();
+            if(work_pid == 0)
+            {
+                if(lock_pid_file(pid_file) == false)
+                {
+                    exit(-1);
+                }
+                close(wpinfo.sockfds[0]);
+                Worker * pWorker = new Worker(m_service_name.c_str(), m_next_process,
+                    CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
+                pWorker->Working();
+                delete pWorker;
+                close(wpinfo.sockfds[1]);
+                exit(0);
+            }
+            else if(work_pid > 0)
+            {
+                close(wpinfo.sockfds[1]);
+                wpinfo.pid = work_pid;
+                m_work_processes[m_next_process] = wpinfo;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+        
+        CLIENT_PARAM client_param;
+        strncpy(client_param.client_ip, client_ip.c_str(), 127);
+        client_param.client_ip[127] = '\0';
+        client_param.https = https;
+        client_param.http2 = CHttpBase::m_enablehttp2;
+        strncpy(client_param.ca_crt_root, CHttpBase::m_ca_crt_root.c_str(), 255);
+        client_param.ca_crt_root[255] = '\0';
+        strncpy(client_param.ca_crt_server, CHttpBase::m_ca_crt_server.c_str(), 255);
+        client_param.ca_crt_server[255] = '\0';
+        strncpy(client_param.ca_password, CHttpBase::m_ca_password.c_str(), 255);
+        client_param.ca_password[255] = '\0';
+        strncpy(client_param.ca_key_server, CHttpBase::m_ca_key_server.c_str(), 255);
+        client_param.ca_key_server[255] = '\0';
+        client_param.client_cer_check = CHttpBase::m_client_cer_check;
+
+        client_param.ctrl = SessionParamData;
+        SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param);
+        close(clt_sockfd);
+
+    }
+    
+    return 0;
+}
+
+int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned short https_port)
 {	
 	CUplusTrace uTrace(LOGNAME, LCKNAME);
 
@@ -789,64 +928,135 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 	while(!svr_exit)
 	{		
 		int nFlag;
-		
-		struct addrinfo hints;
-        struct addrinfo *server_addr, *rp;
-        
-        memset(&hints, 0, sizeof(struct addrinfo));
-        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-        hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
-        hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-        hints.ai_protocol = 0;          /* Any protocol */
-        hints.ai_canonname = NULL;
-        hints.ai_addr = NULL;
-        hints.ai_next = NULL;
-        
-        char szPort[32];
-        sprintf(szPort, "%u", nPort);
-
-        int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort, &hints, &server_addr);
-        if (s != 0)
+        if(http_port > 0)
         {
-           fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-           break;
+            struct addrinfo hints;
+            struct addrinfo *server_addr, *rp;
+            
+            memset(&hints, 0, sizeof(struct addrinfo));
+            hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+            hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+            hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+            hints.ai_protocol = 0;          /* Any protocol */
+            hints.ai_canonname = NULL;
+            hints.ai_addr = NULL;
+            hints.ai_next = NULL;
+            
+            char szPort[32];
+            sprintf(szPort, "%u", http_port);
+
+            int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort, &hints, &server_addr);
+            if (s != 0)
+            {
+               fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+               break;
+            }
+            
+            for (rp = server_addr; rp != NULL; rp = rp->ai_next)
+            {
+               m_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+               if (m_sockfd == -1)
+                   continue;
+               
+               nFlag = 1;
+               setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
+            
+               if (bind(m_sockfd, rp->ai_addr, rp->ai_addrlen) == 0)
+                   break;                  /* Success */
+
+               close(m_sockfd);
+            }
+            
+            if (rp == NULL)
+            {               /* No address succeeded */
+                  fprintf(stderr, "Could not bind\n");
+                  break;
+            }
+
+            freeaddrinfo(server_addr);           /* No longer needed */
+            
+            nFlag = fcntl(m_sockfd, F_GETFL, 0);
+            fcntl(m_sockfd, F_SETFL, nFlag|O_NONBLOCK);
+            
+            if(listen(m_sockfd, 128) == -1)
+            {
+                uTrace.Write(Trace_Error, "Service LISTEN error.");
+                result = 1;
+                write(fd, &result, sizeof(unsigned int));
+                close(fd);
+                break;
+            }
         }
-        
-        for (rp = server_addr; rp != NULL; rp = rp->ai_next)
+        //SSL
+        if(https_port > 0)
         {
-           m_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-           if (m_sockfd == -1)
-               continue;
-           
-           nFlag = 1;
-		   setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
-		
-           if (bind(m_sockfd, rp->ai_addr, rp->ai_addrlen) == 0)
-               break;                  /* Success */
+            struct addrinfo hints2;
+            struct addrinfo *server_addr2, *rp2;
+            
+            memset(&hints2, 0, sizeof(struct addrinfo));
+            hints2.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+            hints2.ai_socktype = SOCK_STREAM; /* Datagram socket */
+            hints2.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+            hints2.ai_protocol = 0;          /* Any protocol */
+            hints2.ai_canonname = NULL;
+            hints2.ai_addr = NULL;
+            hints2.ai_next = NULL;
+            
+            char szPort2[32];
+            sprintf(szPort2, "%u", https_port);
 
-           close(m_sockfd);
+            int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort2, &hints2, &server_addr2);
+            if (s != 0)
+            {
+               fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+               break;
+            }
+            
+            for (rp2 = server_addr2; rp2 != NULL; rp2 = rp2->ai_next)
+            {
+               m_sockfd_ssl = socket(rp2->ai_family, rp2->ai_socktype, rp2->ai_protocol);
+               if (m_sockfd_ssl == -1)
+                   continue;
+               
+               nFlag = 1;
+               setsockopt(m_sockfd_ssl, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
+            
+               if (bind(m_sockfd_ssl, rp2->ai_addr, rp2->ai_addrlen) == 0)
+                   break;                  /* Success */
+
+               close(m_sockfd_ssl);
+            }
+            
+            if (rp2 == NULL)
+            {     /* No address succeeded */
+                  fprintf(stderr, "Could not bind\n");
+                  break;
+            }
+
+            freeaddrinfo(server_addr2);           /* No longer needed */
+            
+            nFlag = fcntl(m_sockfd_ssl, F_GETFL, 0);
+            fcntl(m_sockfd_ssl, F_SETFL, nFlag|O_NONBLOCK);
+            
+            if(listen(m_sockfd_ssl, 128) == -1)
+            {
+                uTrace.Write(Trace_Error, "Security Service LISTEN error.");
+                result = 1;
+                write(fd, &result, sizeof(unsigned int));
+                close(fd);
+                break;
+            }
         }
         
-        if (rp == NULL)
-        {               /* No address succeeded */
-              fprintf(stderr, "Could not bind\n");
-              break;
+        if(m_sockfd == -1 && m_sockfd_ssl == -1)
+        {
+            uTrace.Write(Trace_Error, "Both Service LISTEN error.");
+            result = 1;
+            write(fd, &result, sizeof(unsigned int));
+            close(fd);
+            break;
         }
-
-        freeaddrinfo(server_addr);           /* No longer needed */
-		
-		nFlag = fcntl(m_sockfd, F_GETFL, 0);
-		fcntl(m_sockfd, F_SETFL, nFlag|O_NONBLOCK);
-		
-		if(listen(m_sockfd, 128) == -1)
-		{
-			uTrace.Write(Trace_Error, "Service LISTEN error.");
-			result = 1;
-			write(fd, &result, sizeof(unsigned int));
-			close(fd);
-			break;
-		}
-
+        BOOL accept_ssl_first = FALSE;
 		result = 0;
 		write(fd, &result, sizeof(unsigned int));
 		close(fd);
@@ -924,175 +1134,74 @@ int Service::Run(int fd, const char* hostip, unsigned short nPort)
 				}
 				
 			}
-			FD_SET(m_sockfd, &accept_mask);
-			
+            if(m_sockfd > 0)
+                FD_SET(m_sockfd, &accept_mask);
+            
+            //SSL
+            if(m_sockfd_ssl > 0)
+                FD_SET(m_sockfd_ssl, &accept_mask);
+            
 			accept_timeout.tv_sec = 1;
 			accept_timeout.tv_usec = 0;
-			rc = select(m_sockfd + 1, &accept_mask, NULL, NULL, &accept_timeout);
-			if(rc == 0)
+			rc = select((m_sockfd > m_sockfd_ssl ? m_sockfd : m_sockfd_ssl) + 1, &accept_mask, NULL, NULL, &accept_timeout);
+			if(rc == -1)
 			{	
-				continue;
+                sleep(5);
+				break;
 			}
-			else if(rc == 1)
+			else if(rc == 0)
 			{
-				struct sockaddr_storage clt_addr;
-				struct sockaddr_in * v4_addr;
-				struct sockaddr_in6 * v6_addr;
-				socklen_t clt_size = sizeof(struct sockaddr_storage);
-				int clt_sockfd;
-				if(FD_ISSET(m_sockfd, &accept_mask))
-				{
-					clt_sockfd = accept(m_sockfd, (sockaddr*)&clt_addr, &clt_size);
-
-					if(clt_sockfd < 0)
-					{
-						continue;
-					}
-					
-					char szclientip[INET6_ADDRSTRLEN];
-					if (clt_addr.ss_family == AF_INET)
-					{
-					    v4_addr = (struct sockaddr_in*)&clt_addr;
-                        if(inet_ntop(AF_INET, (void*)&v4_addr->sin_addr, szclientip, INET6_ADDRSTRLEN) == NULL)
-				        {    
-                            close(clt_sockfd);
-                            continue;
-                        }
-                        m_next_process = ntohl(v4_addr->sin_addr.s_addr) % m_work_processes.size();
-
-                    }
-                    else if(clt_addr.ss_family == AF_INET6)
-                    {
-                        v6_addr = (struct sockaddr_in6*)&clt_addr;
-                        if(inet_ntop(AF_INET6, (void*)&v6_addr->sin6_addr, szclientip, INET6_ADDRSTRLEN) == NULL)
-				        {    
-                            close(clt_sockfd);
-                            continue;
-                        }
-                        m_next_process = ntohl(v6_addr->sin6_addr.s6_addr32[3]) % m_work_processes.size(); 
-
-                    }
-                    else
-                    {
-                        m_next_process = 0; 
-                    }
-					
-                    string client_ip = szclientip;
-					int access_result;
-					if(CHttpBase::m_permit_list.size() > 0)
-					{
-						access_result = FALSE;
-						for(int x = 0; x < CHttpBase::m_permit_list.size(); x++)
-						{
-							if(strlike(CHttpBase::m_permit_list[x].c_str(), client_ip.c_str()) == TRUE)
-							{
-								access_result = TRUE;
-								break;
-							}
-						}
-						
-						for(int x = 0; x < CHttpBase::m_reject_list.size(); x++)
-						{
-							if( (strlike(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE)
-							    && (time(NULL) < CHttpBase::m_reject_list[x].expire) )
-							{
-								access_result = FALSE;
-								break;
-							}
-						}
-					}
-					else
-					{
-						access_result = TRUE;
-						for(int x = 0; x < CHttpBase::m_reject_list.size(); x++)
-						{
-							if( (strlike(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE)
-							    && (time(NULL) < CHttpBase::m_reject_list[x].expire) )
-							{
-								access_result = FALSE;
-								break;
-							}
-						}
-					}
-					
-					if(access_result == FALSE)
-					{
-						close(clt_sockfd);
-					}
-					else
-					{					                    
-						char pid_file[1024];
-						sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid",
-						    m_service_name.c_str(), m_next_process);
-						if(check_pid_file(pid_file) == true) /* The related process had crashed */
-						{
-						    WORK_PROCESS_INFO  wpinfo;
-							if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
-								fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
-							
-							int work_pid = fork();
-							if(work_pid == 0)
-							{
-								if(lock_pid_file(pid_file) == false)
-								{
-									exit(-1);
-								}
-								close(wpinfo.sockfds[0]);
-								Worker * pWorker = new Worker(m_service_name.c_str(), m_next_process,
-								    CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
-								pWorker->Working();
-								delete pWorker;
-								close(wpinfo.sockfds[1]);
-								exit(0);
-							}
-							else if(work_pid > 0)
-							{
-								close(wpinfo.sockfds[1]);
-								wpinfo.pid = work_pid;
-								m_work_processes[m_next_process] = wpinfo;
-							}
-							else
-							{
-								continue;
-							}
-						}
-						
-						CLIENT_PARAM client_param;
-						strncpy(client_param.client_ip, client_ip.c_str(), 127);
-						client_param.client_ip[127] = '\0';
-						client_param.svr_type = m_st;
-						client_param.http2 = CHttpBase::m_enablehttp2;
-                        strncpy(client_param.ca_crt_root, CHttpBase::m_ca_crt_root.c_str(), 255);
-                        client_param.ca_crt_root[255] = '\0';
-                   		strncpy(client_param.ca_crt_server, CHttpBase::m_ca_crt_server.c_str(), 255);
-                        client_param.ca_crt_server[255] = '\0';
-            		    strncpy(client_param.ca_password, CHttpBase::m_ca_password.c_str(), 255);
-                        client_param.ca_password[255] = '\0';
-            		    strncpy(client_param.ca_key_server, CHttpBase::m_ca_key_server.c_str(), 255);
-                        client_param.ca_key_server[255] = '\0';
-            		    client_param.client_cer_check = CHttpBase::m_client_cer_check;
-
-						client_param.ctrl = SessionParamData;
-						SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param);
-                        close(clt_sockfd);
-		
-					}
-				}
-				else
-				{
-					continue;
-				}
-				
+                continue;
 			}
 			else
 			{
-				break;
+				BOOL https= FALSE;
+                
+				struct sockaddr_storage clt_addr, clt_addr_ssl;
+                
+				socklen_t clt_size = sizeof(struct sockaddr_storage);
+                socklen_t clt_size_ssl = sizeof(struct sockaddr_storage);
+				int clt_sockfd = -1;
+                int clt_sockfd_ssl = -1;
+                
+                if(FD_ISSET(m_sockfd, &accept_mask))
+                {
+                    https = FALSE;
+                    clt_sockfd = accept(m_sockfd, (sockaddr*)&clt_addr, &clt_size);
+
+                    if(clt_sockfd < 0)
+                    {
+                        continue;
+                    }
+                    if(Accept(clt_sockfd, https, clt_addr, clt_size) < 0)
+                        break;
+                }
+                
+                if(FD_ISSET(m_sockfd_ssl, &accept_mask))
+                {
+                    https = TRUE;
+                    clt_sockfd_ssl = accept(m_sockfd_ssl, (sockaddr*)&clt_addr_ssl, &clt_size_ssl);
+
+                    if(clt_sockfd_ssl < 0)
+                    {
+                        continue;
+                    }
+                    if(Accept(clt_sockfd_ssl, https, clt_addr_ssl, clt_size_ssl) < 0)
+                        break;
+                }
 			}
 		}
-		if(m_sockfd)
+		
+        if(m_sockfd > 0)
 		{
 			m_sockfd = -1;
 			close(m_sockfd);
+		}
+        
+        if(m_sockfd_ssl > 0)
+		{
+			m_sockfd_ssl = -1;
+			close(m_sockfd_ssl);
 		}
 	}
 	free(qBufPtr);
