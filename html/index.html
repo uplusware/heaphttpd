@@ -34,15 +34,20 @@
          alert("WebSocket NOT supported by your Browser!");
       }
     }
+    function perf_run()
+    {
+        for(i = 0; i < document.getElementById('instance_num').value; i++)
+            window.open("/perf.html");
+    }
 </script>
 </head>
 <body>
 	<h1>niuhttpd web server/0.3</h1>
 	<hr>
 	<image src="niuhttpd.png" />
-    <p>
-    <a href="perf.html">Performance Test</a>
-    </p>
+    <p>Performance Test(depends on api/perf)</p>
+    Instance Number: <input id="instance_num" size="3" value="100"/> <a href="javascript:perf_run()">Run</a>
+
 	<p>API DEMO:</p>
 	<form method="post" action="/api/sample" >
 	<table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
@@ -67,6 +72,7 @@
 		</tr>
 	</table>
 	</form>
+
 	<p>PHP DEMO(Fast-CGI/CGI):(<a href="info.php">PHP info</a>)</p>
         <form method="post" action="/sample.php" >
         <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
@@ -78,6 +84,7 @@
                 </tr>
         </table>
         </form>
+
 	<p>Spawn-fcgi/Webpy):(<a href="/webpy/">Webpy</a>)</p>
         <form method="post" action="/webpy/hello" >
         <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
@@ -88,7 +95,8 @@
                         <td><input type="submit" id="cal" name="cal" size="20" value="="></td>
                 </tr>
         </table>
-        </form>	
+        </form>
+        
 	<p>WebSocket DEMO:</p>
     <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
     <tr><td><input type="text" name="ghi" id="ghi"></td><td><a href="javascript:WebSocketSample()">Send</a></td><td>Replied by Web Server:</td><td><div name="ghi_reply" id="ghi_reply"></div></td></tr>

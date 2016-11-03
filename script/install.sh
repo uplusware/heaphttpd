@@ -1,9 +1,12 @@
 #!/bin/bash
-
-#if [ `id -u` -ne 0 ]; then
-#        echo "You need root privileges to run this script"
-#        exit 1
-#fi
+#
+#	Copyright (c) openheap, uplusware
+#	uplusware@gmail.com
+#
+if [ `id -u` -ne 0 ]; then
+        echo "You need root privileges to run this script"
+        exit 1
+fi
 
 #
 # install the niuhttpd System
