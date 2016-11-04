@@ -1,3 +1,7 @@
+/*
+	Copyright (c) openheap, uplusware
+	uplusware@gmail.com
+*/
 #ifndef _STORAGE_ENGINE_H_
 #define _STORAGE_ENGINE_H_
 #include "storage.h"
