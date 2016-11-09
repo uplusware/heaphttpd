@@ -364,7 +364,7 @@ BOOL CHttpBase::LoadAccessList()
 	sem_t* plock = NULL;
 	///////////////////////////////////////////////////////////////////////////////
 	// GLOBAL_REJECT_LIST
-	plock = sem_open("/.GLOBAL_REJECT_LIST.sem", O_CREAT | O_RDWR, 0644, 1);
+	plock = sem_open("/.NIUHTTPD_GLOBAL_REJECT_LIST.sem", O_CREAT | O_RDWR, 0644, 1);
 	if(plock != SEM_FAILED)
 	{
 		sem_wait(plock);
@@ -376,7 +376,7 @@ BOOL CHttpBase::LoadAccessList()
 	}
 	/////////////////////////////////////////////////////////////////////////////////
 	// GLOBAL_PERMIT_LIST
-	plock = sem_open("/.GLOBAL_PERMIT_LIST.sem", O_CREAT | O_RDWR, 0644, 1);
+	plock = sem_open("/.NIUHTTPD_GLOBAL_PERMIT_LIST.sem", O_CREAT | O_RDWR, 0644, 1);
 	if(plock != SEM_FAILED)
 	{
 		sem_wait(plock);
@@ -429,7 +429,7 @@ void CHttpBase::_load_reject_()
 		{
 			stReject sr;
 			sr.ip = strline;
-			sr.expire = 0xFFFFFFFF;
+			sr.expire = 0xFFFFFFFFU;
 			m_reject_list.push_back(sr);
 		}
 	}
@@ -462,8 +462,6 @@ void CHttpBase::_load_ext_()
 				{
 					ext.action = pChildNode->ToElement()->Attribute("action");
 					m_ext_list.push_back(ext);
-
-					/* printf("%s, action: %s\n", pChildNode->ToElement()->Attribute("libso"), pChildNode->ToElement()->Attribute("action")); */
 				}
 			}
 			pChildNode = pChildNode->NextSibling("extension");
