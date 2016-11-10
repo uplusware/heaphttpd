@@ -21,7 +21,7 @@ string CHttpBase::m_work_path = "/var/niuhttpd/";
 string CHttpBase::m_ext_list_file = "/etc/niuhttpd/extension.xml";
 vector<stExtension> CHttpBase::m_ext_list;
 
-string CHttpBase::m_localhostname = "uplusware.com";
+string CHttpBase::m_localhostname = "localhost";
 string CHttpBase::m_hostip = "";
 
 BOOL	CHttpBase::m_enablehttp = TRUE;

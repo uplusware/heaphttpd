@@ -175,7 +175,6 @@ void Htdoc::Response()
                         if((errmsg = dlerror()) == NULL)
                         {
                             ws_main(m_session->GetSocket(), m_session->GetSSL());
-                            dlclose(lhandle);
                         }
                         else
                         {
@@ -190,6 +189,7 @@ void Htdoc::Response()
                             m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                             
                         }
+                        dlclose(lhandle);
                     }
                 }          
                 return;
@@ -302,7 +302,6 @@ void Htdoc::Response()
 			if((errmsg = dlerror()) == NULL)
 			{
 				api_response(m_session, m_work_path.c_str());
-				dlclose(lhandle);
 			}
 			else
 			{
@@ -316,6 +315,7 @@ void Htdoc::Response()
 				m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 				fprintf(stderr, "dlsym %s\n", errmsg);
 			}
+            dlclose(lhandle);
 		}
 	
 	}

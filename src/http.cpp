@@ -117,7 +117,6 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
     
     m_http2 = phttp2;
     m_http2_stream_ind = http2_stream_ind;
-	return;
 }
 
 CHttp::~CHttp()
@@ -145,14 +144,10 @@ CHttp::~CHttp()
 
 	if(m_formdata)
 		delete m_formdata;
-    
-	if(m_lsockfd)
-		delete m_lsockfd;
 }
 
 int CHttp::HttpSend(const char* buf, int len)
 {
-    //printf("%s\n", buf);
 	if(m_ssl)
 		return SSLWrite(m_sockfd, m_ssl, buf, len);
 	else
@@ -162,10 +157,8 @@ int CHttp::HttpSend(const char* buf, int len)
 
 int CHttp::HttpRecv(char* buf, int len)
 {
-    //printf("%s\n", buf);
 	if(m_ssl)
 	{
-		//printf("m_lssl->drecv(%p, %d)\n", buf, len);
 		return m_lssl->drecv(buf, len);
 	}
 	else

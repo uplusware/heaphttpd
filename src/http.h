@@ -33,6 +33,9 @@ enum Http_Connection
 class IHttp
 {
 public:
+    IHttp() {}
+    virtual ~IHttp() {} //Must be have, otherwise there will be memory leak for CHttp and CHttp2
+    
     virtual Http_Connection Processing() = 0;
     virtual int HttpSend(const char* buf, int len) = 0;
     virtual int HttpRecv(char* buf, int len) = 0;

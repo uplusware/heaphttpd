@@ -266,10 +266,10 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             goto clean_ssl3;
         }
 		SSL_CTX_set_mode(ssl_ctx, SSL_MODE_AUTO_RETRY);
-		
+#ifdef OPENSSL_V_1_2		
 		if(session_param->http2)
 			SSL_CTX_set_alpn_select_cb(ssl_ctx, alpn_cb, &isHttp2);
-		
+#endif /* OPENSSL_V_1_2 */		
 		ssl = SSL_new(ssl_ctx);
 		if(!ssl)
 		{

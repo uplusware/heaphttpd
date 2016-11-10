@@ -19,6 +19,7 @@ install: all
 	cp libextsample1.so /var/niuhttpd/ext/
 	cp libextsample2.so /var/niuhttpd/ext/
 	cp libextsample3.so /var/niuhttpd/ext/
+    cp -f extension.xml /etc/niuhttpd/extension.xml
     
 ext: $(EXT1) $(EXT2) $(EXT3)
 

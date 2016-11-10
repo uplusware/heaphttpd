@@ -317,6 +317,16 @@ void memory_cache::_save_session_vars_()
 
 void memory_cache::_reload_session_vars_()
 {
+#if 0    
+    map<session_var_key, session_var *>::iterator iter_ses;
+	for(iter_ses = m_session_vars.begin(); iter_ses != m_session_vars.end(); iter_ses++)
+	{
+	    if(iter_ses->second)
+    		delete iter_ses->second;
+	}
+	m_session_vars.clear();
+#endif
+    
     char szVarFolder[256];
 	sprintf(szVarFolder, "%s/variable", m_dirpath.c_str());
 	
@@ -421,11 +431,11 @@ void memory_cache::reload_session_vars()
 void memory_cache::clear_session_vars()
 {
     pthread_rwlock_wrlock(&m_session_var_rwlock);
-	map<session_var_key, session_var *>::iterator iter_f;
-	for(iter_f = m_session_vars.begin(); iter_f != m_session_vars.end(); iter_f++)
+	map<session_var_key, session_var *>::iterator iter_ses;
+	for(iter_ses = m_session_vars.begin(); iter_ses != m_session_vars.end(); iter_ses++)
 	{
-	    if(iter_f->second)
-    		delete iter_f->second;
+	    if(iter_ses->second)
+    		delete iter_ses->second;
 	}
 	m_session_vars.clear();
 	pthread_rwlock_unlock(&m_session_var_rwlock);
@@ -606,6 +616,15 @@ void memory_cache::_save_server_vars_()
 
 void memory_cache::_reload_server_vars_()
 {
+#if 0    
+    map<string, server_var *>::iterator iter_srv;
+	for(iter_srv = m_server_vars.begin(); iter_srv != m_server_vars.end(); iter_srv++)
+	{
+	    if(iter_srv->second)
+    		delete iter_srv->second;
+	}
+	m_server_vars.clear();
+#endif    
     char szVarFolder[256];
 	sprintf(szVarFolder, "%s/variable", m_dirpath.c_str());
 	
@@ -702,11 +721,11 @@ void memory_cache::reload_server_vars()
 void memory_cache::clear_server_vars()
 {
     pthread_rwlock_wrlock(&m_server_var_rwlock);
-	map<string, server_var *>::iterator iter_f;
-	for(iter_f = m_server_vars.begin(); iter_f != m_server_vars.end(); iter_f++)
+	map<string, server_var *>::iterator iter_srv;
+	for(iter_srv = m_server_vars.begin(); iter_srv != m_server_vars.end(); iter_srv++)
 	{
-	    if(iter_f->second)
-    		delete iter_f->second;
+	    if(iter_srv->second)
+    		delete iter_srv->second;
 	}
 	m_server_vars.clear();
 	pthread_rwlock_unlock(&m_server_var_rwlock);
@@ -846,11 +865,11 @@ void memory_cache::unlock_file(file_cache* fc)
 void memory_cache::clear_files()
 {
     pthread_rwlock_wrlock(&m_file_rwlock);
-	map<string, file_cache *>::iterator iter_f;
-	for(iter_f = m_file_cache.begin(); iter_f != m_file_cache.end(); iter_f++)
+	map<string, file_cache *>::iterator iter_file;
+	for(iter_file = m_file_cache.begin(); iter_file != m_file_cache.end(); iter_file++)
 	{
-	    if(iter_f->second)
-    		delete iter_f->second;
+	    if(iter_file->second)
+    		delete iter_file->second;
 	}
 	m_file_cache.clear();
 	pthread_rwlock_unlock(&m_file_rwlock);
@@ -859,8 +878,15 @@ void memory_cache::clear_files()
 ///////////////////////////////////////////////////////////////////////////////
 void memory_cache::_reload_cookies_()
 {
-    m_cookies.clear();
-    
+#if 0    
+   map<string, Cookie*>::iterator iter_c;
+	for(iter_c = m_cookies.begin(); iter_c != m_cookies.end(); iter_c++)
+	{
+	    if(iter_c->second)
+    		delete iter_c->second;
+	}
+	m_cookies.clear();
+#endif    
     char szCookieFolder[256];
 	sprintf(szCookieFolder, "%s/cookie", m_dirpath.c_str());
 	
@@ -906,11 +932,6 @@ void memory_cache::_reload_cookies_()
                         if(iter != m_cookies.end() 
                             && iter->second->getCreateTime() < cookie_instance->getCreateTime())
                         {
-                            /* Remove the older one */
-                            /*
-                            m_cookies.erase(iter); 
-					        m_cookies.insert(map<string, Cookie*>::value_type(cookie_instance.getName(), cookie_instance));
-					        */
 					        if(iter->second)
 					            delete iter->second;
 					        iter->second = cookie_instance;
