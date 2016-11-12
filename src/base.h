@@ -9,8 +9,6 @@
 #define CONFIG_FILE_PATH	"/etc/niuhttpd/niuhttpd.conf"
 #define PERMIT_FILE_PATH	"/etc/niuhttpd/permit.list"
 #define REJECT_FILE_PATH	"/etc/niuhttpd/reject.list"
-#define DOMAIN_FILE_PATH	"/etc/niuhttpd/domain.list"
-#define WEBADMIN_FILE_PATH	"/etc/niuhttpd/webadmin.list"
 
 #include <openssl/rsa.h>     
 #include <openssl/crypto.h>
@@ -547,7 +545,6 @@ public:
 	static string	m_config_file;
 	static string	m_permit_list_file;
 	static string	m_reject_list_file;
-	static string	m_domain_list_file;
 	
 
 	static vector<stReject> m_reject_list;

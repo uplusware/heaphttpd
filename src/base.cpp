@@ -65,6 +65,7 @@ string	CHttpBase::m_reject_list_file = REJECT_FILE_PATH;
 
 vector<stReject> CHttpBase::m_reject_list;
 vector<string> CHttpBase::m_permit_list;
+
 #ifdef _WITH_MEMCACHED_
     map<string, int> CHttpBase::m_memcached_list;
 #endif /* _WITH_MEMCACHED_ */
