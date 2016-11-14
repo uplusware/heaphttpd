@@ -188,7 +188,7 @@ public:
 	void AppendReject(const char* data);
 
 protected:
-    int Accept(int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_addr, socklen_t clt_size);
+    int Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_addr, socklen_t clt_size);
 
 	mqd_t m_service_qid;
 	sem_t* m_service_sid;

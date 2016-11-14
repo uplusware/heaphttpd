@@ -15,11 +15,11 @@ HTTPLIB = libniuhttp.so
 HTTPLIBOBJS =   httpsessionvar.o httpservervar.o cookie.o   \
                 http.o httpcomm.o cache.o htdoc.o http2.o http2comm.o hpack.o http2stream.o   \
                 fstring.o webdoc.o webcgi.o niuapi.o wwwauth.o fastcgi.o	\
+                util/trace.o	            \
                 util/digcalc.o	            \
                 util/sha1.o                 \
                 util/md5.o	                \
                 util/DES.o	                \
-                util/trace.o	            \
                 util/sysdep.o               \
                 util/uuid.o                 \
                 util/huffman.o              \

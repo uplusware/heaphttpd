@@ -55,9 +55,6 @@ char PIDFILE[256] = "/tmp/niuhttpd/niuhttpd.pid";
 
 static int Run()
 {
-	CUplusTrace uTrace(LOGNAME, LCKNAME);
-	uTrace.Write(Trace_Msg, "%s", "Service starts");
-
 	int retVal = 0;
 	int http_pid = -1, https_pid = -1;
 
@@ -97,7 +94,6 @@ static int Run()
 					printf("Start HTTP Service OK \t\t\t[%u]\n", http_pid);
 				else
 				{
-					uTrace.Write(Trace_Error, "%s", "Start HTTP Service Failed.");
 					printf("Start HTTP Service Failed. \t\t\t[Error]\n");
 				}
 				close(pfd[0]);

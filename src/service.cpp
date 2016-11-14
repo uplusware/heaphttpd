@@ -701,7 +701,7 @@ void Service::ReloadExtension()
 		sem_close(m_service_sid);
 }
 
-int Service::Accept(int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_addr, socklen_t clt_size)
+int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_addr, socklen_t clt_size)
 {
     struct sockaddr_in * v4_addr;
     struct sockaddr_in6 * v6_addr;
@@ -774,6 +774,7 @@ int Service::Accept(int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_ad
     
     if(access_result == FALSE)
     {
+        uTrace.Write(Trace_Msg, "Reject %s", client_ip.c_str());
         close(clt_sockfd);
         return 0;
     }
@@ -796,6 +797,7 @@ int Service::Accept(int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_ad
                     exit(-1);
                 }
                 close(wpinfo.sockfds[0]);
+                uTrace.Write(Trace_Msg, "Re-create worker process %u", m_next_process);
                 Worker * pWorker = new Worker(m_service_name.c_str(), m_next_process,
                     CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
                 pWorker->Working();
@@ -841,8 +843,8 @@ int Service::Accept(int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_ad
 
 int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned short https_port)
 {	
-	CUplusTrace uTrace(LOGNAME, LCKNAME);
-
+    CUplusTrace uTrace(LOGNAME, LCKNAME);
+    
 	m_child_list.clear();
 	unsigned int result = 0;
 	string strqueue = "/.niuhttpd_";
@@ -904,6 +906,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 				exit(-1);
 			}
 			close(wpinfo.sockfds[0]);
+            uTrace.Write(Trace_Msg, "Create worker process %u", i);
 			Worker* pWorker = new Worker(m_service_name.c_str(), i, CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
 			if(pWorker)
 			{
@@ -921,7 +924,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 		}
 		else
 		{
-			fprintf(stderr, "fork error, work_pid = %d, %S %d\n", work_pid, __FILE__, __LINE__);
+			uTrace.Write(Trace_Error, "fork error, work_pid = %d, %S %d\n", work_pid, __FILE__, __LINE__);
 		}
 	}
 
@@ -980,12 +983,13 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             
             if(listen(m_sockfd, 128) == -1)
             {
-                uTrace.Write(Trace_Error, "Service LISTEN error.");
+                uTrace.Write(Trace_Error, "Service LISTEN error, %s:%u", hostip ? hostip : "", http_port);
                 result = 1;
                 write(fd, &result, sizeof(unsigned int));
                 close(fd);
                 break;
             }
+            uTrace.Write(Trace_Msg, "HTTP service works on %s:%u", hostip ? hostip : "", http_port);
         }
         //SSL
         if(https_port > 0)
@@ -1040,17 +1044,17 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             
             if(listen(m_sockfd_ssl, 128) == -1)
             {
-                uTrace.Write(Trace_Error, "Security Service LISTEN error.");
+                uTrace.Write(Trace_Msg, "Service LISTEN error, %s:%u", hostip ? hostip : "", https_port);
                 result = 1;
                 write(fd, &result, sizeof(unsigned int));
                 close(fd);
                 break;
             }
+            uTrace.Write(Trace_Msg, "HTTPS service works on %s:%u", hostip ? hostip : "", https_port);
         }
         
         if(m_sockfd == -1 && m_sockfd_ssl == -1)
         {
-            uTrace.Write(Trace_Error, "Both Service LISTEN error.");
             result = 1;
             write(fd, &result, sizeof(unsigned int));
             close(fd);
@@ -1173,7 +1177,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
                     {
                         continue;
                     }
-                    if(Accept(clt_sockfd, https, clt_addr, clt_size) < 0)
+                    if(Accept(uTrace, clt_sockfd, https, clt_addr, clt_size) < 0)
                         break;
                 }
                 
@@ -1186,7 +1190,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
                     {
                         continue;
                     }
-                    if(Accept(clt_sockfd_ssl, https, clt_addr_ssl, clt_size_ssl) < 0)
+                    if(Accept(uTrace, clt_sockfd_ssl, https, clt_addr_ssl, clt_size_ssl) < 0)
                         break;
                 }
 			}
