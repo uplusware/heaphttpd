@@ -204,6 +204,9 @@ static int alpn_cb(SSL *ssl,
 
 static void SESSION_HANDLING(SESSION_PARAM* session_param)
 {
+    static char SSLERR_LOGNAME[256] = "/var/log/niuhttpd/sslerr.log";
+    static char SSLERR_LCKNAME[256] = "/.NIUHTTPD_SSLERR.LOG";
+    
 	BOOL isHttp2 = FALSE;
 	Session* pSession = NULL;
     SSL* ssl = NULL;
@@ -228,7 +231,8 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		ssl_ctx = SSL_CTX_new(meth);
 		if(!ssl_ctx)
 		{
-			fprintf(stderr, "SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+            uTrace.Write(Trace_Error, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
 		
@@ -240,20 +244,23 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		SSL_CTX_load_verify_locations(ssl_ctx, session_param->ca_crt_root.c_str(), NULL);
 		if(SSL_CTX_use_certificate_file(ssl_ctx, session_param->ca_crt_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
-			fprintf(stderr, "SSL_CTX_use_certificate_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+            uTrace.Write(Trace_Error, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
 		//printf("[%s]\n", session_param->ca_password.c_str());
 		SSL_CTX_set_default_passwd_cb_userdata(ssl_ctx, (char*)session_param->ca_password.c_str());
 		if(SSL_CTX_use_PrivateKey_file(ssl_ctx, session_param->ca_key_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
-			fprintf(stderr, "SSL_CTX_use_PrivateKey_file: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+            uTrace.Write(Trace_Error, "SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 
 		}
 		if(!SSL_CTX_check_private_key(ssl_ctx))
 		{
-			fprintf(stderr, "SSL_CTX_check_private_key: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+            uTrace.Write(Trace_Error, "SSL_CTX_check_private_key: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
 		if(session_param->http2)
@@ -262,7 +269,8 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
         if(ssl_rc == 0)
         {
-            fprintf(stderr, "SSL_CTX_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+            uTrace.Write(Trace_Error, "SSL_CTX_set_cipher_list: %s", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl3;
         }
 		SSL_CTX_set_mode(ssl_ctx, SSL_MODE_AUTO_RETRY);
@@ -273,13 +281,15 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		ssl = SSL_new(ssl_ctx);
 		if(!ssl)
 		{
-			fprintf(stderr, "SSL_new: %s\n", ERR_error_string(ERR_get_error(),NULL));
+			CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+            uTrace.Write(Trace_Error, "SSL_new: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl2;
 		}
 		ssl_rc = SSL_set_fd(ssl, session_param->sockfd);
         if(ssl_rc == 0)
         {
-            fprintf(stderr, "SSL_set_fd: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+            uTrace.Write(Trace_Error, "SSL_set_fd: %s", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl2;
         }
         if(session_param->http2)
@@ -288,7 +298,8 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             ssl_rc = SSL_set_cipher_list(ssl, "ALL");
         if(ssl_rc == 0)
         {
-            fprintf(stderr, "SSL_set_cipher_list: %s\n", ERR_error_string(ERR_get_error(),NULL));
+            CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+            uTrace.Write(Trace_Error, "SSL_set_cipher_list: %s", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl2;
         }
 re_ssl_accept:        
@@ -304,33 +315,37 @@ re_ssl_accept:
             {
                 if(ERR_get_error() == 0)
                 {
-                    fprintf(stderr, "SSL_accept(%d): shutdown by peer\n", ssl_rc);
+                    CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+                    uTrace.Write(Trace_Error, "SSL_accept(%d): shutdown by peer", ssl_rc);
                 }
                 else
                 {
-                    fprintf(stderr, "SSL_accept(%d): SSL_ERROR_SYSCALL %s\n", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
+                    CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+                    uTrace.Write(Trace_Error, "SSL_accept(%d): SSL_ERROR_SYSCALL %s", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
                 }
             }
             else
             {
-                fprintf(stderr, "SSL_accept(%d): %s, SSL_get_error: %d\n", ssl_rc, ERR_error_string(ERR_get_error(),NULL), ret);
+                CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+                uTrace.Write(Trace_Error, "SSL_accept(%d): %s, SSL_get_error: %d", ssl_rc, ERR_error_string(ERR_get_error(),NULL), ret);
             }
 			goto clean_ssl2;
 		}
         else if(ssl_rc = 0)
 		{
-		    fprintf(stderr, "SSL_accept(%d): %s\n", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
+		    CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+            uTrace.Write(Trace_Error, "SSL_accept(%d): %s", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl1;
 		}
         
-        /* printf("HTTP Version: %s\n", isHttp2 ? "HTTP/2" : "HTTP/1.1"); */
         bSSLAccepted = TRUE;
         if(session_param->client_cer_check)
         {
             ssl_rc = SSL_get_verify_result(ssl);
             if(ssl_rc != X509_V_OK)
             {
-                fprintf(stderr, "SSL_get_verify_result: %s\n", ERR_error_string(ERR_get_error(),NULL));
+                CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+                uTrace.Write(Trace_Error, "SSL_get_verify_result: %s", ERR_error_string(ERR_get_error(),NULL));
                 goto clean_ssl1;
             }
         }
@@ -339,7 +354,8 @@ re_ssl_accept:
 			client_cert = SSL_get_peer_certificate(ssl);
 			if (client_cert == NULL)
 			{
-				printf("SSL_get_peer_certificate: %s\n", ERR_error_string(ERR_get_error(),NULL));
+				CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
+                uTrace.Write(Trace_Error, "SSL_get_peer_certificate: %s", ERR_error_string(ERR_get_error(),NULL));
 				goto clean_ssl1;
 			}
 		}
@@ -351,6 +367,7 @@ re_ssl_accept:
 	{
 		pSession->Process();
 		delete pSession;
+        pSession = NULL;
 	}
 
 clean_ssl1:
