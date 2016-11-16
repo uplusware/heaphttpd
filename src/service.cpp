@@ -501,7 +501,7 @@ Worker::~Worker()
 	m_srvobjmap.ReleaseAll();
 }
 
-void Worker::Working()
+void Worker::Working(CUplusTrace& uTrace)
 {
 	ThreadPool WorkerPool(m_thread_num, 
 	    INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, LEAVE_THREAD_POOL_HANDLER);
@@ -514,12 +514,11 @@ void Worker::Working()
 		CLIENT_PARAM client_param;
 		if(RECV_FD(m_sockfd, &clt_sockfd, &client_param)  < 0)
 		{
-			printf("RECV_FD < 0\n");
 			continue;
 		}
 		if(clt_sockfd < 0)
 		{
-			fprintf(stderr, "RECV_FD error, clt_sockfd = %d %s %d\n", clt_sockfd, __FILE__, __LINE__);
+			uTrace.Write(Trace_Error, "RECV_FD error, clt_sockfd = %d %s %d", clt_sockfd, __FILE__, __LINE__);
 			bQuit = true;
 		}
 
@@ -804,7 +803,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
         {
             WORK_PROCESS_INFO  wpinfo;
             if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
-                fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
+                uTrace.Write(Trace_Error, "socketpair error, %s %d\n", __FILE__, __LINE__);
             
             int work_pid = fork();
             if(work_pid == 0)
@@ -817,7 +816,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
                 uTrace.Write(Trace_Msg, "Re-create worker process %u", m_next_process);
                 Worker * pWorker = new Worker(m_service_name.c_str(), m_next_process,
                     CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
-                pWorker->Working();
+                pWorker->Working(uTrace);
                 delete pWorker;
                 close(wpinfo.sockfds[1]);
                 exit(0);
@@ -913,7 +912,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 		unlink(pid_file);
 		WORK_PROCESS_INFO  wpinfo;
 		if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
-			fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
+			uTrace.Write(Trace_Error, "socketpair error, %s %d\n", __FILE__, __LINE__);
 		int work_pid = fork();
 		if(work_pid == 0)
 		{
@@ -927,7 +926,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 			Worker* pWorker = new Worker(m_service_name.c_str(), i, CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
 			if(pWorker)
 			{
-				pWorker->Working();
+				pWorker->Working(uTrace);
 				delete pWorker;
 			}
 			close(wpinfo.sockfds[1]);
@@ -941,7 +940,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 		}
 		else
 		{
-			uTrace.Write(Trace_Error, "fork error, work_pid = %d, %S %d\n", work_pid, __FILE__, __LINE__);
+			uTrace.Write(Trace_Error, "fork error, work_pid = %d, %s %d\n", work_pid, __FILE__, __LINE__);
 		}
 	}
 
@@ -968,7 +967,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort, &hints, &server_addr);
             if (s != 0)
             {
-               fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+               uTrace.Write(Trace_Error, "getaddrinfo: %s %s %d", gai_strerror(s), __FILE__, __LINE__);
                break;
             }
             
@@ -989,7 +988,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             
             if (rp == NULL)
             {               /* No address succeeded */
-                  fprintf(stderr, "Could not bind\n");
+                  uTrace.Write(Trace_Error, "Could not bind %s %d", __FILE__, __LINE__);
                   break;
             }
 
@@ -1029,7 +1028,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort2, &hints2, &server_addr2);
             if (s != 0)
             {
-               fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+               uTrace.Write(Trace_Error, "getaddrinfo: %s %s %d", gai_strerror(s), __FILE__, __LINE__);
                break;
             }
             
@@ -1050,7 +1049,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             
             if (rp2 == NULL)
             {     /* No address succeeded */
-                  fprintf(stderr, "Could not bind\n");
+                  uTrace.Write(Trace_Error, "Could not bind %s %d", __FILE__, __LINE__);
                   break;
             }
 
@@ -1149,7 +1148,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 			{
 				if(errno != ETIMEDOUT && errno != EINTR && errno != EMSGSIZE)
 				{
-					fprintf(stderr, "mq_timedreceive error, errno = %d, %S %d\n", errno, __FILE__, __LINE__);
+					uTrace.Write(Trace_Error, "mq_timedreceive error, errno = %d, %s, %s %d\n", errno, strerror(errno), __FILE__, __LINE__);
 					svr_exit = TRUE;
 					break;
 				}

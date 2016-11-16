@@ -46,29 +46,32 @@ test -x /var/niuhttpd/ext || mkdir /var/niuhttpd/ext
 
 cp -rf ${path}/html/*  /var/niuhttpd/html/ 
 
+test -x /etc/niuhttpd/niuhttpd.conf && mv /etc/niuhttpd/niuhttpd.conf /etc/niuhttpd/niuhttpd.conf.$((`date "+%Y%m%d%H%M%S"`))
 cp -f ${path}/niuhttpd.conf /etc/niuhttpd/niuhttpd.conf
 chmod 600 /etc/niuhttpd/niuhttpd.conf
 
-cp -f ${path}/ca.crt /var/niuhttpd/cert/ca.crt
+test -x /var/niuhttpd/cert/ca.crt || cp -f ${path}/ca.crt /var/niuhttpd/cert/ca.crt
 chmod 600 /var/niuhttpd/cert/ca.crt
 
-cp -f ${path}/server.key /var/niuhttpd/cert/server.key
+test -x /var/niuhttpd/cert/server.key || cp -f ${path}/server.key /var/niuhttpd/cert/server.key
 chmod 600 /var/niuhttpd/cert/server.key
 
-cp -f ${path}/server.crt /var/niuhttpd/cert/server.crt
+test -x /var/niuhttpd/cert/server.crt || cp -f ${path}/server.crt /var/niuhttpd/cert/server.crt
 chmod 600 /var/niuhttpd/cert/server.crt
 
-cp -f ${path}/client.key /var/niuhttpd/cert/client.key
+test -x /var/niuhttpd/cert/client.key || cp -f ${path}/client.key /var/niuhttpd/cert/client.key
 chmod 600 /var/niuhttpd/cert/client.key
- 
-cp -f ${path}/client.crt /var/niuhttpd/cert/client.crt
+
+test -x /var/niuhttpd/cert/client.crt || cp -f ${path}/client.crt /var/niuhttpd/cert/client.crt
 chmod 600 /var/niuhttpd/cert/client.crt
 
-cp -f ${path}/permit.list /etc/niuhttpd/permit.list
+test -x /etc/niuhttpd/permit.list || cp -f ${path}/permit.list /etc/niuhttpd/permit.list
 chmod a-x /etc/niuhttpd/permit.list
-cp -f ${path}/reject.list /etc/niuhttpd/reject.list
+
+test -x /etc/niuhttpd/reject.list || cp -f ${path}/reject.list /etc/niuhttpd/reject.list
 chmod a-x /etc/niuhttpd/reject.list
-cp -f ${path}/extension.xml /etc/niuhttpd/extension.xml
+
+test -x /etc/niuhttpd/extension.xml || cp -f ${path}/extension.xml /etc/niuhttpd/extension.xml
 chmod a-x /etc/niuhttpd/extension.xml
 
 

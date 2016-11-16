@@ -17,6 +17,7 @@
 #include <sys/select.h>
 
 #include "util/general.h"
+#include "util/trace.h"
 #include "base.h"
 #include "session.h"
 #include <mqueue.h>
@@ -159,7 +160,7 @@ public:
 	Worker(const char* service_name, int process_seq, int thread_num, int sockfd);
 	virtual ~Worker();
 
-	void Working();
+	void Working(CUplusTrace& uTrace);
 private:
 	memory_cache* m_cache;
 	ServiceObjMap m_srvobjmap;
