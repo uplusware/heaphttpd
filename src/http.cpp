@@ -42,7 +42,8 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 {	
     m_srvobj = srvobj;
     m_web_socket_handshake = Websocket_None;
-    m_keep_alive = TRUE; //HTTP 1.1 Keep-Alive is enabled as default
+    m_keep_alive = TRUE; //HTTP/1.1 Keep-Alive is enabled as default
+    m_enabled_keep_alive = TRUE; //default is true in a session
 	m_passed_wwwauth = FALSE;
 	m_wwwauth_scheme = wwwauth_scheme;
 	m_cache = ch;
@@ -124,7 +125,7 @@ CHttp::~CHttp()
     int flags = fcntl(m_sockfd, F_GETFL, 0); 
 	fcntl(m_sockfd, F_SETFL, flags & ~O_NONBLOCK);
 
-	if(m_keep_alive != TRUE) //close the socket when non-keep-alive or non-websocket
+	if(m_keep_alive != TRUE || m_enabled_keep_alive != TRUE) //close the socket when non-keep-alive or non-websocket
 	{
 		if(m_sockfd > 0)
 		{
@@ -651,7 +652,7 @@ Http_Connection CHttp::LineParse(const char* text)
             
             Response();
             
-            return m_keep_alive ? httpKeepAlive : httpClose;
+            return (m_keep_alive && m_enabled_keep_alive) ? httpKeepAlive : httpClose;
         }
         else
         {
@@ -681,11 +682,11 @@ Http_Connection CHttp::LineParse(const char* text)
                 {
                     m_keep_alive = FALSE;
                 }
-                if(strcasestr(strConnection.c_str(), "Keep-Alive") != NULL)
+                else if(strcasestr(strConnection.c_str(), "Keep-Alive") != NULL)
                 {
                     m_keep_alive = TRUE;
                 }
-                if(strcasestr(strConnection.c_str(), "Upgrade") != NULL)
+                else if(strcasestr(strConnection.c_str(), "Upgrade") != NULL)
                 {
                     m_web_socket_handshake = Websocket_Sync;
                 }

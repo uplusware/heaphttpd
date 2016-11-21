@@ -149,6 +149,9 @@ public:
 	void* GetExtensionDate() { return m_extdata; }
     
     BOOL GetKeepAlive() { return m_keep_alive; }
+    BOOL IsEnabledKeepAlive() { return m_enabled_keep_alive; }
+    
+    void EnableKeepAlive(BOOL keep_alive) { m_enabled_keep_alive = keep_alive; }
     
     unsigned int GetContentLength() { return m_content_length; }
     
@@ -213,6 +216,7 @@ protected:
 	AUTH_SCHEME m_wwwauth_scheme;
     
     BOOL m_keep_alive;
+    BOOL m_enabled_keep_alive;
     WebSocket_HandShake m_web_socket_handshake;
     ServiceObjMap* m_srvobj;
     
