@@ -452,7 +452,6 @@ void CHttp::Response()
     NIU_POST_GET_VARS(m_postdata.c_str(), _POST_VARS_);
     NIU_COOKIE_VARS(m_cookie.c_str(), _COOKIE_VARS_);
     
-    /* printf("COOKIE: %s\n", m_cookie.c_str()); */
     if(_COOKIE_VARS_.size() > 0)
     {
         /* Wouldn't save cookie in server side */
@@ -487,7 +486,7 @@ void CHttp::Response()
         m_cgi.SetData(m_postdata.c_str(), m_postdata.length());
     }
 
-    //Extension hook 1
+    //1st extension hook
     BOOL skipAction = FALSE;
     for(int x = 0; x < m_ext_list->size(); x++)
     {
@@ -511,7 +510,7 @@ void CHttp::Response()
             m_fastcgi_socktype.c_str(), m_fastcgi_sockfile.c_str(), 
             m_fastcgi_addr.c_str(), m_fastcgi_port);
 
-        //Extension hook 2
+        //2nd extension hook
         for(int x = 0; x < m_ext_list->size(); x++)
         {
             void* (*ext_response)(CHttp*, const char*, Htdoc*);
@@ -530,7 +529,7 @@ void CHttp::Response()
             m_http2->SendHttp2PushPromiseResponse();
         }
         
-        //Extension hook 3
+        //3rd extension hook
         for(int x = 0; x < m_ext_list->size(); x++)
         {
             void* (*ext_finish)(CHttp*, const char*, Htdoc*);
@@ -644,7 +643,6 @@ Http_Connection CHttp::LineParse(const char* text)
         }
         else if(strcasecmp(strtext.c_str(), "") == 0) /* if true, then http request header finished. */
         {
-            //printf("METHOD, %d\n", m_http_method);
             if(m_http_method == hmPost)
             {
                 RecvPostData();
