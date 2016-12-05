@@ -21,7 +21,7 @@ enum stream_state_e
 class http2_stream
 {
 public:
-    http2_stream(uint_32 stream_ind, CHttp2* phttp2, ServiceObjMap* srvobj, int sockfd,
+    http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, ServiceObjMap* srvobj, int sockfd,
         const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
@@ -32,6 +32,7 @@ public:
         const char* fastcgi_addr, unsigned short fastcgi_port,
         const char* private_path, AUTH_SCHEME wwwauth_scheme = asNone,
 		SSL* ssl = NULL);
+        
     virtual ~http2_stream();
     
     int hpack_parse(HTTP2_Header_Field* field, int len);
@@ -58,6 +59,15 @@ public:
     void RefreshLastUsedTime();
     time_t GetLastUsedTime();
     
+    void IncreasePeerWindowSize(uint_32 window_size);
+    void DecreasePeerWindowSize(uint_32 window_size);
+
+    void IncreaseLocalWindowSize(uint_32 window_size);
+    void DecreaseLocalWindowSize(uint_32 window_size);
+    
+    int GetPeerWindowSize();
+    int GetLocalWindowSize();
+
     string m_path;
     string m_method;
     string m_authority;
@@ -101,6 +111,12 @@ private:
     uint_32 m_priority_weight;
     
     stream_state_e m_stream_state;
+    
+    int m_initial_peer_window_size;
+    int m_initial_local_window_size;
+    
+    int m_peer_window_size;
+    int m_local_window_size;
     
     time_t m_last_used_time;
 };

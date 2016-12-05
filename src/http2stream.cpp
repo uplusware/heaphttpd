@@ -1,8 +1,9 @@
 #include "http2stream.h"
+#include "debug.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //http2_stream
-http2_stream::http2_stream(uint_32 stream_ind, CHttp2* phttp2, ServiceObjMap* srvobj, int sockfd,
+http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, ServiceObjMap* srvobj, int sockfd,
         const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
@@ -78,6 +79,12 @@ http2_stream::http2_stream(uint_32 stream_ind, CHttp2* phttp2, ServiceObjMap* sr
     m_dependency_stream = 0;
     m_priority_weight = 16;
     m_stream_state = stream_idle;
+    
+    m_peer_window_size = peer_window_size;
+    m_local_window_size = local_window_size;
+    
+    m_initial_peer_window_size = peer_window_size;
+    m_initial_local_window_size = local_window_size;
     
     m_last_used_time = time(NULL);
 }
@@ -195,7 +202,23 @@ stream_state_e http2_stream::GetStreamState()
 
 void http2_stream::SetDependencyStream(uint_32 dependency_stream)
 {
-    m_dependency_stream = dependency_stream;
+    if(dependency_stream == 0)
+        m_dependency_stream = dependency_stream;
+    else
+    {
+        http2_stream* p_dependency_stream = m_http2->get_stream(dependency_stream);       
+        if(p_dependency_stream)
+        {
+            m_dependency_stream = dependency_stream;
+        }
+        else
+        {
+            m_dependency_stream = 0;
+        }
+    }
+#ifdef _http2_debug_
+        printf("    Set Stream %d Dependency stream %d \n", m_dependency_stream, m_stream_ind);
+#endif /* _http2_debug_ */    
 }
 
 uint_32 http2_stream::GetDependencyStream()
@@ -209,6 +232,100 @@ void http2_stream::RefreshLastUsedTime()
 #ifdef _http2_debug_
     printf("  Refresh stream(%u) as %u\n", m_stream_ind, m_last_used_time);
 #endif /* _http2_debug_ */     
+}
+
+void http2_stream::IncreasePeerWindowSize(uint_32 window_size)
+{
+    if(m_dependency_stream == 0)
+    {
+        m_peer_window_size += window_size;
+#ifdef _http2_debug_
+        printf("    Current Stream[%u] Peer Windows Size %d\n", m_stream_ind, m_peer_window_size);
+#endif /* _http2_debug_ */ 
+    }
+    else
+    {
+        http2_stream* p_dependency_stream = m_http2->get_stream(m_dependency_stream);
+        
+#ifdef _http2_debug_
+        printf("    Find Dependency Stream %d = %p\n", m_dependency_stream, p_dependency_stream);
+#endif /* _http2_debug_ */
+
+        if(p_dependency_stream)
+            p_dependency_stream->IncreasePeerWindowSize(window_size);
+    }
+}
+
+void http2_stream::DecreasePeerWindowSize(uint_32 window_size)
+{
+    if(m_dependency_stream == 0)
+    {
+        m_peer_window_size -= window_size;
+    #ifdef _http2_debug_
+        printf("    Current Stream[%u] Peer Windows Size %d\n", m_stream_ind, m_peer_window_size);
+    #endif /* _http2_debug_ */ 
+    }
+    else
+    {
+        http2_stream* p_dependency_stream = m_http2->get_stream(m_dependency_stream);
+#ifdef _http2_debug_
+        printf("    Find Dependency Stream %d = %p\n", m_dependency_stream, p_dependency_stream);
+#endif /* _http2_debug_ */        
+        if(p_dependency_stream)
+            p_dependency_stream->DecreasePeerWindowSize(window_size);
+    }
+}
+
+void http2_stream::IncreaseLocalWindowSize(uint_32 window_size)
+{
+    if(m_dependency_stream == 0)
+    {
+        m_local_window_size += window_size;
+    #ifdef _http2_debug_
+        printf("    Current Stream[%u] Local Windows Size %d\n", m_stream_ind, m_local_window_size);
+    #endif /* _http2_debug_ */ 
+    }
+    else
+    {
+        http2_stream* p_dependency_stream = m_http2->get_stream(m_dependency_stream);
+#ifdef _http2_debug_
+        printf("    Find Dependency Stream %d = %p\n", m_dependency_stream, p_dependency_stream);
+#endif /* _http2_debug_ */        
+        if(p_dependency_stream)
+            p_dependency_stream->IncreaseLocalWindowSize(window_size);
+    }
+}
+
+void http2_stream::DecreaseLocalWindowSize(uint_32 window_size)
+{
+    if(m_dependency_stream == 0)
+    {
+        m_local_window_size -= window_size;
+    #ifdef _http2_debug_
+        printf("    Current Stream[%u] Local Windows Size %d\n", m_stream_ind, m_local_window_size);
+    #endif /* _http2_debug_ */ 
+        if(m_local_window_size <= 0)
+            m_http2->send_window_update(m_stream_ind, m_initial_local_window_size);
+    }
+    else
+    {
+        http2_stream* p_dependency_stream = m_http2->get_stream(m_dependency_stream);
+#ifdef _http2_debug_
+        printf("    Find Dependency Stream %d = %p\n", m_dependency_stream, p_dependency_stream);
+#endif /* _http2_debug_ */        
+        if(p_dependency_stream)
+            p_dependency_stream->DecreaseLocalWindowSize(window_size);
+    }
+}
+
+int http2_stream::GetPeerWindowSize()
+{
+    return m_peer_window_size;
+}
+
+int http2_stream::GetLocalWindowSize()
+{
+    return m_local_window_size;
 }
 
 time_t http2_stream::GetLastUsedTime()

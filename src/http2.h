@@ -130,13 +130,18 @@ public:
     int SendHttp2EmptyContent(uint_32 stream_ind, uint_8 flags = HTTP2_FRAME_FLAG_END_STREAM);
     void SendHttp2PushPromiseRequest(uint_32 stream_ind);
     void SendHttp2PushPromiseResponse();
-private:
+    
     void send_setting_ack(uint_32 stream_ind);
-    void send_window_update(uint_32 stream_ind, uint_32 window_size);
+    void send_window_update(uint_32 stream_ind, uint_32 increament_window_size);
     void send_goaway(uint_32 last_stream_ind, uint_32 error_code);
     void send_push_promise_request(uint_32 stream_ind);
     void send_rst_stream(uint_32 stream_ind);
+    void send_initial_window_size(uint_32 window_size);
+    
     http2_stream* create_stream(uint_32 stream_ind);
+    
+    http2_stream* get_stream(uint_32 stream_ind);
+    
 private:
     ServiceObjMap * m_srvobj;
     int m_sockfd;
@@ -177,7 +182,13 @@ private:
     uint_32 m_header_table_size;
     BOOL m_enable_push;
     uint_32 m_max_concurrent_streams;
-    uint_32 m_initial_window_size;
+    
+    uint_32 m_initial_local_window_size;
+    uint_32 m_initial_peer_window_size;
+    
+    uint_32 m_local_window_size;    
+    uint_32 m_peer_window_size;
+    
     uint_32 m_max_frame_size;
     uint_32 m_max_header_list_size;
     
