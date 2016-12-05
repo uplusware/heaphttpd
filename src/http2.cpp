@@ -435,10 +435,10 @@ int CHttp2::ProtRecv()
 	if(ret == sizeof(HTTP2_Frame))
 	{
 		uint_32 payload_len = frame_hdr->length.len24;
-        payload_len = ntohl(payload_len << 8);
+        payload_len = ntohl(payload_len << 8) & 0x00FFFFFFU;
         uint_32 stream_ind = frame_hdr->identifier;
         
-        stream_ind = ntohl(stream_ind << 1);
+        stream_ind = ntohl(stream_ind << 1) & 0x7FFFFFFFU;
         
 #ifdef _http2_debug_        
 		printf(">>>> FRAME(%03d): length(%05d) type(%s)\n", stream_ind, payload_len, frame_names[frame_hdr->type]);
@@ -525,11 +525,11 @@ int CHttp2::ProtRecv()
         {           
             HTTP2_Frame_Goaway* frm_goaway = (HTTP2_Frame_Goaway*)payload;
             uint_32 last_stream_id = frm_goaway->last_stream_id;
-            last_stream_id = ntohl(last_stream_id << 31);
+            last_stream_id = ntohl(last_stream_id << 1) & 0x7FFFFFFFU;
             uint_32 error_code = frm_goaway->error_code;
             error_code = ntohl(error_code);
 #ifdef _http2_debug_
-            printf("  Recieved HTTP2_FRAME_TYPE_GOAWAY(%s) on Last Stream(%d)\n", error_table[error_code], last_stream_id);
+            printf("  Recieved HTTP2_FRAME_TYPE_GOAWAY(%s) on Last Stream(%u)\n", error_table[error_code], last_stream_id);
             
             for(int c = 0; c < payload_len - sizeof(HTTP2_Frame_Goaway); c++)
             {
@@ -552,16 +552,16 @@ int CHttp2::ProtRecv()
             }
             
             HTTP2_Frame_Priority * prority = (HTTP2_Frame_Priority *)payload;
-            uint_32 dep_ind = ntohl(prority->dependency << 1);
+            uint_32 dep_ind = ntohl(prority->dependency << 1) & 0x7FFFFFFFU;
             m_stream_list[stream_ind]->SetDependencyStream(dep_ind);
             m_stream_list[stream_ind]->SetPriorityWeight(prority->weight);
-            if(prority->e == HTTP2_STREAM_DEPENDENCY_E_SET)
+            if(prority->e == HTTP2_STREAM_DEPENDENCY_E_SET && dep_ind != 0)
             {
                 for(map<uint_32, http2_stream*>::iterator it = m_stream_list.begin(); it != m_stream_list.end(); ++it)
                 {
                     if(it->second->GetDependencyStream() == dep_ind)
                     {
-                        it->second->SetDependencyStream(dep_ind);
+                        it->second->SetDependencyStream(stream_ind);
                     }
                 }
             }
@@ -594,26 +594,24 @@ int CHttp2::ProtRecv()
             if((frame_hdr->flags & HTTP2_FRAME_FLAG_PRIORITY) == HTTP2_FRAME_FLAG_PRIORITY)
             {              
                 HTTP2_Frame_Header_Weight * header_weight = (HTTP2_Frame_Header_Weight*)(payload + offset);
-                uint_32 * a = (uint_32 *)header_weight;
-                dep_ind = header_weight->dependency;
-                dep_ind = ntohl(dep_ind << 1);
+                dep_ind = ntohl(header_weight->dependency << 1) & 0x7FFFFFFFU;
                 weight = header_weight->weight;
                 offset += sizeof(HTTP2_Frame_Header_Weight);
                 
                 m_stream_list[stream_ind]->SetDependencyStream(dep_ind);
                 m_stream_list[stream_ind]->SetPriorityWeight(weight);
-                if(header_weight->e == HTTP2_STREAM_DEPENDENCY_E_SET)
+                if(header_weight->e == HTTP2_STREAM_DEPENDENCY_E_SET && dep_ind != 0)
                 {
                     for(map<uint_32, http2_stream*>::iterator it = m_stream_list.begin(); it != m_stream_list.end(); ++it)
                     {
                         if(it->second->GetDependencyStream() == dep_ind)
                         {
-                            it->second->SetDependencyStream(dep_ind);
+                            it->second->SetDependencyStream(stream_ind);
                         }
                     }
                 }
 #ifdef _http2_debug_                
-                printf("  There's >> PRIORITY <<, Weight: %d, e: %d, depends on stream %d\n", weight, header_weight->e, dep_ind);
+                printf("  There's >> PRIORITY <<, Weight: %d, e: %d, depends on stream %u\n", weight, header_weight->e, dep_ind);
 #endif /* _http2_debug_ */                
             }
             
@@ -751,7 +749,7 @@ int CHttp2::ProtRecv()
 #ifdef _http2_debug_
                 printf("  Send Ack for %s = %d\n", setting_table[identifier], value);
 #endif /* _http2_debug_ */
-                send_setting_ack(ntohl(frame_hdr->identifier << 1));
+                send_setting_ack(ntohl(frame_hdr->identifier << 1) & 0x7FFFFFFFU);
             }
             else
             {
@@ -818,7 +816,7 @@ int CHttp2::ProtRecv()
         else if(frame_hdr->type == HTTP2_FRAME_TYPE_WINDOW_UPDATE)
         {
             HTTP2_Frame_Window_Update* win_update = (HTTP2_Frame_Window_Update*)payload;
-            uint_32 win_size = ntohl(win_update->win_size << 1);
+            uint_32 win_size = ntohl(win_update->win_size << 1) & 0x7FFFFFFFU;
             if(win_size == 0)
             {
                 send_goaway(stream_ind, HTTP2_PROTOCOL_ERROR);
@@ -855,7 +853,7 @@ int CHttp2::ProtRecv()
                 {
                     m_stream_list[stream_ind]->SetStreamState(stream_closed);
 #ifdef _http2_debug_                        
-                    printf("  Reset HTTP2 Stream(%d) for %s\n", stream_ind, error_table[ntohl(rst_stream->error_code)]);
+                    printf("  Reset HTTP2 Stream(%u) for %s\n", stream_ind, error_table[ntohl(rst_stream->error_code)]);
 #endif /* _http2_debug_ */                      
                 }
             }
