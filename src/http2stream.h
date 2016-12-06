@@ -112,9 +112,6 @@ private:
     
     stream_state_e m_stream_state;
     
-    int m_initial_peer_window_size;
-    int m_initial_local_window_size;
-    
     int m_peer_window_size;
     int m_local_window_size;
     

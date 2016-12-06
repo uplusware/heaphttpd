@@ -138,9 +138,11 @@ public:
     void send_rst_stream(uint_32 stream_ind);
     void send_initial_window_size(uint_32 window_size);
     
-    http2_stream* create_stream(uint_32 stream_ind);
+    http2_stream* create_stream_instance(uint_32 stream_ind);
     
-    http2_stream* get_stream(uint_32 stream_ind);
+    http2_stream* get_stream_instance(uint_32 stream_ind);
+    
+    uint_32  get_initial_local_window_size();
     
 private:
     ServiceObjMap * m_srvobj;

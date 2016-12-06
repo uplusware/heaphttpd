@@ -373,6 +373,8 @@ int hpack::build(const char* http1_headrs, int len, map<int, pair<string, string
             memcpy(fields_buf + response_len, hdr_string, hdr_string_len);
             response_len += hdr_string_len;
         }
+        if(hdr_string)
+            free(hdr_string);
     }
     
     m_field = (HTTP2_Header_Field*)fields_buf;
@@ -483,6 +485,7 @@ int hpack::parse(HTTP2_Header_Field* field, int len)
                     if(out_size < 0)
                     {
                         free(out_buff);
+                        hf_finish(h_node);
                         return -1;
                     }
                     out_buff[out_size] = '\0';
@@ -521,6 +524,7 @@ int hpack::parse(HTTP2_Header_Field* field, int len)
                     if(out_size < 0)
                     {
                         free(out_buff);
+                        hf_finish(h_node);
                         return -1;
                     }
                     out_buff[out_size] = '\0';
@@ -566,6 +570,7 @@ int hpack::parse(HTTP2_Header_Field* field, int len)
                     if(out_size < 0)
                     {
                         free(out_buff);
+                        hf_finish(h_node);
                         return -1;
                     }
                     out_buff[out_size] = '\0';

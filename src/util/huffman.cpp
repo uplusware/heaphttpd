@@ -48,6 +48,21 @@ static int _hf_add_node(NODE* h_node, unsigned char sym, int code, int code_len)
 	return 0;
 }
 
+static int _hf_del_node(NODE* h_node){
+    if(h_node)
+    {
+        for(int i = 0; i < 256; i++)
+        {
+            if(h_node->children[i])
+            {
+                _hf_del_node(h_node->children[i]);
+            }
+        }
+        free(h_node);
+    }
+	return 0;
+}
+
 int hf_init(NODE** h_node){
 	int i   = 0;
 	*h_node    = node_create();
@@ -58,7 +73,12 @@ int hf_init(NODE** h_node){
 }
 
 void hf_finish(NODE* h_node){
-	free(h_node);
+	int i   = 0;
+	for(i = 0; i < 256; i++){
+		_hf_del_node(h_node->children[i]);
+	}
+    
+    free(h_node);
 }
 
 int hf_byte_encode(unsigned char ch, int remain, unsigned char *buff){

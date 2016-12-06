@@ -149,10 +149,9 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
     memset(m_preface, 0, HTTP2_PREFACE_LEN);
     int ret = HttpRecv(m_preface, HTTP2_PREFACE_LEN);
 	m_preface[HTTP2_PREFACE_LEN] = '\0';
-	
     if(ret != HTTP2_PREFACE_LEN)
     {
-        throw(new string("HTTP2: Wrong client preface."));
+        throw(new string("http2: couldn't get client preface."));
         return;
     }
     
@@ -165,7 +164,7 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
     if(strcmp(client_preface_str, m_preface) != 0)
     {
         send_goaway(0, HTTP2_PROTOCOL_ERROR);
-        throw(new string("HTTP2: Wrong client preface."));
+        throw(new string("http2: wrong client preface content."));
         return;
     }
     char * server_preface = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Setting));
@@ -190,7 +189,8 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
     }
     free(server_preface);
 	
-    send_window_update(0, 1024*1024*16*100);
+    //send_window_update(0, 1024*1024*16*100);
+    send_initial_window_size(m_initial_local_window_size);
 }
 
 CHttp2::~CHttp2()
@@ -276,8 +276,6 @@ void CHttp2::send_window_update(uint_32 stream_ind, uint_32 increament_window_si
     
     HttpSend((const char*)http2_buf, sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Window_Update));
     
-    
-    
 #ifdef _http2_debug_
     printf("  Send WINDOW_UPDATE as %d\n", increament_window_size);
 #endif /* _http2_debug_ */
@@ -355,7 +353,7 @@ void CHttp2::send_goaway(uint_32 last_stream_ind, uint_32 error_code)
     free(http2_buf);
 }
 
-http2_stream* CHttp2::create_stream(uint_32 stream_ind)
+http2_stream* CHttp2::create_stream_instance(uint_32 stream_ind)
 {
     if(stream_ind > 0)
     {
@@ -388,7 +386,7 @@ http2_stream* CHttp2::create_stream(uint_32 stream_ind)
         return NULL;
 }
 
-http2_stream*  CHttp2::get_stream(uint_32 stream_ind)
+http2_stream*  CHttp2::get_stream_instance(uint_32 stream_ind)
 {
     if(stream_ind > 0)
     {
@@ -401,6 +399,11 @@ http2_stream*  CHttp2::get_stream(uint_32 stream_ind)
             return m_stream_list[stream_ind];
     }
     return NULL;
+}
+
+uint_32  CHttp2::get_initial_local_window_size()
+{
+    return m_initial_local_window_size;
 }
 
 int CHttp2::HttpSend(const char* buf, int len)
@@ -474,7 +477,7 @@ int CHttp2::ProtRecv()
                     delete oldest_it->second;
                     m_stream_list.erase(oldest_it);
                 }
-                m_stream_list[stream_ind] = create_stream(stream_ind);
+                m_stream_list[stream_ind] = create_stream_instance(stream_ind);
             }
             m_stream_list[stream_ind]->RefreshLastUsedTime();
         
@@ -575,7 +578,7 @@ int CHttp2::ProtRecv()
             if(stream_ind > 0 && m_stream_list[stream_ind]->GetStreamState() == stream_closed)
             {
                 delete m_stream_list[stream_ind];
-                m_stream_list[stream_ind] = create_stream(stream_ind);
+                m_stream_list[stream_ind] = create_stream_instance(stream_ind);
             }
             uint_32 padding_len = 0;
             uint_32 dep_ind = 0;
@@ -888,12 +891,18 @@ int CHttp2::ProtRecv()
             }
         }
 CONTINUE_SESSION:
+        if(frame_hdr)
+            free(frame_hdr);
+        
         if(payload)
             free(payload);
         
 		return ret;
 	}
 END_SESSION:
+    if(frame_hdr)
+        free(frame_hdr);
+        
     if(payload)
         free(payload);
     return -1;
@@ -964,7 +973,7 @@ void CHttp2::TransHttp2ParseHttp1Header(uint_32 stream_ind, hpack* hdr)
                     str_line += " ";
                     str_line += m_stream_list[stream_ind]->m_path;
                     str_line += " HTTP/1.1\r\n";
-                    //printf(str_line.c_str());
+                    
                     m_stream_list[stream_ind]->http1_parse(str_line.c_str());
                 }
             }
@@ -987,7 +996,7 @@ void CHttp2::TransHttp2ParseHttp1Header(uint_32 stream_ind, hpack* hdr)
                     str_line += " ";
                     str_line += m_stream_list[stream_ind]->m_path;
                     str_line += " HTTP/1.1\r\n";
-                    //printf(str_line.c_str());
+                    
                     m_stream_list[stream_ind]->http1_parse(str_line.c_str());
                 }
             }
@@ -1165,7 +1174,8 @@ int CHttp2::TransHttp1SendHttp2Header(uint_32 stream_ind, const char* buf, int l
     int ret = HttpSend(response_buf, response_len);
     
     m_stream_list[stream_ind]->SetStreamState(stream_open);
-    
+    if(response_buf)
+        free(response_buf);
     return ret;
 }
 
@@ -1180,7 +1190,7 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
     {
         uint_32 pre_send_len = (len - sent_len) > m_max_frame_size ? m_max_frame_size : (len - sent_len);
 #ifdef _http2_debug_                    
-        printf("  Send DATA Frame as Length: %d/%d\n", pre_send_len, len);
+        printf("  Send DATA Frame as Length: %d/%d on stream %u\n", pre_send_len, len, stream_ind);
 #endif /* _http2_debug_ */ 
         int response_len;
         char* response_buf = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data2) + pre_send_len);
@@ -1193,12 +1203,14 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
         
         http2_frm_data->identifier = htonl(stream_ind) >> 1;
         
-        //printf("stream_ind:　%d\n", stream_ind);
-        
         HTTP2_Frame_Data2* data = (HTTP2_Frame_Data2*)(response_buf + sizeof(HTTP2_Frame));
         memcpy(data->data, buf + sent_len, pre_send_len);
         
         ret = HttpSend(response_buf, response_len);
+        
+        if(response_buf)
+            free(response_buf);
+    
         if(ret == 0)
         {
             sent_len += pre_send_len;
@@ -1234,7 +1246,8 @@ int CHttp2::SendHttp2EmptyContent(uint_32 stream_ind, uint_8 flags)
         m_stream_list[stream_ind]->SetStreamState(stream_half_closed_local);
     else
         m_stream_list[stream_ind]->SetStreamState(stream_closed);
-    
+    if(response_buf)
+        free(response_buf);
     return ret;
 }
 
@@ -1268,7 +1281,7 @@ void CHttp2::PushPromise(uint_32 stream_ind, const char * path)
             break;
         }
     }
-    m_stream_list[promised_stream_ind] = create_stream(promised_stream_ind);
+    m_stream_list[promised_stream_ind] = create_stream_instance(promised_stream_ind);
     
     m_stream_list[promised_stream_ind]->SetStreamState(stream_reserved_local);
     

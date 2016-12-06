@@ -398,22 +398,23 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
 	while(1)
 	{
         len = SSL_read(ssl, buf + nRecv, buf_len - nRecv);
-        //printf("SSL_read, %d %d %d\n", sockfd, len, buf_len);
         if(len == 0)
         {
             ret = SSL_get_error(ssl, len);
             if(ret == SSL_ERROR_ZERO_RETURN)
             {
-                printf("SSL_read: shutdown by the peer\n");
+                //printf("SSL_read: shutdown by the peer %d\n", ret);
             }
             else if(ret == SSL_ERROR_SYSCALL)
             {
                 if(ERR_get_error() == 0)
                 {
-                    printf("SSL_read: shutdown by the peer\n");
+                    //printf("SSL_read: shutdown by the peer %d\n", ret);
                 }
                 else
-                    printf("SSL_read: SSL_ERROR_SYSCALL, %s\n", ERR_error_string(ERR_get_error(),NULL));
+                {
+                    printf("SSL_read: SSL_ERROR_SYSCALL, %d, %s\n", ret, ERR_error_string(ERR_get_error(), NULL));
+                }
             }
             shutdown(sockfd, SHUT_RDWR);
             return -1;
