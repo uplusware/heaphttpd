@@ -6,6 +6,6 @@
 #ifndef __HTTPD_DEBUG__
 #define __HTTPD_DEBUG__
 
-// #define _http2_debug_
+/* #define _http2_debug_ */
 
 #endif /* __HTTPD_DEBUG__ */

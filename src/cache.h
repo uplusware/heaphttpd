@@ -195,6 +195,7 @@ private:
 #ifdef _WITH_MEMCACHED_  
     memcached_st * m_memcached;
     map<pthread_t, memcached_st *> m_memcached_map;
+    memcached_server_st * m_memcached_servers;
 #endif /* _WITH_MEMCACHED_ */    
 };
 

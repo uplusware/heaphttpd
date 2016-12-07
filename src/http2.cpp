@@ -151,6 +151,19 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
 	m_preface[HTTP2_PREFACE_LEN] = '\0';
     if(ret != HTTP2_PREFACE_LEN)
     {
+        //clear resource before throw the exception
+        for(int x; x < m_stream_list.size(); x++)
+        {
+            delete m_stream_list[x];
+            m_stream_list[x] = NULL;
+        }
+        
+        if(m_lssl)
+            delete m_lssl;
+        
+        if(m_lsockfd)
+            delete m_lsockfd;
+    
         throw(new string("http2: couldn't get client preface."));
         return;
     }
@@ -164,6 +177,20 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
     if(strcmp(client_preface_str, m_preface) != 0)
     {
         send_goaway(0, HTTP2_PROTOCOL_ERROR);
+        
+        //clear resource before throw the exception
+        for(int x; x < m_stream_list.size(); x++)
+        {
+            delete m_stream_list[x];
+            m_stream_list[x] = NULL;
+        }
+        
+        if(m_lssl)
+            delete m_lssl;
+        
+        if(m_lsockfd)
+            delete m_lsockfd;
+        
         throw(new string("http2: wrong client preface content."));
         return;
     }
@@ -184,6 +211,20 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
 	if(HttpSend(server_preface, sizeof(HTTP2_Frame) + sizeof(HTTP2_Setting)) != 0)
     {
         free(server_preface);
+        
+        //clear resource before throw the exception
+        for(int x; x < m_stream_list.size(); x++)
+        {
+            delete m_stream_list[x];
+            m_stream_list[x] = NULL;
+        }
+        
+        if(m_lssl)
+            delete m_lssl;
+        
+        if(m_lsockfd)
+            delete m_lsockfd;
+        
         throw(new string("HTTP2: Wrong server preface."));
         return;
     }
@@ -303,12 +344,7 @@ void CHttp2::send_initial_window_size(uint_32 window_size)
     HTTP2_Setting* initial_window_size_setting = (HTTP2_Setting*)(frame_initial_window_size_buf + sizeof(HTTP2_Frame));
     initial_window_size_setting->identifier = htons(HTTP2_SETTINGS_INITIAL_WINDOW_SIZE);
     initial_window_size_setting->value = htonl(window_size);
-	if(HttpSend(frame_initial_window_size_buf, sizeof(HTTP2_Frame) + sizeof(HTTP2_Setting)) != 0)
-    {
-        free(frame_initial_window_size_buf);
-        throw(new string("HTTP2: Wrong server preface."));
-        return;
-    }
+	HttpSend(frame_initial_window_size_buf, sizeof(HTTP2_Frame) + sizeof(HTTP2_Setting));
     free(frame_initial_window_size_buf);
     
     //Sent out, set the value to local
@@ -427,24 +463,24 @@ int CHttp2::HttpRecv(char* buf, int len)
                     
 int CHttp2::ProtRecv()
 {
-    HTTP2_Frame* frame_hdr = (HTTP2_Frame*)malloc(sizeof(HTTP2_Frame));
-	memset(frame_hdr, 0, sizeof(HTTP2_Frame));
+    HTTP2_Frame frame_hdr;// = (HTTP2_Frame*)malloc(sizeof(HTTP2_Frame));
+	memset(&frame_hdr, 0, sizeof(HTTP2_Frame));
 	
 #ifdef _http2_debug_        
 		printf("\n\n>>>> Waiting the comming frame...\n");
 #endif /* _http2_debug_ */
     char* payload = NULL;   
-	int ret = HttpRecv((char*)frame_hdr, sizeof(HTTP2_Frame));
+	int ret = HttpRecv((char*)&frame_hdr, sizeof(HTTP2_Frame));
 	if(ret == sizeof(HTTP2_Frame))
 	{
-		uint_32 payload_len = frame_hdr->length.len24;
+		uint_32 payload_len = frame_hdr.length.len24;
         payload_len = ntohl(payload_len << 8) & 0x00FFFFFFU;
-        uint_32 stream_ind = frame_hdr->identifier;
+        uint_32 stream_ind = frame_hdr.identifier;
         
         stream_ind = ntohl(stream_ind << 1) & 0x7FFFFFFFU;
         
 #ifdef _http2_debug_        
-		printf(">>>> FRAME(%03d): length(%05d) type(%s)\n", stream_ind, payload_len, frame_names[frame_hdr->type]);
+		printf(">>>> FRAME(%03d): length(%05d) type(%s)\n", stream_ind, payload_len, frame_names[frame_hdr.type]);
 #endif /* _http2_debug_ */
         
         if(payload_len > 0)
@@ -487,32 +523,32 @@ int CHttp2::ProtRecv()
 #endif /* _http2_debug_ */
 
             if(state == stream_idle 
-                && frame_hdr->type != HTTP2_FRAME_TYPE_HEADERS
-                && frame_hdr->type != HTTP2_FRAME_TYPE_PRIORITY)
+                && frame_hdr.type != HTTP2_FRAME_TYPE_HEADERS
+                && frame_hdr.type != HTTP2_FRAME_TYPE_PRIORITY)
             {
                 send_goaway(stream_ind, HTTP2_PROTOCOL_ERROR);
                 goto END_SESSION;
             }
             else if(state == stream_reserved_local 
-                && frame_hdr->type != HTTP2_FRAME_TYPE_RST_STREAM
-                && frame_hdr->type != HTTP2_FRAME_TYPE_PRIORITY
-                && frame_hdr->type != HTTP2_FRAME_TYPE_WINDOW_UPDATE)
+                && frame_hdr.type != HTTP2_FRAME_TYPE_RST_STREAM
+                && frame_hdr.type != HTTP2_FRAME_TYPE_PRIORITY
+                && frame_hdr.type != HTTP2_FRAME_TYPE_WINDOW_UPDATE)
             {
                 send_goaway(stream_ind, HTTP2_STREAM_CLOSED);
                 goto END_SESSION;
             }
             else if(state == stream_half_closed_remote 
-                && frame_hdr->type != HTTP2_FRAME_TYPE_RST_STREAM
-                && frame_hdr->type != HTTP2_FRAME_TYPE_PRIORITY
-                && frame_hdr->type != HTTP2_FRAME_TYPE_WINDOW_UPDATE)
+                && frame_hdr.type != HTTP2_FRAME_TYPE_RST_STREAM
+                && frame_hdr.type != HTTP2_FRAME_TYPE_PRIORITY
+                && frame_hdr.type != HTTP2_FRAME_TYPE_WINDOW_UPDATE)
             {
                 send_goaway(stream_ind, HTTP2_STREAM_CLOSED);
                 goto END_SESSION;
             }
-            else if (state == stream_closed && frame_hdr->type != HTTP2_FRAME_TYPE_PRIORITY)
+            else if (state == stream_closed && frame_hdr.type != HTTP2_FRAME_TYPE_PRIORITY)
             {
-                if(frame_hdr->type == HTTP2_FRAME_TYPE_WINDOW_UPDATE 
-                    || frame_hdr->type == HTTP2_FRAME_TYPE_RST_STREAM)
+                if(frame_hdr.type == HTTP2_FRAME_TYPE_WINDOW_UPDATE 
+                    || frame_hdr.type == HTTP2_FRAME_TYPE_RST_STREAM)
                 {
                    goto CONTINUE_SESSION;
                 }
@@ -524,7 +560,7 @@ int CHttp2::ProtRecv()
             }
         }
         
-        if(frame_hdr->type == HTTP2_FRAME_TYPE_GOAWAY)
+        if(frame_hdr.type == HTTP2_FRAME_TYPE_GOAWAY)
         {           
             HTTP2_Frame_Goaway* frm_goaway = (HTTP2_Frame_Goaway*)payload;
             uint_32 last_stream_id = frm_goaway->last_stream_id;
@@ -546,7 +582,7 @@ int CHttp2::ProtRecv()
 #endif /* _http2_debug_ */ 
             goto END_SESSION;
         }
-        else if(frame_hdr->type == HTTP2_FRAME_TYPE_PRIORITY)
+        else if(frame_hdr.type == HTTP2_FRAME_TYPE_PRIORITY)
         {
             if(stream_ind == 0)
             {
@@ -573,7 +609,7 @@ int CHttp2::ProtRecv()
 #endif /* _http2_debug_ */
                      
         }
-        else if(frame_hdr->type == HTTP2_FRAME_TYPE_HEADERS)
+        else if(frame_hdr.type == HTTP2_FRAME_TYPE_HEADERS)
         {
             if(stream_ind > 0 && m_stream_list[stream_ind]->GetStreamState() == stream_closed)
             {
@@ -584,7 +620,7 @@ int CHttp2::ProtRecv()
             uint_32 dep_ind = 0;
             uint_8 weight;
             int offset = 0;
-            if( (frame_hdr->flags & HTTP2_FRAME_FLAG_PADDED) == HTTP2_FRAME_FLAG_PADDED)
+            if( (frame_hdr.flags & HTTP2_FRAME_FLAG_PADDED) == HTTP2_FRAME_FLAG_PADDED)
             {
 #ifdef _http2_debug_                
                 printf("  There's some >> PAD <<!\n");
@@ -594,7 +630,7 @@ int CHttp2::ProtRecv()
                 offset += sizeof(HTTP2_Frame_Header_Pad);
             }
             
-            if((frame_hdr->flags & HTTP2_FRAME_FLAG_PRIORITY) == HTTP2_FRAME_FLAG_PRIORITY)
+            if((frame_hdr.flags & HTTP2_FRAME_FLAG_PRIORITY) == HTTP2_FRAME_FLAG_PRIORITY)
             {              
                 HTTP2_Frame_Header_Weight * header_weight = (HTTP2_Frame_Header_Weight*)(payload + offset);
                 dep_ind = ntohl(header_weight->dependency << 1) & 0x7FFFFFFFU;
@@ -632,7 +668,7 @@ int CHttp2::ProtRecv()
                     goto END_SESSION;
                 }
                 
-                if((frame_hdr->flags & HTTP2_FRAME_FLAG_END_HEADERS) == HTTP2_FRAME_FLAG_END_HEADERS)
+                if((frame_hdr.flags & HTTP2_FRAME_FLAG_END_HEADERS) == HTTP2_FRAME_FLAG_END_HEADERS)
                 {
 #ifdef _http2_debug_                    
                     printf("  Recieved HTTP2_FRAME_FLAG_END_HEADERS\n");
@@ -641,7 +677,7 @@ int CHttp2::ProtRecv()
                     m_stream_list[stream_ind]->ClearHpack();
                 }
                 
-                if((frame_hdr->flags & HTTP2_FRAME_FLAG_END_STREAM) == HTTP2_FRAME_FLAG_END_STREAM)
+                if((frame_hdr.flags & HTTP2_FRAME_FLAG_END_STREAM) == HTTP2_FRAME_FLAG_END_STREAM)
                 {
 #ifdef _http2_debug_                    
                     printf("  Recieved HTTP2_FRAME_FLAG_END_STREAM. Close Stream(%d)\n", stream_ind);
@@ -659,7 +695,7 @@ int CHttp2::ProtRecv()
                 }
             }
         }
-        else if(frame_hdr->type == HTTP2_FRAME_TYPE_CONTINUATION)
+        else if(frame_hdr.type == HTTP2_FRAME_TYPE_CONTINUATION)
         {
             HTTP2_Frame_Continuation * continuation = (HTTP2_Frame_Continuation*)(payload);
             
@@ -680,7 +716,7 @@ int CHttp2::ProtRecv()
                         send_goaway(stream_ind, HTTP2_COMPRESSION_ERROR);
                        goto END_SESSION;
                     }
-                    if((frame_hdr->flags & HTTP2_FRAME_FLAG_END_HEADERS) == HTTP2_FRAME_FLAG_END_HEADERS)
+                    if((frame_hdr.flags & HTTP2_FRAME_FLAG_END_HEADERS) == HTTP2_FRAME_FLAG_END_HEADERS)
                     {
 #ifdef _http2_debug_                    
                         printf("  Recieved HTTP2_FRAME_FLAG_END_HEADERS\n");
@@ -696,15 +732,15 @@ int CHttp2::ProtRecv()
                 goto END_SESSION;
             }
         }
-        else if(frame_hdr->type == HTTP2_FRAME_TYPE_PUSH_PROMISE) // PUSH_PROMISE wouldn't been sent by the client
+        else if(frame_hdr.type == HTTP2_FRAME_TYPE_PUSH_PROMISE) // PUSH_PROMISE wouldn't been sent by the client
         {
             send_goaway(stream_ind, HTTP2_PROTOCOL_ERROR);
             goto END_SESSION;
         }
-        else if(frame_hdr->type == HTTP2_FRAME_TYPE_SETTINGS)
+        else if(frame_hdr.type == HTTP2_FRAME_TYPE_SETTINGS)
         {
             HTTP2_Setting* client_setting = (HTTP2_Setting*)payload;
-            if((frame_hdr->flags & HTTP2_FRAME_FLAG_SETTING_ACK) != HTTP2_FRAME_FLAG_SETTING_ACK) //non setting ack
+            if((frame_hdr.flags & HTTP2_FRAME_FLAG_SETTING_ACK) != HTTP2_FRAME_FLAG_SETTING_ACK) //non setting ack
             {
                 uint_16 identifier = ntohs(client_setting->identifier);
                 uint_32 value = ntohl(client_setting->value);
@@ -752,7 +788,7 @@ int CHttp2::ProtRecv()
 #ifdef _http2_debug_
                 printf("  Send Ack for %s = %d\n", setting_table[identifier], value);
 #endif /* _http2_debug_ */
-                send_setting_ack(ntohl(frame_hdr->identifier << 1) & 0x7FFFFFFFU);
+                send_setting_ack(ntohl(frame_hdr.identifier << 1) & 0x7FFFFFFFU);
             }
             else
             {
@@ -762,7 +798,7 @@ int CHttp2::ProtRecv()
 
             }
         }
-        else if(frame_hdr->type == HTTP2_FRAME_TYPE_DATA)
+        else if(frame_hdr.type == HTTP2_FRAME_TYPE_DATA)
         {
             if(stream_ind == 0)
                 m_local_window_size -= payload_len;
@@ -779,7 +815,7 @@ int CHttp2::ProtRecv()
             
             int offset = 0;
             uint_32 padding_len = 0;
-            if( (frame_hdr->flags & HTTP2_FRAME_FLAG_PADDED) == HTTP2_FRAME_FLAG_PADDED)
+            if( (frame_hdr.flags & HTTP2_FRAME_FLAG_PADDED) == HTTP2_FRAME_FLAG_PADDED)
             {
                 HTTP2_Frame_Data1 * data1 = (HTTP2_Frame_Data1* )payload;
                 padding_len = data1->pad_length;
@@ -799,7 +835,7 @@ int CHttp2::ProtRecv()
 #endif /* _http2_debug_ */
             m_stream_list[stream_ind]->Response();
             
-            if((frame_hdr->flags & HTTP2_FRAME_FLAG_END_STREAM) == HTTP2_FRAME_FLAG_END_STREAM)
+            if((frame_hdr.flags & HTTP2_FRAME_FLAG_END_STREAM) == HTTP2_FRAME_FLAG_END_STREAM)
             {
 #ifdef _http2_debug_                    
                 printf("  Recieved HTTP2_FRAME_FLAG_END_STREAM. Close Stream(%d)\n", stream_ind);
@@ -816,7 +852,7 @@ int CHttp2::ProtRecv()
 #endif /* _http2_debug_ */
             }
         }
-        else if(frame_hdr->type == HTTP2_FRAME_TYPE_WINDOW_UPDATE)
+        else if(frame_hdr.type == HTTP2_FRAME_TYPE_WINDOW_UPDATE)
         {
             HTTP2_Frame_Window_Update* win_update = (HTTP2_Frame_Window_Update*)payload;
             uint_32 win_size = ntohl(win_update->win_size << 1) & 0x7FFFFFFFU;
@@ -844,7 +880,7 @@ int CHttp2::ProtRecv()
                 }
             }
         }
-        else if(frame_hdr->type == HTTP2_FRAME_TYPE_RST_STREAM)
+        else if(frame_hdr.type == HTTP2_FRAME_TYPE_RST_STREAM)
         {
             if(stream_ind > 0)
             {
@@ -861,9 +897,9 @@ int CHttp2::ProtRecv()
                 }
             }
         }
-        else if(frame_hdr->type == HTTP2_FRAME_TYPE_PING)
+        else if(frame_hdr.type == HTTP2_FRAME_TYPE_PING)
         {
-            if((frame_hdr->flags & HTTP2_FRAME_FLAG_PING_ACK) != HTTP2_FRAME_FLAG_PING_ACK) //non setting ack
+            if((frame_hdr.flags & HTTP2_FRAME_FLAG_PING_ACK) != HTTP2_FRAME_FLAG_PING_ACK) //non setting ack
             {
                 HTTP2_Frame* ping_ack = (HTTP2_Frame*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Ping));
                 ping_ack->length.len3b[0] = 0x00;
@@ -872,7 +908,7 @@ int CHttp2::ProtRecv()
                 ping_ack->type = HTTP2_FRAME_TYPE_PING;
                 ping_ack->flags = HTTP2_FRAME_FLAG_PING_ACK;
                 ping_ack->r = HTTP2_FRAME_R_UNSET;
-                ping_ack->identifier = frame_hdr->identifier;
+                ping_ack->identifier = frame_hdr.identifier;
                 
                 HTTP2_Frame_Ping* ping_ack_frm = (HTTP2_Frame_Ping*)((char*)ping_ack + sizeof(HTTP2_Frame));
                 HTTP2_Frame_Ping* ping_frm = (HTTP2_Frame_Ping*)payload;
@@ -890,18 +926,13 @@ int CHttp2::ProtRecv()
 #endif /* _http2_debug_ */                
             }
         }
-CONTINUE_SESSION:
-        if(frame_hdr)
-            free(frame_hdr);
-        
+CONTINUE_SESSION:        
         if(payload)
             free(payload);
         
 		return ret;
 	}
 END_SESSION:
-    if(frame_hdr)
-        free(frame_hdr);
         
     if(payload)
         free(payload);

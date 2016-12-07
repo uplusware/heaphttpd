@@ -207,15 +207,16 @@ void http2_stream::SetDependencyStream(uint_32 dependency_stream)
         if(p_dependency_stream)
         {
             m_dependency_stream = dependency_stream;
+#ifdef _http2_debug_
+            printf("    Set stream[%u] depends on stream[%u]\n", m_stream_ind, m_dependency_stream);
+#endif /* _http2_debug_ */ 
         }
         else
         {
             m_dependency_stream = 0;
         }
     }
-#ifdef _http2_debug_
-        printf("    Set stream[%u] depends on stream[%u]\n", m_stream_ind, m_dependency_stream);
-#endif /* _http2_debug_ */    
+   
 }
 
 uint_32 http2_stream::GetDependencyStream()
@@ -261,7 +262,9 @@ void http2_stream::DecreasePeerWindowSize(uint_32 window_size)
     {
         http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);      
         if(p_dependency_stream)
+        {
             p_dependency_stream->DecreasePeerWindowSize(window_size);
+        }
     }
 }
 
@@ -290,14 +293,19 @@ void http2_stream::DecreaseLocalWindowSize(uint_32 window_size)
     #ifdef _http2_debug_
         printf("    Current Stream[%u] Local Windows Size %d\n", m_stream_ind, m_local_window_size);
     #endif /* _http2_debug_ */ 
+        
         if(m_local_window_size <= 0)
+        {
             m_http2->send_window_update(m_stream_ind, m_http2->get_initial_local_window_size());
+        }
     }
     else
     {
         http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);       
         if(p_dependency_stream)
+        {
             p_dependency_stream->DecreaseLocalWindowSize(window_size);
+        }
     }
 }
 

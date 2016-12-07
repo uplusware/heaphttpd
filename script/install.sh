@@ -44,7 +44,7 @@ test -x /var/niuhttpd/ws || mkdir /var/niuhttpd/ws
 test -x /var/niuhttpd/webpy || mkdir /var/niuhttpd/webpy
 test -x /var/niuhttpd/ext || mkdir /var/niuhttpd/ext
 
-cp -rf ${path}/html/*  /var/niuhttpd/html/ 
+cp -rf ${path}/html/*  /var/niuhttpd/html/
 
 test -x /etc/niuhttpd/niuhttpd.conf && mv /etc/niuhttpd/niuhttpd.conf /etc/niuhttpd/niuhttpd.conf.$((`date "+%Y%m%d%H%M%S"`))
 cp -f ${path}/niuhttpd.conf /etc/niuhttpd/niuhttpd.conf

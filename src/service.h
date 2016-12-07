@@ -52,11 +52,13 @@ static bool lock_pid_file(const char* pflag)
 	
     if((fd = open(pflag, O_WRONLY|O_CREAT, 0644)) < 0)
 	{
+        perror("open");
 		return false;  
 	}
 	/* try and set a write lock on the entire file   */   
 	if(write_lock(fd, 0, SEEK_SET, 0) < 0)
 	{   
+        perror("write_lock");
 		if((errno == EACCES) || (errno == EAGAIN))
 		{   
 		    return false;   
@@ -71,6 +73,7 @@ static bool lock_pid_file(const char* pflag)
 	/* truncate to zero length, now that we have the lock   */   
 	if(ftruncate(fd, 0) < 0)
 	{   
+        perror("ftruncate");
 	    close(fd);               
 		return false;
 	}   
@@ -79,6 +82,7 @@ static bool lock_pid_file(const char* pflag)
 	sprintf(buf, "%d\n", ::getpid());   
 	if(write(fd, buf, strlen(buf)) != strlen(buf))
 	{   
+        perror("write");
 	    close(fd);               
 		return false;
 	}   
@@ -86,12 +90,14 @@ static bool lock_pid_file(const char* pflag)
 	/*   set close-on-exec flag for descriptor   */   
 	if((val = fcntl(fd, F_GETFD, 0) < 0 ))
 	{   
+        perror("fcntl, F_GETFD");
 	    close(fd);   
 		return false;
 	}   
 	val |= FD_CLOEXEC;   
 	if(fcntl(fd, F_SETFD, val) <0 )
 	{   
+        perror("fcntl, F_SETFD");
 	    close(fd);   
 		return false;
 	}

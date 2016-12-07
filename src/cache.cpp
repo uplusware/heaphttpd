@@ -39,15 +39,15 @@
 	m_file_cache_size = 0;
     
 #ifdef _WITH_MEMCACHED_
-        memcached_server_st * memcached_servers = NULL;
+        m_memcached_servers = NULL;
         memcached_return rc;
         m_memcached = NULL;
         for (map<string, int>::iterator iter = memcached_list.begin( ); iter != memcached_list.end( ); ++iter)
         {
             if(!m_memcached)
                 m_memcached = memcached_create(NULL);
-            memcached_servers = memcached_server_list_append(memcached_servers, (*iter).first.c_str(), (*iter).second, &rc);
-            rc = memcached_server_push(m_memcached, memcached_servers);
+            m_memcached_servers = memcached_server_list_append(m_memcached_servers, (*iter).first.c_str(), (*iter).second, &rc);
+            rc = memcached_server_push(m_memcached, m_memcached_servers);
         }
 #endif /* _WITH_MEMCACHED_ */  
 }
@@ -64,6 +64,11 @@ memory_cache::~memory_cache()
 #ifdef _WITH_MEMCACHED_          
     if(m_memcached)
         memcached_free(m_memcached);
+    
+    if(m_memcached_servers)
+        free(m_memcached_servers);
+    
+    m_memcached_servers = NULL;
     m_memcached = NULL;
     map<pthread_t, memcached_st *>::iterator iter_st;
     
@@ -394,12 +399,16 @@ void memory_cache::_reload_session_vars_()
 					    }
 					    session_var* session_var_instance = new session_var(strline.c_str());
 					    iter = m_session_vars.find(session_var_key(session_var_instance->getUID(), session_var_instance->getName()));
-                        if(iter != m_session_vars.end() 
-                            && iter->second->getCreateTime() < session_var_instance->getCreateTime())
+                        if(iter != m_session_vars.end())
                         {
-                            if(iter->second)
-                                delete iter->second; /* Remove the older one */
-                            iter->second = session_var_instance;
+                            if(iter->second->getCreateTime() < session_var_instance->getCreateTime())
+                            {
+                                if(iter->second)
+                                    delete iter->second; /* Remove the older one */
+                                iter->second = session_var_instance;
+                            }
+                            else
+                                delete session_var_instance;
 					    }
 					    else
 					    {
@@ -685,12 +694,16 @@ void memory_cache::_reload_server_vars_()
 					    }
 					    server_var* server_var_instance = new server_var(strline.c_str());
 					    map<string, server_var*>::iterator iter = m_server_vars.find(server_var_instance->getName());
-                        if(iter != m_server_vars.end() 
-                            && iter->second->getCreateTime() < server_var_instance->getCreateTime())
+                        if(iter != m_server_vars.end())
                         {
-                            if(iter->second)
-                                delete iter->second;  /* Remove the older one */
-                            iter->second = server_var_instance;
+                            if(iter->second->getCreateTime() < server_var_instance->getCreateTime())
+                            {
+                                if(iter->second)
+                                    delete iter->second;  /* Remove the older one */
+                                iter->second = server_var_instance;
+                            }
+                            else
+                                delete server_var_instance;
 					    }
 					    else
 					    {

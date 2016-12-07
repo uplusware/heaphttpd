@@ -810,6 +810,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
             {
                 if(lock_pid_file(pid_file) == false)
                 {
+                    printf("lock pid file failed: %s\n", pid_file);
                     exit(-1);
                 }
                 close(wpinfo.sockfds[0]);
@@ -819,6 +820,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
                 pWorker->Working(uTrace);
                 delete pWorker;
                 close(wpinfo.sockfds[1]);
+                printf("Workder[%d] is quit\n", m_next_process);
                 exit(0);
             }
             else if(work_pid > 0)
@@ -919,6 +921,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 
 			if(lock_pid_file(pid_file) == false)
 			{
+                printf("lock pid file failed: %s\n", pid_file);
 				exit(-1);
 			}
 			close(wpinfo.sockfds[0]);
@@ -1088,7 +1091,9 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 		int rc;
 		while(1)
 		{	
-			waitpid(-1, NULL, WNOHANG);
+            int w = waitpid(-1, NULL, WNOHANG);
+            if(w > 0)
+                printf("waitpid: %d\n", w);
 
 			clock_gettime(CLOCK_REALTIME, &ts);
 			rc = mq_timedreceive(m_service_qid, qBufPtr, qBufLen, 0, &ts);

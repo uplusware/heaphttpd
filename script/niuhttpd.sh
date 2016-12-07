@@ -29,7 +29,7 @@ niuhttpd_start()
 niuhttpd_stop()
 {
 	/usr/bin/niuhttpd stop
-	sleep 3
+	sleep 5
 }
 
 niuhttpd_status()
