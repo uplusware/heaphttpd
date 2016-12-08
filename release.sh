@@ -22,8 +22,8 @@ if uname -o | grep -i linux;
 then
 	o=linux
 	cd src/
-#	make clean
-	make
+	make clean
+	make $4
 	cd ..
 elif uname -o | grep -i solaris;
 then
