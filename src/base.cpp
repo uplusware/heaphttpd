@@ -30,7 +30,50 @@ unsigned short	CHttpBase::m_httpport = 5080;
 BOOL	CHttpBase::m_enablehttps = TRUE;
 unsigned short	CHttpBase::m_httpsport = 5081;
 
+string   CHttpBase::m_https_cipher = "ALL";
+
 BOOL   CHttpBase::m_enablehttp2 = FALSE;
+
+/* OpenSSL TLSv1.2 default cipher list
+ *
+    ECDHE-RSA-AES256-GCM-SHA384
+    ECDHE-ECDSA-AES256-GCM-SHA384
+    ECDHE-RSA-AES256-SHA384
+    ECDHE-ECDSA-AES256-SHA384
+    DH-DSS-AES256-GCM-SHA384
+    DHE-DSS-AES256-GCM-SHA384
+    DH-RSA-AES256-GCM-SHA384
+    DHE-RSA-AES256-GCM-SHA384
+    DHE-RSA-AES256-SHA256
+    DHE-DSS-AES256-SHA256
+    DH-RSA-AES256-SHA256
+    DH-DSS-AES256-SHA256
+    ECDH-RSA-AES256-GCM-SHA384
+    ECDH-ECDSA-AES256-GCM-SHA384
+    ECDH-RSA-AES256-SHA384
+    ECDH-ECDSA-AES256-SHA384
+    AES256-GCM-SHA384
+    AES256-SHA256
+    ECDHE-RSA-AES128-GCM-SHA256
+    ECDHE-ECDSA-AES128-GCM-SHA256
+    ECDHE-RSA-AES128-SHA256
+    ECDHE-ECDSA-AES128-SHA256
+    DH-DSS-AES128-GCM-SHA256
+    DHE-DSS-AES128-GCM-SHA256
+    DH-RSA-AES128-GCM-SHA256
+    DHE-RSA-AES128-GCM-SHA256
+    DHE-RSA-AES128-SHA256
+    DHE-DSS-AES128-SHA256
+    DH-RSA-AES128-SHA256
+    DH-DSS-AES128-SHA256
+    ECDH-RSA-AES128-GCM-SHA256
+    ECDH-ECDSA-AES128-GCM-SHA256
+    ECDH-RSA-AES128-SHA256
+    ECDH-ECDSA-AES128-SHA256
+    AES128-GCM-SHA256
+    AES128-SHA256
+*/
+string   CHttpBase::m_http2_tls_cipher = "ECDHE-RSA-AES128-GCM-SHA256:ALL";
 
 string CHttpBase::m_www_authenticate = "";
 BOOL   CHttpBase::m_client_cer_check = FALSE;
@@ -184,12 +227,24 @@ BOOL CHttpBase::LoadConfig()
 				m_httpsport = atoi(httpsport.c_str());
 				//printf("%d\n", m_httpsport);
 			}
+            else if(strncasecmp(strline.c_str(), "HTTPSCipher", strlen("HTTPSCipher")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_https_cipher);
+				strtrim(m_https_cipher);
+				//printf("%s\n", m_https_cipher.c_str());
+			}
 			else if(strncasecmp(strline.c_str(), "HTTP2Enable", strlen("HTTP2Enable")) == 0)
 			{
 				string HTTP2Enable;
 				strcut(strline.c_str(), "=", NULL, HTTP2Enable );
 				strtrim(HTTP2Enable);
 				m_enablehttp2= (strcasecmp(HTTP2Enable.c_str(), "yes")) == 0 ? TRUE : FALSE;
+			}
+            else if(strncasecmp(strline.c_str(), "HTTP2TLSCipher", strlen("HTTP2TLSCipher")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_http2_tls_cipher);
+				strtrim(m_http2_tls_cipher);
+				//printf("%s\n", m_http2_tls_cipher.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "WWWAuthenticate", strlen("WWWAuthenticate")) == 0)
 			{
@@ -346,16 +401,6 @@ BOOL CHttpBase::LoadConfig()
 
 	m_runtime = time(NULL);
 
-	//generate the RSA keys
-/*	RSA* rsa = RSA_generate_key(1024, 0x10001, NULL, NULL);
-	if(rsa)
-	{
-		BN_bn2bin( rsa->n, m_rsa_pub_key);
-		BN_bn2bin( rsa->d, m_rsa_pri_key );
-		
-		RSA_free(rsa);
-	}
-*/	
 	return TRUE;
 }
 

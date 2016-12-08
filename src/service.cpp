@@ -172,11 +172,13 @@ static int alpn_cb(SSL *ssl,
 		int len = p[0];
 		p++;
         
-		/*for(int x = 0; x < len; x++)
+		/*
+        for(int x = 0; x < len; x++)
 		{
 			printf("%c", p[x]);
 		}
-		printf("\n");*/
+		printf("\n");
+        */
         
 		if(len == 2 && memcmp(p, "h2", 2) == 0)
 		{
@@ -217,17 +219,14 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
     if(session_param->https == TRUE)
 	{
 		SSL_METHOD* meth;
-#ifdef OPENSSL_V_1_2
+#ifdef OPENSSL_V_1_1
 	    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
-        meth = (SSL_METHOD*)TLSv1_2_server_method();
+        meth = (SSL_METHOD*)TLS_server_method();
 #else
         SSL_load_error_strings();
 		OpenSSL_add_ssl_algorithms();
-        if(session_param->http2)
-            meth = (SSL_METHOD*)SSLv23_server_method();
-        else
-            meth = (SSL_METHOD*)TLSv1_2_server_method();
-#endif /* TLSV1_2_SUPPORT */
+        meth = (SSL_METHOD*)SSLv23_server_method();
+#endif /* OPENSSL_V_1_1 */
 		ssl_ctx = SSL_CTX_new(meth);
 		if(!ssl_ctx)
 		{
@@ -248,7 +247,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             uTrace.Write(Trace_Error, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
-		//printf("[%s]\n", session_param->ca_password.c_str());
+        
 		SSL_CTX_set_default_passwd_cb_userdata(ssl_ctx, (char*)session_param->ca_password.c_str());
 		if(SSL_CTX_use_PrivateKey_file(ssl_ctx, session_param->ca_key_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
@@ -264,9 +263,9 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 			goto clean_ssl3;
 		}
 		if(session_param->http2)
-            ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ECDHE-RSA-AES128-GCM-SHA256:ALL");
+            ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, CHttpBase::m_http2_tls_cipher.c_str());
         else
-            ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
+            ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, CHttpBase::m_https_cipher.c_str());
         if(ssl_rc == 0)
         {
             CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);
@@ -274,10 +273,8 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             goto clean_ssl3;
         }
 		SSL_CTX_set_mode(ssl_ctx, SSL_MODE_AUTO_RETRY);
-#ifdef OPENSSL_V_1_2		
 		if(session_param->http2)
 			SSL_CTX_set_alpn_select_cb(ssl_ctx, alpn_cb, &isHttp2);
-#endif /* OPENSSL_V_1_2 */		
 		ssl = SSL_new(ssl_ctx);
 		if(!ssl)
 		{
@@ -293,9 +290,9 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             goto clean_ssl2;
         }
         if(session_param->http2)
-            ssl_rc = SSL_set_cipher_list(ssl, "ECDHE-RSA-AES128-GCM-SHA256:ALL");
+            ssl_rc = SSL_set_cipher_list(ssl, CHttpBase::m_http2_tls_cipher.c_str());
         else
-            ssl_rc = SSL_set_cipher_list(ssl, "ALL");
+            ssl_rc = SSL_set_cipher_list(ssl, CHttpBase::m_https_cipher.c_str());
         if(ssl_rc == 0)
         {
             CUplusTrace uTrace(SSLERR_LOGNAME, SSLERR_LCKNAME);

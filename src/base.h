@@ -510,7 +510,9 @@ public:
 	static BOOL		m_enablehttps;
 	static unsigned short	m_httpsport;
 	static BOOL     m_enablehttp2;
-	
+	static string   m_https_cipher;
+    static string   m_http2_tls_cipher;
+    
 	static string 	m_www_authenticate;
 	static BOOL 	m_client_cer_check;
 	static string	m_ca_crt_root;

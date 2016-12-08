@@ -34,8 +34,8 @@ else
 MDEF = _LINUX_OS_
 endif
 
-ifdef openssl_v_1_2
-    TLSV_DEF = OPENSSL_V_1_2
+ifdef openssl_v_1_1
+    TLSV_DEF = OPENSSL_V_1_1
     INCDIR = -I/usr/local/include
     LDDIRS = -L. -L/usr/local/lib
 else
