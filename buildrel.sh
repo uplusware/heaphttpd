@@ -1,4 +1,4 @@
-cd src/
+cd src
 make clean
 make
 cd ..

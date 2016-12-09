@@ -28,6 +28,7 @@ HTTPLIBOBJS =   httpsessionvar.o httpservervar.o cookie.o   \
                 tinyxml/tinyxml.o           \
                 tinyxml/tinystr.o
 
+
 ifdef CYGWIN
 MDEF = CYGWIN
 else
@@ -36,29 +37,30 @@ endif
 
 ifdef openssl_v_1_1
     TLSV_DEF = OPENSSL_V_1_1
-    INCDIR = -I/usr/local/include
-    LDDIRS = -L. -L/usr/local/lib
+    OPENSSL_DIR=openssl-1.1.x
 else
     TLSV_DEF = OPENSSL_V_1_0
-    INCDIR = 
-    LDDIRS = -L.
+    OPENSSL_DIR=openssl-1.0.x
 endif
 
+INCDIR = -I../$(OPENSSL_DIR)/include
+LDDIRS = -L.
+    
 ifdef memcached
-    LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lmemcached -lniuauth -lniuwebsocket
+    LDLIST_HTTP = -lstdc++ -lmemcached -lniuauth -lniuwebsocket
     MEMCACHED_DEF = _WITH_MEMCACHED_
 else
-    LDLIST_HTTP = -lstdc++ -lssl -lcrypto -lniuauth -lniuwebsocket
+    LDLIST_HTTP = -lstdc++ -lniuauth -lniuwebsocket
     MEMCACHED_DEF = _WITHOUT_MEMCACHED_
 endif
 
 
 
 
-LDLIST_SVR = -lstdc++ -lrt -ldl -lssl -lcrypto -lpthread -lniuhttp -lniuauth -lniuwebsocket
+LDLIST_SVR = ../$(OPENSSL_DIR)/libssl.a ../$(OPENSSL_DIR)/libcrypto.a -lstdc++ -lrt -ldl -lpthread -lniuhttp -lniuauth -lniuwebsocket
 LDLIST_TOOL = -lstdc++
 LDLIST_AUTH = -lstdc++
-LDLIST_WS = -lstdc++ -lssl -lcrypto
+LDLIST_WS = -lstdc++
 
 FLAGS = -O2 -fPIC -w
 
