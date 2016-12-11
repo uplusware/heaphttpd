@@ -219,14 +219,14 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
     if(session_param->https == TRUE)
 	{
 		SSL_METHOD* meth;
-#ifdef OPENSSL_V_1_1
+#if OPENSSL_VERSION_NUMBER >= 0x010100000L
 	    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
         meth = (SSL_METHOD*)TLS_server_method();
 #else
         SSL_load_error_strings();
 		OpenSSL_add_ssl_algorithms();
         meth = (SSL_METHOD*)SSLv23_server_method();
-#endif /* OPENSSL_V_1_1 */
+#endif /* OPENSSL_VERSION_NUMBER */
 		ssl_ctx = SSL_CTX_new(meth);
 		if(!ssl_ctx)
 		{
@@ -273,8 +273,11 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             goto clean_ssl3;
         }
 		SSL_CTX_set_mode(ssl_ctx, SSL_MODE_AUTO_RETRY);
+#if OPENSSL_VERSION_NUMBER >= 0x010002000L
 		if(session_param->http2)
 			SSL_CTX_set_alpn_select_cb(ssl_ctx, alpn_cb, &isHttp2);
+#endif /* OPENSSL_VERSION_NUMBER */
+
 		ssl = SSL_new(ssl_ctx);
 		if(!ssl)
 		{

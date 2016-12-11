@@ -35,13 +35,7 @@ else
 MDEF = _LINUX_OS_
 endif
 
-ifdef openssl_v_1_1
-    TLSV_DEF = OPENSSL_V_1_1
-    OPENSSL_DIR=openssl-1.1.x
-else
-    TLSV_DEF = OPENSSL_V_1_0
-    OPENSSL_DIR=openssl-1.0.x
-endif
+OPENSSL_DIR=openssl
 
 INCDIR = -I../$(OPENSSL_DIR)/include
 LDDIRS = -L.
@@ -89,7 +83,7 @@ $(WSLIB): $(WSLIBOBJS)
 	$(CC) -shared -W -fPIC -o $@ $(WSLIBOBJS) $(LDDIRS) $(LDLIST_WS)
     
 %.o : %.cpp
-	$(CC) -D$(MDEF) -D$(MEMCACHED_DEF) -D$(TLSV_DEF) $(INCDIR) $(FLAGS) -c $< -o $@
+	$(CC) -D$(MDEF) -D$(MEMCACHED_DEF) $(INCDIR) $(FLAGS) -c $< -o $@
 
 clean:
 	-rm -f  $(HTTPSRV) $(HTTPLIB) $(WSLIB) $(AUTHLIB) $(NIUTOOL) $(WSLIBOBJS) $(HTTPSRVOBJS) $(NIUTOOLOBJS) $(HTTPLIBOBJS) $(AUTHLIBOBJS) *.elf *.gdb *.o *.a *.so
