@@ -719,6 +719,8 @@ void Service::ReloadExtension()
 
 int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_addr, socklen_t clt_size)
 {
+    unsigned int ip_lowbytes;
+    
     struct sockaddr_in * v4_addr;
     struct sockaddr_in6 * v6_addr;
         
@@ -731,8 +733,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
             close(clt_sockfd);
             return 0;
         }
-        m_next_process = ntohl(v4_addr->sin_addr.s_addr) % m_work_processes.size();
-
+        ip_lowbytes = ntohl(v4_addr->sin_addr.s_addr);
     }
     else if(clt_addr.ss_family == AF_INET6)
     {
@@ -742,14 +743,18 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
             close(clt_sockfd);
             return 0;
         }
-        m_next_process = ntohl(v6_addr->sin6_addr.s6_addr32[3]) % m_work_processes.size(); 
-
+        ip_lowbytes = ntohl(v6_addr->sin6_addr.s6_addr32[3]); 
+    }
+        
+    if(CHttpBase::m_instance_balance_scheme[0] == 'R')
+    {
+        m_next_process++;
+        m_next_process = m_next_process % m_work_processes.size();
     }
     else
     {
-        m_next_process = 0; 
+        m_next_process = ip_lowbytes % m_work_processes.size();
     }
-    
     string client_ip = szclientip;
     int access_result;
     if(CHttpBase::m_permit_list.size() > 0)
@@ -808,26 +813,42 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
             int work_pid = fork();
             if(work_pid == 0)
             {
+                close(clt_sockfd);
+                
                 if(lock_pid_file(pid_file) == false)
                 {
                     printf("lock pid file failed: %s\n", pid_file);
                     exit(-1);
                 }
                 close(wpinfo.sockfds[0]);
-                uTrace.Write(Trace_Msg, "Re-create worker process %u", m_next_process);
+                wpinfo.sockfds[0] = -1;
+                
+                uTrace.Write(Trace_Msg, "Create worker process [%u]", m_next_process);
                 Worker * pWorker = new Worker(m_service_name.c_str(), m_next_process,
                     CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
                 pWorker->Working(uTrace);
                 delete pWorker;
                 close(wpinfo.sockfds[1]);
-                printf("Workder[%d] is quit\n", m_next_process);
+                wpinfo.sockfds[1] = -1;
+                
+                uTrace.Write(Trace_Msg, "Quit from workder process [%d]\n", m_next_process);
                 exit(0);
             }
             else if(work_pid > 0)
-            {
+            {   
                 close(wpinfo.sockfds[1]);
+                wpinfo.sockfds[1] = -1;
                 wpinfo.pid = work_pid;
-                m_work_processes[m_next_process] = wpinfo;
+                
+                if(m_work_processes[m_next_process].sockfds[0] > 0)
+                    close(m_work_processes[m_next_process].sockfds[0]);
+                
+                if(m_work_processes[m_next_process].sockfds[1] > 0)
+                    close(m_work_processes[m_next_process].sockfds[1]);
+                            
+                m_work_processes[m_next_process].sockfds[0] = wpinfo.sockfds[0];
+                m_work_processes[m_next_process].sockfds[1] = wpinfo.sockfds[1];
+                m_work_processes[m_next_process].pid = wpinfo.pid;
             }
             else
             {
@@ -851,7 +872,8 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
         client_param.client_cer_check = CHttpBase::m_client_cer_check;
 
         client_param.ctrl = SessionParamData;
-        SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param);
+        if(m_work_processes[m_next_process].sockfds[0] > 0)
+            SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param);
         close(clt_sockfd);
 
     }
@@ -903,48 +925,59 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 	CLEAR_QUEUE(m_service_qid);
 	
 	BOOL svr_exit = FALSE;
-	int qBufLen = attr.mq_msgsize;
-	char* qBufPtr = (char*)malloc(qBufLen);
 
 	m_next_process = 0;
+    
 	for(int i = 0; i < CHttpBase::m_max_instance_num; i++)
 	{
 		char pid_file[1024];
 		sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid", m_service_name.c_str(), i);
 		unlink(pid_file);
 		WORK_PROCESS_INFO  wpinfo;
-		if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
-			uTrace.Write(Trace_Error, "socketpair error, %s %d\n", __FILE__, __LINE__);
-		int work_pid = fork();
-		if(work_pid == 0)
-		{
-
-			if(lock_pid_file(pid_file) == false)
-			{
-                printf("lock pid file failed: %s\n", pid_file);
-				exit(-1);
-			}
-			close(wpinfo.sockfds[0]);
-            uTrace.Write(Trace_Msg, "Create worker process %u", i);
-			Worker* pWorker = new Worker(m_service_name.c_str(), i, CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
-			if(pWorker)
-			{
-				pWorker->Working(uTrace);
-				delete pWorker;
-			}
-			close(wpinfo.sockfds[1]);
-			exit(0);
-		}
-		else if(work_pid > 0)
-		{
-			close(wpinfo.sockfds[1]);
-			wpinfo.pid = work_pid;
-			m_work_processes.push_back(wpinfo);
-		}
-		else
-		{
-			uTrace.Write(Trace_Error, "fork error, work_pid = %d, %s %d\n", work_pid, __FILE__, __LINE__);
-		}
+        wpinfo.sockfds[0] = -1;
+        wpinfo.sockfds[1] = -1;
+        wpinfo.pid = 0;
+        if(CHttpBase::m_instance_prestart == TRUE)
+        {
+            if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
+                uTrace.Write(Trace_Error, "socketpair error, %s %d\n", __FILE__, __LINE__);
+            int work_pid = fork();
+            if(work_pid == 0)
+            {
+                if(lock_pid_file(pid_file) == false)
+                {
+                    printf("lock pid file failed: %s\n", pid_file);
+                    exit(-1);
+                }
+                
+                close(wpinfo.sockfds[0]);
+                wpinfo.sockfds[0] = -1;
+                
+                uTrace.Write(Trace_Msg, "Create worker process %u", i);
+                Worker* pWorker = new Worker(m_service_name.c_str(), i, CHttpBase::m_max_instance_thread_num, wpinfo.sockfds[1]);
+                if(pWorker)
+                {
+                    pWorker->Working(uTrace);
+                    delete pWorker;
+                }
+                close(wpinfo.sockfds[1]);
+                wpinfo.sockfds[1] = -1;
+                exit(0);
+            }
+            else if(work_pid > 0)
+            {
+                close(wpinfo.sockfds[1]);
+                wpinfo.sockfds[1] = -1;
+                
+                wpinfo.pid = work_pid;
+                
+            }
+            else
+            {
+                uTrace.Write(Trace_Error, "fork error, work_pid = %d, %s %d\n", work_pid, __FILE__, __LINE__);
+            }
+        }        
+        m_work_processes.push_back(wpinfo);
 	}
 
 	while(!svr_exit)
@@ -1091,24 +1124,28 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 		int rc;
 		while(1)
 		{	
-            int w = waitpid(-1, NULL, WNOHANG);
+            pid_t w = waitpid(-1, NULL, WNOHANG);
             if(w > 0)
-                printf("waitpid: %d\n", w);
+                printf("pid %u exits\n", w);
 
 			clock_gettime(CLOCK_REALTIME, &ts);
-			rc = mq_timedreceive(m_service_qid, qBufPtr, qBufLen, 0, &ts);
+            
+            int q_buf_len = attr.mq_msgsize;
+            char* q_buf_ptr = (char*)malloc(q_buf_len);
+    
+			rc = mq_timedreceive(m_service_qid, q_buf_ptr, q_buf_len, 0, &ts);
 
 			if( rc != -1)
 			{
-				pQMsg = (stQueueMsg*)qBufPtr;
+				pQMsg = (stQueueMsg*)q_buf_ptr;
 				if(pQMsg->cmd == MSG_EXIT)
 				{
 					for(int j = 0; j < m_work_processes.size(); j++)
 					{
 						CLIENT_PARAM client_param;
 						client_param.ctrl = SessionParamQuit;
-						
-						SEND_FD(m_work_processes[j].sockfds[0], 0, &client_param);
+						if(m_work_processes[j].sockfds[0] > 0)
+                            SEND_FD(m_work_processes[j].sockfds[0], 0, &client_param);
 					}
 					svr_exit = TRUE;
 					break;
@@ -1120,8 +1157,8 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 					{
 						CLIENT_PARAM client_param;
 						client_param.ctrl = SessionParamExt;
-						
-						SEND_FD(m_work_processes[j].sockfds[0], 0, &client_param);
+						if(m_work_processes[j].sockfds[0] > 0)
+                            SEND_FD(m_work_processes[j].sockfds[0], 0, &client_param);
 					}
 				}
 				else if(pQMsg->cmd == MSG_GLOBAL_RELOAD)
@@ -1159,6 +1196,9 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 				}
 				
 			}
+            
+            free(q_buf_ptr);
+                
             if(m_sockfd > 0)
                 FD_SET(m_sockfd, &accept_mask);
             
@@ -1229,7 +1269,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 			close(m_sockfd_ssl);
 		}
 	}
-	free(qBufPtr);
+    
 	if(m_service_qid != (mqd_t)-1)
 		mq_close(m_service_qid);
 	if(m_service_sid != SEM_FAILED)

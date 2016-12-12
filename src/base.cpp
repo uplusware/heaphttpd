@@ -100,6 +100,8 @@ string CHttpBase::m_fastcgi_sockfile = "/var/run/webpy-fcgi.sock";
 
 unsigned int CHttpBase::m_max_instance_num = 10;
 unsigned int CHttpBase::m_max_instance_thread_num = 1024;
+BOOL CHttpBase::m_instance_prestart = FALSE;
+string CHttpBase::m_instance_balance_scheme = "R";
 
 unsigned int CHttpBase::m_runtime = 0;
 string	CHttpBase::m_config_file = CONFIG_FILE_PATH;
@@ -196,6 +198,18 @@ BOOL CHttpBase::LoadConfig()
 				strtrim(maxconn);
 				m_max_instance_thread_num = atoi(maxconn.c_str());
 				//printf("%d\n", m_max_conn);
+			}
+            else if(strncasecmp(strline.c_str(), "InstancePrestart", strlen("InstancePrestart")) == 0)
+			{
+				string instance_prestart;
+				strcut(strline.c_str(), "=", NULL, instance_prestart );
+				strtrim(instance_prestart);
+				m_instance_prestart = (strcasecmp(instance_prestart.c_str(), "yes")) == 0 ? TRUE : FALSE;
+			}
+            else if(strncasecmp(strline.c_str(), "InstanceBalanceScheme", strlen("InstanceBalanceScheme")) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_instance_balance_scheme );
+				strtrim(m_instance_balance_scheme);
 			}
 			else if(strncasecmp(strline.c_str(), "HTTPEnable", strlen("HTTPEnable")) == 0)
 			{

@@ -541,7 +541,8 @@ public:
 	
 	static unsigned int	m_max_instance_num;
 	static unsigned int	m_max_instance_thread_num;
-	
+	static BOOL m_instance_prestart;
+    static string m_instance_balance_scheme;
 	static unsigned int	m_runtime;
 
 	static string	m_config_file;
