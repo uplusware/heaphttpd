@@ -83,6 +83,7 @@ static int Run()
 				http_svr.Run(pfd[1], CHttpBase::m_hostip.c_str(), 
                     CHttpBase::m_enablehttp ? (unsigned short)CHttpBase::m_httpport : 0,
                     CHttpBase::m_enablehttps ? (unsigned short)CHttpBase::m_httpsport : 0);
+                close(pfd[1]);
 				exit(0);
 			}
 			else if(http_pid > 0)
@@ -239,6 +240,13 @@ int main(int argc, char* argv[])
     sigaddset(&signals, SIGPIPE);
     sigprocmask(SIG_BLOCK, &signals, NULL);
     
+#if OPENSSL_VERSION_NUMBER >= 0x010100000L
+    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
+#else
+    SSL_load_error_strings();
+	OpenSSL_add_ssl_algorithms();
+#endif /* OPENSSL_VERSION_NUMBER */
+
     if(argc == 2)
     {
         processcmd(argv[1], CONFIG_FILE_PATH, PERMIT_FILE_PATH, REJECT_FILE_PATH, NULL);

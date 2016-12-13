@@ -220,11 +220,8 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 	{
 		SSL_METHOD* meth;
 #if OPENSSL_VERSION_NUMBER >= 0x010100000L
-	    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
         meth = (SSL_METHOD*)TLS_server_method();
 #else
-        SSL_load_error_strings();
-		OpenSSL_add_ssl_algorithms();
         meth = (SSL_METHOD*)SSLv23_server_method();
 #endif /* OPENSSL_VERSION_NUMBER */
 		ssl_ctx = SSL_CTX_new(meth);
@@ -1120,7 +1117,11 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
     	FD_ZERO(&accept_mask);
 		struct timeval accept_timeout;
 		struct timespec ts;
-		stQueueMsg* pQMsg;
+        
+        int q_buf_len = attr.mq_msgsize;
+        char* q_buf_ptr = (char*)malloc(q_buf_len);
+            
+		stQueueMsg* pQMsg = NULL;
 		int rc;
 		while(1)
 		{	
@@ -1129,10 +1130,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
                 printf("pid %u exits\n", w);
 
 			clock_gettime(CLOCK_REALTIME, &ts);
-            
-            int q_buf_len = attr.mq_msgsize;
-            char* q_buf_ptr = (char*)malloc(q_buf_len);
-    
+
 			rc = mq_timedreceive(m_service_qid, q_buf_ptr, q_buf_len, 0, &ts);
 
 			if( rc != -1)
@@ -1197,7 +1195,6 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 				
 			}
             
-            free(q_buf_ptr);
                 
             if(m_sockfd > 0)
                 FD_SET(m_sockfd, &accept_mask);
@@ -1257,16 +1254,19 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 			}
 		}
 		
+        free(q_buf_ptr);
+        
         if(m_sockfd > 0)
 		{
-			m_sockfd = -1;
+			
 			close(m_sockfd);
+            m_sockfd = -1;
 		}
         
         if(m_sockfd_ssl > 0)
 		{
-			m_sockfd_ssl = -1;
 			close(m_sockfd_ssl);
+            m_sockfd_ssl = -1;
 		}
 	}
     
