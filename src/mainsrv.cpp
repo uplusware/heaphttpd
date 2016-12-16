@@ -48,7 +48,8 @@ static void daemon_init()
 	umask(0);
 	close(STDIN_FILENO);
 	close(STDOUT_FILENO);
-	close(STDERR_FILENO);
+    if(CHttpBase::m_close_stderr)
+        close(STDERR_FILENO);
 }
 
 char PIDFILE[256] = "/tmp/niuhttpd/niuhttpd.pid";

@@ -14,6 +14,7 @@
 string CHttpBase::m_sw_version = "0.3";
 
 //Global
+BOOL CHttpBase::m_close_stderr = TRUE;
 string CHttpBase::m_encoding = "UTF-8";
 
 string CHttpBase::m_private_path = "/tmp/niuhttpd/private";
@@ -154,17 +155,22 @@ BOOL CHttpBase::LoadConfig()
 			
 		if(strncasecmp(strline.c_str(), "#", strlen("#")) != 0)
 		{	
-			if(strncasecmp(strline.c_str(), "PrivatePath", strlen("PrivatePath")) == 0)
+			if(strncasecmp(strline.c_str(), "CloseStderr", strlen("CloseStderr")) == 0)
+			{
+				string close_stderr;
+				strcut(strline.c_str(), "=", NULL, close_stderr );
+				strtrim(close_stderr);
+				m_close_stderr = (strcasecmp(close_stderr.c_str(), "yes")) == 0 ? TRUE : FALSE;
+			}
+            else if(strncasecmp(strline.c_str(), "PrivatePath", strlen("PrivatePath")) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_private_path);
 				strtrim(m_private_path);
-				//printf("%s\n", m_private_path.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "WorkPath", strlen("WorkPath")) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_work_path);
 				strtrim(m_work_path);
-				//printf("%s\n", m_work_path.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "ExtensionListFile", strlen("ExtensionListFile")) == 0)
 			{
@@ -175,13 +181,11 @@ BOOL CHttpBase::LoadConfig()
 			{
 				strcut(strline.c_str(), "=", NULL, m_localhostname );
 				strtrim(m_localhostname);
-				//printf("%s\n", m_localhostname.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "HostIP", strlen("HostIP")) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_hostip );
 				strtrim(m_hostip);
-				/* printf("[%s]\n", m_hostip.c_str()); */
 			}
 			else if(strncasecmp(strline.c_str(), "InstanceNum", strlen("InstanceNum")) == 0)
 			{
@@ -189,7 +193,6 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, maxconn );
 				strtrim(maxconn);
 				m_max_instance_num = atoi(maxconn.c_str());
-				/* printf("%d\n", m_max_instance_num); */
 			}
 			else if(strncasecmp(strline.c_str(), "InstanceThreadNum", strlen("InstanceThreadNum")) == 0)
 			{
@@ -197,7 +200,6 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, maxconn );
 				strtrim(maxconn);
 				m_max_instance_thread_num = atoi(maxconn.c_str());
-				//printf("%d\n", m_max_conn);
 			}
             else if(strncasecmp(strline.c_str(), "InstancePrestart", strlen("InstancePrestart")) == 0)
 			{
@@ -224,7 +226,6 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, httpport );
 				strtrim(httpport);
 				m_httpport = atoi(httpport.c_str());
-				//printf("%d\n", m_httpport);
 			}
 			else if(strncasecmp(strline.c_str(), "HTTPSEnable", strlen("HTTPSEnable")) == 0)
 			{
@@ -239,13 +240,11 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, httpsport );
 				strtrim(httpsport);
 				m_httpsport = atoi(httpsport.c_str());
-				//printf("%d\n", m_httpsport);
 			}
             else if(strncasecmp(strline.c_str(), "HTTPSCipher", strlen("HTTPSCipher")) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_https_cipher);
 				strtrim(m_https_cipher);
-				//printf("%s\n", m_https_cipher.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "HTTP2Enable", strlen("HTTP2Enable")) == 0)
 			{
@@ -258,7 +257,6 @@ BOOL CHttpBase::LoadConfig()
 			{
 				strcut(strline.c_str(), "=", NULL, m_http2_tls_cipher);
 				strtrim(m_http2_tls_cipher);
-				//printf("%s\n", m_http2_tls_cipher.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "WWWAuthenticate", strlen("WWWAuthenticate")) == 0)
 			{
@@ -277,31 +275,26 @@ BOOL CHttpBase::LoadConfig()
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_crt_root);
 				strtrim(m_ca_crt_root);
-				//printf("%s\n", m_ca_crt_root.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "CAServerCrt", strlen("CAServerCrt")) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_crt_server);
 				strtrim(m_ca_crt_server);
-				//printf("%s\n", m_ca_crt_server.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "CAServerKey", strlen("CAServerKey")) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_key_server);
 				strtrim(m_ca_key_server);
-				//printf("%s\n", m_ca_crt_server.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "CAClientCrt", strlen("CAClientCrt")) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_crt_client);
 				strtrim(m_ca_crt_client);
-				//printf("%s\n", m_ca_crt_client.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "CAClientKey", strlen("CAClientKey")) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_key_client);
 				strtrim(m_ca_key_client);
-				//printf("%s\n", m_ca_crt_client.c_str());
 			}
 			else if(strncasecmp(strline.c_str(), "CAPassword", strlen("CAPassword")) == 0)
 			{
