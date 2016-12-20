@@ -34,9 +34,7 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
     const char* fpm_socktype, const char* fpm_sockfile,
     const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
-    const char* fastcgi_name, const char* fastcgi_pgm,  
-    const char* fastcgi_socktype, const char* fastcgi_sockfile,
-    const char* fastcgi_addr, unsigned short fastcgi_port,
+    map<string, cgi_cfg_t>* cgi_list,
 	const char* private_path, AUTH_SCHEME wwwauth_scheme, 
 	SSL* ssl, CHttp2* phttp2, uint_32 http2_stream_ind)
 {	
@@ -87,12 +85,7 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	m_fpm_port = fpm_port;
     m_phpcgi_path = phpcgi_path;
     
-    m_fastcgi_name = fastcgi_name;
-    m_fastcgi_pgm = fastcgi_pgm;
-    m_fastcgi_socktype = fastcgi_socktype;
-    m_fastcgi_sockfile = fastcgi_sockfile;
-	m_fastcgi_addr = fastcgi_addr;
-	m_fastcgi_port = fastcgi_port;
+    m_cgi_list = cgi_list;
 
     m_private_path = private_path;
     
@@ -506,9 +499,7 @@ void CHttp::Response()
         Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), 
             m_fpm_socktype.c_str(), m_fpm_sockfile.c_str(), 
             m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str(),
-            m_fastcgi_name.c_str(), m_fastcgi_pgm.c_str(), 
-            m_fastcgi_socktype.c_str(), m_fastcgi_sockfile.c_str(), 
-            m_fastcgi_addr.c_str(), m_fastcgi_port);
+            m_cgi_list);
 
         //2nd extension hook
         for(int x = 0; x < m_ext_list->size(); x++)

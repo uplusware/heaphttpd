@@ -50,9 +50,7 @@ void Session::Process()
 					CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(),
                     CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
                     CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
-                    CHttpBase::m_fastcgi_name.c_str(), CHttpBase::m_fastcgi_pgm.c_str(), 
-                    CHttpBase::m_fastcgi_socktype.c_str(), CHttpBase::m_fastcgi_sockfile.c_str(), 
-                    CHttpBase::m_fastcgi_addr.c_str(), CHttpBase::m_fastcgi_port,
+                    &CHttpBase::m_cgi_list,
                     CHttpBase::m_private_path.c_str(), wwwauth_scheme);
             }
             else if(m_https)
@@ -64,9 +62,7 @@ void Session::Process()
                         CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
                         CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
                         CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
-                        CHttpBase::m_fastcgi_name.c_str(), CHttpBase::m_fastcgi_pgm.c_str(),  
-                        CHttpBase::m_fastcgi_socktype.c_str(), CHttpBase::m_fastcgi_sockfile.c_str(), 
-                        CHttpBase::m_fastcgi_addr.c_str(), CHttpBase::m_fastcgi_port,
+                        &CHttpBase::m_cgi_list,
                         CHttpBase::m_private_path.c_str(), wwwauth_scheme, m_ssl);
                 }
                 else
@@ -76,9 +72,7 @@ void Session::Process()
                         CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
                         CHttpBase::m_fpm_socktype.c_str(), CHttpBase::m_fpm_sockfile.c_str(), 
                         CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
-                        CHttpBase::m_fastcgi_name.c_str(), CHttpBase::m_fastcgi_pgm.c_str(),  
-                        CHttpBase::m_fastcgi_socktype.c_str(), CHttpBase::m_fastcgi_sockfile.c_str(), 
-                        CHttpBase::m_fastcgi_addr.c_str(), CHttpBase::m_fastcgi_port,
+                        &CHttpBase::m_cgi_list,
                         CHttpBase::m_private_path.c_str(), wwwauth_scheme, m_ssl);
                 }
             }

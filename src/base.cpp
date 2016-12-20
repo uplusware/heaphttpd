@@ -92,12 +92,7 @@ unsigned short CHttpBase::m_fpm_port = 9000;
 string CHttpBase::m_fpm_sockfile = "/var/run/php5-fpm.sock";
 string CHttpBase::m_phpcgi_path = "/usr/bin/php-cgi";
 
-string  CHttpBase::m_fastcgi_name = "webpy";
-string  CHttpBase::m_fastcgi_pgm = "/var/niuhttpd/webpy/main.py";
-string  CHttpBase::m_fastcgi_socktype = "INET";
-string	CHttpBase::m_fastcgi_addr = "127.0.0.1";
-unsigned short CHttpBase::m_fastcgi_port = 9001;
-string CHttpBase::m_fastcgi_sockfile = "/var/run/webpy-fcgi.sock";
+map<string, cgi_cfg_t> CHttpBase::m_cgi_list;
 
 unsigned int CHttpBase::m_max_instance_num = 10;
 unsigned int CHttpBase::m_max_instance_thread_num = 1024;
@@ -146,6 +141,9 @@ BOOL CHttpBase::LoadConfig()
 		printf("%s is not exist.", m_config_file.c_str());
 		return FALSE;
 	}
+    
+    string current_cgi_name = "";
+    
 	while(getline(configfilein, strline))
 	{
 		strtrim(strline);
@@ -338,38 +336,79 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, m_phpcgi_path);
 				strtrim(m_phpcgi_path);
 			}
-			/* Fast-CGI */
-			else if(strncasecmp(strline.c_str(), "FastCGIName", strlen("FastCGIName")) == 0)
+			/* Fast-CGI/S-CGI/uWSGI */
+            else if(strncasecmp(strline.c_str(), "CGIName", strlen("CGIName")) == 0)
 			{
-				strcut(strline.c_str(), "=", NULL, m_fastcgi_name);
-				strtrim(m_fastcgi_name);
+				strcut(strline.c_str(), "=", NULL, current_cgi_name);
+				strtrim(current_cgi_name);
+                if(current_cgi_name != "")
+                    m_cgi_list[current_cgi_name].cgi_name = current_cgi_name;
 			}
-			else if(strncasecmp(strline.c_str(), "FastCGIPgm", strlen("FastCGIPgm")) == 0)
+            else if(strncasecmp(strline.c_str(), "CGIType", strlen("CGIType")) == 0)
 			{
-				strcut(strline.c_str(), "=", NULL, m_fastcgi_pgm);
-				strtrim(m_fastcgi_pgm);
+                string cgi_type;
+				strcut(strline.c_str(), "=", NULL, cgi_type);
+				strtrim(cgi_type);
+                
+                if(current_cgi_name != "")
+                {
+                    if(cgi_type[0] == 'F')
+                        m_cgi_list[current_cgi_name].cgi_type = fastcgi_e;
+                    else if(cgi_type[0] == 'S')
+                        m_cgi_list[current_cgi_name].cgi_type = scgi_e;
+                    else
+                        m_cgi_list[current_cgi_name].cgi_type = none_e;
+                }
 			}
-			else if(strncasecmp(strline.c_str(), "FastCGISockType", strlen("FastCGISockType")) == 0)
+			else if(strncasecmp(strline.c_str(), "CGIPgm", strlen("CGIPgm")) == 0)
 			{
-				strcut(strline.c_str(), "=", NULL, m_fastcgi_socktype);
-				strtrim(m_fastcgi_socktype);
+                string cgi_pgm;
+				strcut(strline.c_str(), "=", NULL, cgi_pgm);
+				strtrim(cgi_pgm);
+                if(current_cgi_name != "")
+                {
+                    m_cgi_list[current_cgi_name].cgi_pgm = cgi_pgm;
+                }
 			}
-			else if(strncasecmp(strline.c_str(), "FastCGIIPAddr", strlen("FastCGIIPAddr")) == 0)
+			else if(strncasecmp(strline.c_str(), "CGISockType", strlen("CGISockType")) == 0)
 			{
-				strcut(strline.c_str(), "=", NULL, m_fastcgi_addr);
-				strtrim(m_fastcgi_addr);
+                string cgi_socktype;
+				strcut(strline.c_str(), "=", NULL, cgi_socktype);
+				strtrim(cgi_socktype);
+                if(current_cgi_name != "")
+                {
+                    m_cgi_list[current_cgi_name].cgi_socktype = cgi_socktype;
+                }
 			}
-			else if(strncasecmp(strline.c_str(), "FastCGIPort", strlen("FastCGIPort")) == 0)
+			else if(strncasecmp(strline.c_str(), "Fast", strlen("CGIIPAddr")) == 0)
+			{
+                string cgi_addr;
+				strcut(strline.c_str(), "=", NULL, cgi_addr);
+				strtrim(cgi_addr);
+                if(current_cgi_name != "")
+                {
+                    m_cgi_list[current_cgi_name].cgi_addr = cgi_addr;
+                }
+			}
+			else if(strncasecmp(strline.c_str(), "CGIPort", strlen("CGIPort")) == 0)
 			{
 				string fastcgi_port;
 				strcut(strline.c_str(), "=", NULL, fastcgi_port);
 				strtrim(fastcgi_port);
-				m_fastcgi_port = atoi(fastcgi_port.c_str());
+                if(current_cgi_name != "")
+                {
+                    m_cgi_list[current_cgi_name].cgi_port = atoi(fastcgi_port.c_str());
+                }
 			}
-            else if(strncasecmp(strline.c_str(), "FastCGISockFile", strlen("FastCGISockFile")) == 0)
+            else if(strncasecmp(strline.c_str(), "CGISockFile", strlen("CGISockFile")) == 0)
 			{
-				strcut(strline.c_str(), "=", NULL, m_fastcgi_sockfile);
-				strtrim(m_fastcgi_sockfile);
+                string cgi_sockfile;
+				strcut(strline.c_str(), "=", NULL, cgi_sockfile);
+				strtrim(cgi_sockfile);
+                if(current_cgi_name != "")
+                {
+                    m_cgi_list[current_cgi_name].cgi_sockfile = cgi_sockfile;
+                }
 			}
 #ifdef _WITH_MEMCACHED_
             else if(strncasecmp(strline.c_str(), "MEMCACHEDList", strlen("MEMCACHEDList")) == 0)
@@ -392,10 +431,10 @@ BOOL CHttpBase::LoadConfig()
 				m_memcached_list.insert(make_pair<string, int>(memc_addr.c_str(), memc_port));
 			}
 #endif /* _WITH_MEMCACHED_ */			
-			else
+			/*else
 			{
-				/* printf("%s\n", strline.c_str()); */
-			}
+				printf("%s\n", strline.c_str());
+			}*/
 			strline = "";
 		}
 		

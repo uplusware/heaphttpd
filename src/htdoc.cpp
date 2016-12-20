@@ -13,6 +13,7 @@
 #include "util/sysdep.h"
 #include "websocket.h"
 #include "fastcgi.h"
+#include "scgi.h"
 #include "wwwauth.h"
 #include "htdoc.h"
 #include "httpcomm.h"
@@ -249,9 +250,7 @@ void Htdoc::Response()
     //printf("%s\n", strResource.c_str());
 	m_session->SetResource(strResource.c_str());
 	
-	string fcgi_name = "/";
-	fcgi_name += m_fastcgi_name;
-	fcgi_name += "/";
+
 	
 	if(strncmp(strResource.c_str(), "/api/", 5) == 0)
 	{
@@ -319,97 +318,6 @@ void Htdoc::Response()
 		}
 	
 	}
-	else if(strncmp(strResource.c_str(), fcgi_name.c_str(), fcgi_name.length()) == 0)
-    {
-    	string pyfile =  m_work_path.c_str();
-		pyfile += m_session->GetResource();
-		
-		//printf("%s\n", pyfile.c_str());
-		
-		//printf("%s\n", m_session->GetResource());
-		m_session->SetMetaVar("SCRIPT_FILENAME", m_fastcgi_pgm.c_str());
-		m_session->SetMetaVar("REDIRECT_STATUS", "200");
-		
-        FastCGI* fcgi = NULL;
-        if(strcasecmp(m_fastcgi_socktype.c_str(), "UNIX") == 0)
-            fcgi = new FastCGI(m_fastcgi_sockfile.c_str());
-        else
-			fcgi = new FastCGI(m_fastcgi_addr.c_str(), m_fastcgi_port);
-		if(fcgi && fcgi->Connect() == 0 && fcgi->BeginRequest(1) == 0)
-		{	
-			if(m_session->m_cgi.m_meta_var.size() > 0)
-				fcgi->SendParams(m_session->m_cgi.m_meta_var);
-			fcgi->SendEmptyParams();
-			if(m_session->m_cgi.GetDataLen() > 0)
-			{
-				fcgi->Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
-			}
-			fcgi->SendEmpty_STDIN();
-			
-			string strResponse, strHeader, strBody;
-			string strerr;
-			unsigned int appstatus;
-			unsigned char protocolstatus;
-			
-			int t = fcgi->RecvAppData(strResponse, strerr, appstatus, protocolstatus);
-			if(strResponse != "")
-			{
-				strcut(strResponse.c_str(), NULL, "\r\n\r\n", strHeader);
-				strcut(strResponse.c_str(), "\r\n\r\n", NULL, strBody);
-				
-				if(strHeader != "")
-				{
-					strHeader += "\r\n";
-				}
-				CHttpResponseHdr header;
-				header.SetStatusCode(SC200);
-				header.SetFields(strHeader.c_str());
-				
-				string strWanning, strParseError;
-				
-				//Replace the body with parse error
-				if(strParseError != "")
-				{
-					strBody = strParseError;
-				}
-				
-				//Append the warnning
-				if(strWanning != "")
-				{
-					strBody = strWanning + strBody;
-				}
-				header.SetField("Content-Length", strBody.length());
-				//printf("%s", header.Text());
-				m_session->SendHeader(header.Text(), header.Length());
-				if(strBody != "" && m_session->GetMethod() != hmHead)
-					m_session->SendContent(strBody.c_str(), strBody.length());
-			}
-			else
-			{
-				CHttpResponseHdr header;
-				header.SetStatusCode(SC500);
-				
-				header.SetField("Content-Type", "text/html");
-				header.SetField("Content-Length", header.GetDefaultHTMLLength());
-				
-				m_session->SendHeader(header.Text(), header.Length());
-				m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-			}
-		}
-		else
-		{
-			CHttpResponseHdr header;
-			header.SetStatusCode(SC500);
-			
-			header.SetField("Content-Type", "text/html");
-			header.SetField("Content-Length", header.GetDefaultHTMLLength());
-			
-			m_session->SendHeader(header.Text(), header.Length());
-			m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-		}
-        if(fcgi)
-            delete fcgi;
-    }
 	else if(strncmp(strResource.c_str(), "/cgi-bin/", 8) == 0)
 	{
 	    string script_name;
@@ -503,219 +411,426 @@ void Htdoc::Response()
 			m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
 		}
 	}
-	else
-	{
-        string strResource, strExtName;
-        lowercase(m_session->GetResource(), strResource);
-        get_extend_name(strResource.c_str(), strExtName);
-        
-        if(strExtName == "php")
+    else
+    {
+        map<string, cgi_cfg_t>::iterator cgi_cfg;
+        for(cgi_cfg = (*m_cgi_list).begin(); cgi_cfg != (*m_cgi_list).end(); cgi_cfg++)
         {
-			if(strcasecmp(m_php_mode.c_str(), "cgi") == 0)
-			{
-				int fds[2];
-				socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
-		
-				pid_t cgipid = fork();
-				if(cgipid > 0)
-				{
-					close(fds[1]);
-					m_session->WriteDataToCGI(fds[0]);
-					shutdown(fds[0], SHUT_WR);
-					
-					string strResponse, strHeader, strBody;
-					m_session->ReadDataFromCGI(fds[0], strResponse);
-					if(strResponse != "")
-					{
-						strcut(strResponse.c_str(), NULL, "\r\n\r\n", strHeader);
-						strcut(strResponse.c_str(), "\r\n\r\n", NULL, strBody);
-						
-						if(strHeader != "")
-						{
-							strHeader += "\r\n";
-						}
-						CHttpResponseHdr header;
-						header.SetStatusCode(SC200);
-						header.SetFields(strHeader.c_str());
-						
-						string strWanning, strParseError;
-						
-						strcut(strHeader.c_str(), "PHP Warning:", "\n", strWanning);
-						strcut(strHeader.c_str(), "PHP Parse error:", "\n", strParseError);
-						
-						strtrim(strWanning);
-						strtrim(strParseError);
-						
-						//Replace the body with parse error
-						if(strParseError != "")
-						{
-							strBody = strParseError;
-						}
-						
-						//Append the warnning
-						if(strWanning != "")
-						{
-							strBody = strWanning + strBody;
-						}
-						header.SetField("Content-Length", strBody.length());
-						//printf("%s", header.Text());
-						m_session->SendHeader(header.Text(), header.Length());
-						if(strBody != "" && m_session->GetMethod() != hmHead)
-							m_session->SendContent(strBody.c_str(), strBody.length());
-					}
-					else
-					{
-						CHttpResponseHdr header;
-						header.SetStatusCode(SC500);
-						
-						header.SetField("Content-Type", "text/html");
-						header.SetField("Content-Length", header.GetDefaultHTMLLength());
-						
-						m_session->SendHeader(header.Text(), header.Length());
-						m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-					}
-					close(fds[0]);
-					waitpid(cgipid, NULL, 0);
-				}
-				else if(cgipid == 0)
-				{
-					string phpfile = m_work_path.c_str();
-					phpfile += "/html/";
-					phpfile += m_session->GetResource();
-					
-					close(fds[0]);
-					m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
-					m_session->SetMetaVar("REDIRECT_STATUS", "200");
-					m_session->SetMetaVarsToEnv();
-					dup2(fds[1], STDIN_FILENO);
-					dup2(fds[1], STDOUT_FILENO);
-					dup2(fds[1], STDERR_FILENO);
-					close(fds[1]);
-					delete m_session;
-					execl(m_phpcgi_path.c_str(), "php-cgi", NULL);
-					exit(-1);
-				}
-				else
-				{
-						close(fds[0]);
-						close(fds[1]);
-				}
-			}
-			else if(strcasecmp(m_php_mode.c_str(), "fpm") == 0)
-			{
-				string phpfile =  m_work_path.c_str();
-				phpfile += "/html/";
-				phpfile += m_session->GetResource();
-				m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
-				m_session->SetMetaVar("REDIRECT_STATUS", "200");
-				
-                FastCGI* fcgi = NULL;
-                if(strcasecmp(m_fpm_socktype.c_str(), "UNIX") == 0)
-                    fcgi = new FastCGI(m_fpm_sockfile.c_str());
+            	string fcgi_name = "/";
+                fcgi_name += cgi_cfg->second.cgi_name;
+                fcgi_name += "/";
+                
+                if(strncmp(strResource.c_str(), fcgi_name.c_str(), fcgi_name.length()) == 0)
+                    break;
+        }
+        if(cgi_cfg != (*m_cgi_list).end())
+        {
+            string pyfile =  m_work_path.c_str();
+            pyfile += m_session->GetResource();
+            
+            m_session->SetMetaVar("SCRIPT_FILENAME", cgi_cfg->second.cgi_pgm.c_str());
+            m_session->SetMetaVar("REDIRECT_STATUS", "200");
+            
+            
+            cgi_base* cgi_instance = NULL;
+            
+            if(cgi_cfg->second.cgi_type == fastcgi_e)
+            {
+                if(strcasecmp(cgi_cfg->second.cgi_socktype.c_str(), "UNIX") == 0)
+                    cgi_instance = new FastCGI(cgi_cfg->second.cgi_sockfile.c_str());
                 else
-    				fcgi = new FastCGI(m_fpm_addr.c_str(), m_fpm_port);
-				if(fcgi && fcgi->Connect() == 0 && fcgi->BeginRequest(1) == 0)
-				{	
-					//printf("BeginRequest end\n");
-					if(m_session->m_cgi.m_meta_var.size() > 0)
-						fcgi->SendParams(m_session->m_cgi.m_meta_var);
-					fcgi->SendEmptyParams();
-					if(m_session->m_cgi.GetDataLen() > 0)
-					{
-						fcgi->Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
-					}
-					fcgi->SendEmpty_STDIN();
-					
-					string strResponse, strHeader, strBody;
-					string strerr;
-					unsigned int appstatus;
-					unsigned char protocolstatus;
-					
-					int t = fcgi->RecvAppData(strResponse, strerr, appstatus, protocolstatus);
-					//printf("%d [%s]\n", t, strResponse.c_str());
-					if(strResponse != "")
-					{
-						strcut(strResponse.c_str(), NULL, "\r\n\r\n", strHeader);
-						strcut(strResponse.c_str(), "\r\n\r\n", NULL, strBody);
-						
-						if(strHeader != "")
-						{
-							strHeader += "\r\n";
-						}
-						CHttpResponseHdr header;
-						header.SetStatusCode(SC200);
-						header.SetFields(strHeader.c_str());
-						
-						string strWanning, strParseError;
-						
-						strcut(strHeader.c_str(), "PHP Warning:", "\n", strWanning);
-						strcut(strHeader.c_str(), "PHP Parse error:", "\n", strParseError);
-						
-						strtrim(strWanning);
-						strtrim(strParseError);
-						
-						//Replace the body with parse error
-						if(strParseError != "")
-						{
-							strBody = strParseError;
-						}
-						
-						//Append the warnning
-						if(strWanning != "")
-						{
-							strBody = strWanning + strBody;
-						}
-						header.SetField("Content-Length", strBody.length());
-						//printf("%s", header.Text());
-						m_session->SendHeader(header.Text(), header.Length());
-						if(strBody != "" && m_session->GetMethod() != hmHead)
-							m_session->SendContent(strBody.c_str(), strBody.length());
-					}
-					else
-					{
-						CHttpResponseHdr header;
-						header.SetStatusCode(SC500);
-						
-						header.SetField("Content-Type", "text/html");
-						header.SetField("Content-Length", header.GetDefaultHTMLLength());
-						
-						m_session->SendHeader(header.Text(), header.Length());
-						m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-					}
-				}
-				else
-				{
-					CHttpResponseHdr header;
-					header.SetStatusCode(SC500);
-					
-					header.SetField("Content-Type", "text/html");
-					header.SetField("Content-Length", header.GetDefaultHTMLLength());
-					
-					m_session->SendHeader(header.Text(), header.Length());
-					m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-				}
-                if(fcgi)
-                    delete fcgi;
-			
-			}
-			else
-			{
-				CHttpResponseHdr header;
-				header.SetStatusCode(SC501);
-				
-				header.SetField("Content-Type", "text/html");
-				header.SetField("Content-Length", header.GetDefaultHTMLLength());
-				
-				m_session->SendHeader(header.Text(), header.Length());
-				m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-			}
+                    cgi_instance = new FastCGI(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
+            
+                FastCGI* fcgi_instance = dynamic_cast<FastCGI*>(cgi_instance);
+                if(fcgi_instance && fcgi_instance->Connect() == 0 && fcgi_instance->BeginRequest(1) == 0)
+                {	
+                    if(m_session->m_cgi.m_meta_var.size() > 0)
+                        fcgi_instance->SendParams(m_session->m_cgi.m_meta_var);
+                    fcgi_instance->SendEmptyParams();
+                    if(m_session->m_cgi.GetDataLen() > 0)
+                    {
+                        fcgi_instance->Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
+                    }
+                    fcgi_instance->SendEmpty_STDIN();
+                    
+                    vector<char> cgiResponse;
+                    string strHeader;
+                    string strerr;
+                    unsigned int appstatus;
+                    unsigned char protocolstatus;
+                    
+                    int t = fcgi_instance->RecvAppData(cgiResponse, strerr, appstatus, protocolstatus);
+                    
+                    if(cgiResponse.size() > 0 && protocolstatus == FCGI_REQUEST_COMPLETE)
+                    {
+                        const char* pbody;
+                        unsigned int body_len;
+                        memsplit2str(&cgiResponse[0], cgiResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
+                        
+                        if(strHeader != "")
+                        {
+                            strHeader += "\r\n";
+                        }
+                        
+                        CHttpResponseHdr header;
+                        if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
+                        {
+                            header.SetStatusCode(strHeader.c_str() + strlen("Status: "));
+                            header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2);
+                        }
+                        else
+                        {
+                            header.SetStatusCode(SC200);
+                            header.SetFields(strHeader.c_str());
+                        }
+                        
+                        header.SetField("Content-Length", body_len);
+                        
+                        m_session->SendHeader(header.Text(), header.Length());
+                        if(body_len > 0 && m_session->GetMethod() != hmHead)
+                            m_session->SendContent(pbody, body_len);
+                    }
+                    else
+                    {
+                        CHttpResponseHdr header;
+                        header.SetStatusCode(SC500);
+                        
+                        header.SetField("Content-Type", "text/html");
+                        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                        
+                        m_session->SendHeader(header.Text(), header.Length());
+                        m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    }
+                }
+                else
+                {
+                    CHttpResponseHdr header;
+                    header.SetStatusCode(SC500);
+                    
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    
+                    m_session->SendHeader(header.Text(), header.Length());
+                    m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                }
+            }
+            else if(cgi_cfg->second.cgi_type == scgi_e)
+            {
+                if(strcasecmp(cgi_cfg->second.cgi_socktype.c_str(), "UNIX") == 0)
+                    cgi_instance = new SimpleCGI(cgi_cfg->second.cgi_sockfile.c_str());
+                else
+                    cgi_instance = new SimpleCGI(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
+            
+                SimpleCGI* scgi_instance = dynamic_cast<SimpleCGI*>(cgi_instance);
+                if(scgi_instance && scgi_instance->Connect() == 0)
+                {
+                    scgi_instance->SendRequest(m_session->m_cgi.m_meta_var, m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
+                    
+                    vector<char> cgiResponse;
+                    string strHeader;
+                    
+                    if(scgi_instance->RecvResponse(cgiResponse) > 0)
+                    {
+                        const char* pbody;
+                        unsigned int body_len;
+                        memsplit2str(&cgiResponse[0], cgiResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
+                        
+                        if(strHeader != "")
+                        {
+                            strHeader += "\r\n";
+                        }
+                        
+                        CHttpResponseHdr header;
+                        if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
+                        {
+                            header.SetStatusCode(strHeader.c_str() + strlen("Status: "));
+                            header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2);
+                        }
+                        else
+                        {
+                            header.SetStatusCode(SC200);
+                            header.SetFields(strHeader.c_str());
+                        }
+                                                
+                        header.SetField("Content-Length", body_len);
+                        
+                        m_session->SendHeader(header.Text(), header.Length());
+                        if(body_len > 0 && m_session->GetMethod() != hmHead)
+                            m_session->SendContent(pbody, body_len);
+                    }
+                    else
+                    {
+                        CHttpResponseHdr header;
+                        header.SetStatusCode(SC500);
+                        
+                        header.SetField("Content-Type", "text/html");
+                        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                        
+                        m_session->SendHeader(header.Text(), header.Length());
+                        m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    }
+                }
+                else
+                {
+                    CHttpResponseHdr header;
+                    header.SetStatusCode(SC500);
+                    
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    
+                    m_session->SendHeader(header.Text(), header.Length());
+                    m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                }
+            }
+            /*else if(cgi_cfg->second.cgi_type == uwsgi_e)
+            {
+                RecvResponse
+            }*/
+            else
+            {
+                CHttpResponseHdr header;
+                header.SetStatusCode(SC500);
+                
+                header.SetField("Content-Type", "text/html");
+                header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                
+                m_session->SendHeader(header.Text(), header.Length());
+                m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            }
+            if(cgi_instance)
+                delete cgi_instance;
         }
         else
         {
-            doc *pDoc = new doc(m_session, m_work_path.c_str());
-            pDoc->Response();
-            delete pDoc;
+            string strResource, strExtName;
+            lowercase(m_session->GetResource(), strResource);
+            get_extend_name(strResource.c_str(), strExtName);
+            
+            if(strExtName == "php")
+            {
+                if(strcasecmp(m_php_mode.c_str(), "cgi") == 0)
+                {
+                    int fds[2];
+                    socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
+            
+                    pid_t cgipid = fork();
+                    if(cgipid > 0)
+                    {
+                        close(fds[1]);
+                        m_session->WriteDataToCGI(fds[0]);
+                        shutdown(fds[0], SHUT_WR);
+                        
+                        string strResponse, strHeader, strBody;
+                        m_session->ReadDataFromCGI(fds[0], strResponse);
+                        if(strResponse != "")
+                        {
+                            strcut(strResponse.c_str(), NULL, "\r\n\r\n", strHeader);
+                            strcut(strResponse.c_str(), "\r\n\r\n", NULL, strBody);
+                            
+                            if(strHeader != "")
+                            {
+                                strHeader += "\r\n";
+                            }
+                            CHttpResponseHdr header;
+                            header.SetStatusCode(SC200);
+                            header.SetFields(strHeader.c_str());
+                            
+                            string strWanning, strParseError;
+                            
+                            strcut(strHeader.c_str(), "PHP Warning:", "\n", strWanning);
+                            strcut(strHeader.c_str(), "PHP Parse error:", "\n", strParseError);
+                            
+                            strtrim(strWanning);
+                            strtrim(strParseError);
+                            
+                            //Replace the body with parse error
+                            if(strParseError != "")
+                            {
+                                strBody = strParseError;
+                            }
+                            
+                            //Append the warnning
+                            if(strWanning != "")
+                            {
+                                strBody = strWanning + strBody;
+                            }
+                            header.SetField("Content-Length", strBody.length());
+                            //printf("%s", header.Text());
+                            m_session->SendHeader(header.Text(), header.Length());
+                            if(strBody != "" && m_session->GetMethod() != hmHead)
+                                m_session->SendContent(strBody.c_str(), strBody.length());
+                        }
+                        else
+                        {
+                            CHttpResponseHdr header;
+                            header.SetStatusCode(SC500);
+                            
+                            header.SetField("Content-Type", "text/html");
+                            header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                            
+                            m_session->SendHeader(header.Text(), header.Length());
+                            m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                        }
+                        close(fds[0]);
+                        waitpid(cgipid, NULL, 0);
+                    }
+                    else if(cgipid == 0)
+                    {
+                        string phpfile = m_work_path.c_str();
+                        phpfile += "/html/";
+                        phpfile += m_session->GetResource();
+                        
+                        close(fds[0]);
+                        m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
+                        m_session->SetMetaVar("REDIRECT_STATUS", "200");
+                        m_session->SetMetaVarsToEnv();
+                        dup2(fds[1], STDIN_FILENO);
+                        dup2(fds[1], STDOUT_FILENO);
+                        dup2(fds[1], STDERR_FILENO);
+                        close(fds[1]);
+                        delete m_session;
+                        execl(m_phpcgi_path.c_str(), "php-cgi", NULL);
+                        exit(-1);
+                    }
+                    else
+                    {
+                            close(fds[0]);
+                            close(fds[1]);
+                    }
+                }
+                else if(strcasecmp(m_php_mode.c_str(), "fpm") == 0)
+                {
+                    string phpfile =  m_work_path.c_str();
+                    phpfile += "/html/";
+                    phpfile += m_session->GetResource();
+                    m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
+                    m_session->SetMetaVar("REDIRECT_STATUS", "200");
+                    
+                    FastCGI* fcgi = NULL;
+                    if(strcasecmp(m_fpm_socktype.c_str(), "UNIX") == 0)
+                        fcgi = new FastCGI(m_fpm_sockfile.c_str());
+                    else
+                        fcgi = new FastCGI(m_fpm_addr.c_str(), m_fpm_port);
+                    if(fcgi && fcgi->Connect() == 0 && fcgi->BeginRequest(1) == 0)
+                    {	
+                        //printf("BeginRequest end\n");
+                        if(m_session->m_cgi.m_meta_var.size() > 0)
+                            fcgi->SendParams(m_session->m_cgi.m_meta_var);
+                        fcgi->SendEmptyParams();
+                        if(m_session->m_cgi.GetDataLen() > 0)
+                        {
+                            fcgi->Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
+                        }
+                        fcgi->SendEmpty_STDIN();
+                        
+                        vector<char> cgiResponse;
+                        string strHeader, strDebug;
+                        string strerr;
+                        unsigned int appstatus;
+                        unsigned char protocolstatus;
+                        
+                        int t = fcgi->RecvAppData(cgiResponse, strerr, appstatus, protocolstatus);
+                        
+                        if(cgiResponse.size() > 0 && protocolstatus == FCGI_REQUEST_COMPLETE)
+                        {
+                            const char* pbody;
+                            unsigned int body_len;
+                            memsplit2str(&cgiResponse[0], cgiResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
+                                                            
+                            if(strHeader != "")
+                            {
+                                strHeader += "\r\n";
+                            }
+                            
+                            CHttpResponseHdr header;
+                            
+                            if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
+                            {
+                                header.SetStatusCode(strHeader.c_str() + strlen("Status: "));
+                                header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2);
+                            }
+                            else
+                            {
+                                header.SetStatusCode(SC200);
+                                header.SetFields(strHeader.c_str());
+                            }
+                            
+                            string strWanning, strParseError;
+                            
+                            strcut(strHeader.c_str(), "PHP Warning:", "\n", strWanning);
+                            strcut(strHeader.c_str(), "PHP Parse error:", "\n", strParseError);
+                            
+                            strtrim(strWanning);
+                            strtrim(strParseError);
+                            
+                            //Replace the body with parse error
+                            if(strParseError != "")
+                            {
+                                strDebug = strParseError;
+                            }
+                            
+                            //Append the warnning
+                            if(strWanning != "")
+                            {
+                                strDebug += strWanning;
+                            }
+                            
+                            header.SetField("Content-Length", body_len + strDebug.length());
+                                
+                            m_session->SendHeader(header.Text(), header.Length());
+                            if(body_len > 0 && m_session->GetMethod() != hmHead)
+                            {
+                                m_session->SendContent(pbody, body_len);
+                                if(strDebug.length() > 0)
+                                    m_session->SendContent(strDebug.c_str(), strDebug.length());
+                            }
+                        }
+                        else
+                        {
+                            CHttpResponseHdr header;
+                            header.SetStatusCode(SC500);
+                            
+                            header.SetField("Content-Type", "text/html");
+                            header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                            
+                            m_session->SendHeader(header.Text(), header.Length());
+                            m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                        }
+                    }
+                    else
+                    {
+                        CHttpResponseHdr header;
+                        header.SetStatusCode(SC500);
+                        
+                        header.SetField("Content-Type", "text/html");
+                        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                        
+                        m_session->SendHeader(header.Text(), header.Length());
+                        m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    }
+                    if(fcgi)
+                        delete fcgi;
+                
+                }
+                else
+                {
+                    CHttpResponseHdr header;
+                    header.SetStatusCode(SC501);
+                    
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    
+                    m_session->SendHeader(header.Text(), header.Length());
+                    m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                }
+            }
+            else
+            {
+                doc *pDoc = new doc(m_session, m_work_path.c_str());
+                pDoc->Response();
+                delete pDoc;
+            }
         }
-	}
+    }
 }
 

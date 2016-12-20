@@ -6,11 +6,7 @@
 #ifndef _FASTCGI_H_
 #define _FASTCGI_H_
 
-#include <stdio.h>
-#include <string.h>
-#include <string>
-#include <map>
-using namespace std;
+#include "cgi.h"
 
 #define FCGI_VERSION_1 1
 
@@ -121,21 +117,12 @@ typedef struct {
 	unsigned char valueData[valueLength((B3 & 0x7f) << 24) + (B2 << 16) + (B1 << 8) + B0];*/
 } FCGI_NameValuePair44;
 
-typedef enum {
-    INET_SOCK = 0,
-    UNIX_SOCK
-}FASTCGI_SOCK;
-
-class FastCGI
+class FastCGI : public cgi_base
 {
 public:
 	FastCGI(const char* ipaddr, unsigned short port);
 	FastCGI(const char* sock_file);
 	virtual ~FastCGI();
-	
-	int Connect();
-	int Send(const char* buf, unsigned long long len);
-	int Recv(const char* buf, unsigned long long len);
 	
 	int BeginRequest(unsigned short request_id);
 	int SendParams(map<string, string> &params_map);
@@ -143,18 +130,13 @@ public:
 	int SendEmptyParams();
 	int Send_STDIN(const char* inbuf, unsigned long inbuf_len);
 	int SendEmpty_STDIN();
-	int RecvAppData(string &strout, string& strerr, unsigned int & appstatus, unsigned char & protocolstatus);
+	int RecvAppData(vector<char>& appout, string& errout, unsigned int& appstatus, unsigned char& protocolstatus);
 	int AbortRequest();
 	int EndRequest(unsigned int app_status, unsigned char protocol_status);
 	int GetAppValue(const char* name, string& value);
 private:
 	unsigned char m_RequestIDB0;
 	unsigned char m_RequestIDB1;
-	string m_strIP;
-	unsigned short m_nPort;
-	string m_strSockfile;
-	int m_sockfd;
-    FASTCGI_SOCK m_sockType;
 };
 
 #endif /* _FASTCGI_H_ */

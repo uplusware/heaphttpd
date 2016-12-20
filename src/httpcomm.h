@@ -128,9 +128,10 @@ private:
     Http_Method m_method;
 };
 
-typedef enum 
+enum Http_StatsCode
 {
-	SC100 = 0,
+    SCBEG = 0,
+	SC100 = SCBEG,
     SC101,
     SC102,
     SC200,
@@ -178,7 +179,7 @@ typedef enum
     SC505,
     SC507,
     SCMAX
-}Http_StatsCode;
+};
 
 static const char* HttpStatusText[][2] = {
     {"100", "Continue"},
@@ -227,7 +228,8 @@ static const char* HttpStatusText[][2] = {
     {"503", "Service Unavailable"},
     {"504", "Gateway Timeout"},
     {"505", "HTTP Version Not Supported"},
-    {"507", "Insufficient Storage"}
+    {"507", "Insufficient Storage"},
+    {NULL,  NULL}
 };
 
 typedef enum
@@ -274,6 +276,7 @@ public:
     CHttpResponseHdr();
 	virtual ~CHttpResponseHdr();
 	void SetStatusCode(Http_StatsCode StatusCode);
+    void SetStatusCode(const char* StrStatusCode);
 	
 	Http_StatsCode GetStatusCode();
 	const char* GetDefaultHTML();

@@ -36,23 +36,16 @@ protected:
     string m_fpm_sockfile;
 	string m_fpm_addr;
 	unsigned short m_fpm_port;
-	
-	string m_fastcgi_name;
-    string m_fastcgi_pgm;
-	string m_fastcgi_socktype;
-    string m_fastcgi_sockfile;
-	string m_fastcgi_addr;
-	unsigned short m_fastcgi_port;
-	
+
+    map<string, cgi_cfg_t>* m_cgi_list;
+    
 	string m_phpcgi_path;
 	
 public:
 	Htdoc(CHttp* session, const char* work_path, const char* php_mode, 
         const char* fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
-        const char* fastcgi_name, const char* fastcgi_pgm, 
-        const char* fastcgi_socktype, const char* fastcgi_sockfile, 
-        const char* fastcgi_addr, unsigned short fastcgi_port)
+        map<string, cgi_cfg_t>* cgi_list)
 	{
 		m_session = session;
         m_work_path = work_path;
@@ -63,12 +56,7 @@ public:
 		m_fpm_port = fpm_port;
         m_phpcgi_path = phpcgi_path;
         
-        m_fastcgi_name = fastcgi_name;
-        m_fastcgi_pgm = fastcgi_pgm;
-        m_fastcgi_socktype = fastcgi_socktype;
-        m_fastcgi_sockfile = fastcgi_sockfile;
-		m_fastcgi_addr = fastcgi_addr;
-		m_fastcgi_port = fastcgi_port;
+        m_cgi_list = cgi_list;
 	}
 	virtual ~Htdoc()
 	{

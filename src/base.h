@@ -489,6 +489,22 @@ public:
 	int dbufsize;
 };
 
+enum cgi_t{
+        none_e = 0,
+        fastcgi_e,
+        scgi_e,
+};
+
+typedef struct {
+    string   cgi_name;
+    cgi_t    cgi_type;
+    string   cgi_pgm;
+    string   cgi_socktype;
+	string	 cgi_addr;
+	unsigned short cgi_port;
+    string   cgi_sockfile;
+} cgi_cfg_t;
+    
 class CHttpBase
 {
 public:
@@ -530,14 +546,9 @@ public:
 	static string	m_fpm_addr;
 	static unsigned short m_fpm_port;
     static string   m_fpm_sockfile;
-
-    static string   m_fastcgi_name;
-    static string   m_fastcgi_pgm;
-    static string   m_fastcgi_socktype;
-	static string	m_fastcgi_addr;
-	static unsigned short m_fastcgi_port;
-    static string   m_fastcgi_sockfile;
-	
+    
+	static map<string, cgi_cfg_t> m_cgi_list;
+    
 	static unsigned int 	m_relaytasknum;
 	
 	static unsigned int	m_max_instance_num;

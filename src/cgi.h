@@ -1,0 +1,40 @@
+/*
+	Copyright (c) openheap, uplusware
+	uplusware@gmail.com
+*/
+
+#ifndef _CGI_H_
+#define _CGI_H_
+
+#include <stdio.h>
+#include <string.h>
+#include <string>
+#include <vector>
+#include <map>
+using namespace std;
+
+typedef enum {
+    INET_SOCK = 0,
+    UNIX_SOCK
+}CGI_SOCK;
+
+class cgi_base
+{
+public:
+	cgi_base(const char* ipaddr, unsigned short port);
+	cgi_base(const char* sock_file);
+	virtual ~cgi_base();
+	
+	int Connect();
+	int Send(const char* buf, unsigned long long len);
+	int Recv(const char* buf, unsigned long long len);
+	
+private:
+	string m_strIP;
+	unsigned short m_nPort;
+	string m_strSockfile;
+	int m_sockfd;
+    CGI_SOCK m_sockType;
+};
+
+#endif /* _CGI_H_ */

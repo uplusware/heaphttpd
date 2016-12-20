@@ -17,166 +17,20 @@
 #include "util/general.h"
 
 FastCGI::FastCGI(const char* ipaddr, unsigned short port)
+    : cgi_base(ipaddr, port)
 {
-	m_sockfd = -1;
-	m_strIP = ipaddr;
-	m_nPort = port;
-    m_sockType = INET_SOCK;
+
 }
 
 FastCGI::FastCGI(const char* sock_file)
+    : cgi_base(sock_file)
 {
-	m_sockfd = -1;
-	m_strSockfile = sock_file;
-    m_sockType = UNIX_SOCK;
+
 }
 
 FastCGI::~FastCGI()
 {
-	if(m_sockfd >= 0)
-		close(m_sockfd);
-}
 
-int FastCGI::Connect()
-{
-	string err_msg;
-	int err_code = 1;
-	int err_code_len = sizeof(err_code);
-	int res;
-	struct sockaddr_in6 ser_addr;
-    struct sockaddr_un ser_unix;
-
-	fd_set mask_r, mask_w; 
-	struct timeval timeout; 
-	
-	m_sockfd = socket(m_sockType == INET_SOCK ? AF_INET6 : AF_UNIX, SOCK_STREAM, 0);
-	if(m_sockfd < 0)
-	{
-		err_msg = "system error\r\n";
-		return -1;
-	}
-	
-	int flags = fcntl(m_sockfd, F_GETFL, 0); 
-	fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK); 
-	
-    if(m_sockType == INET_SOCK)
-    {
-	    struct addrinfo hints;
-        struct addrinfo *server_addr, *rp;
-        
-        memset(&hints, 0, sizeof(struct addrinfo));
-        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-        hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
-        hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-        hints.ai_protocol = 0;          /* Any protocol */
-        hints.ai_canonname = NULL;
-        hints.ai_addr = NULL;
-        hints.ai_next = NULL;
-        
-        char szPort[32];
-        sprintf(szPort, "%u", m_nPort);
-        
-        /*printf("fast-cgi: %s %s\n", m_strIP.c_str(), szPort);*/
-        int s = getaddrinfo(m_strIP != "" ? m_strIP.c_str() : NULL, szPort, &hints, &server_addr);
-        if (s != 0)
-        {
-           fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-           return FALSE;
-        }
-        
-        for (rp = server_addr; rp != NULL; rp = rp->ai_next)
-        {
-            m_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-            if (m_sockfd == -1)
-               continue;
-
-            int flags = fcntl(m_sockfd, F_GETFL, 0); 
-            fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK);
-
-            timeout.tv_sec = 10; 
-            timeout.tv_usec = 0;
-
-            connect(m_sockfd, rp->ai_addr, rp->ai_addrlen);
-            break;
-        }
-         
-        if (rp == NULL)
-        {
-            err_msg = "system error\r\n";
-		    return -1;
-        }
-
-        freeaddrinfo(server_addr);           /* No longer needed */
-    }
-    else
-    {
-        char local_sockfile[256];
-        sprintf(local_sockfile, "/tmp/niuhttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
-
-        //printf("local sock file: %s\n", local_sockfile);        
-        memset(&ser_unix, 0, sizeof(ser_unix));
-	    ser_unix.sun_family = AF_UNIX;
-	    strcpy(ser_unix.sun_path, local_sockfile);
-        unlink(ser_unix.sun_path);
-
-        int size = offsetof(struct sockaddr_un, sun_path) + strlen(ser_unix.sun_path);
-	    if (bind(m_sockfd, (struct sockaddr *)&ser_unix, size) < 0)
-        {
-		   err_msg = "system error\r\n";
-		   return -1;
-	    }
-        
-        memset(&ser_unix, 0, sizeof(ser_unix));
-    	ser_unix.sun_family = AF_UNIX;
-    	strcpy(ser_unix.sun_path, m_strSockfile.c_str());
-    	size = offsetof(struct sockaddr_un, sun_path) + strlen(ser_unix.sun_path);
-
-        connect(m_sockfd, (struct sockaddr*)&ser_unix, size);
-    }
-    
-
-	timeout.tv_sec = 10; 
-	timeout.tv_usec = 0;      
-
-	FD_ZERO(&mask_r);
-	FD_ZERO(&mask_w);
-	
-	FD_SET(m_sockfd, &mask_r);
-	FD_SET(m_sockfd, &mask_w);
-	res = select(m_sockfd + 1, &mask_r, &mask_w, NULL, &timeout);
-	
-	if( res != 1) 
-	{
-		close(m_sockfd);
-		m_sockfd = -1;
-		err_msg = "can not connect the ";
-		err_msg += m_sockType == INET_SOCK ? m_strIP : m_strSockfile;
-		err_msg += ".\r\n";
-		
-		return -1;
-	}
-	getsockopt(m_sockfd,SOL_SOCKET,SO_ERROR,(char*)&err_code,(socklen_t*)&err_code_len);
-	if(err_code !=0)
-	{
-		close(m_sockfd);
-		m_sockfd = -1;
-		err_msg = "system error\r\n";
-		return -1;
-	}
-	
-	//printf("connected\n");
-	return 0;
-}
-
-int FastCGI::Send(const char* buf, unsigned long long len)
-{
-	//printf("SEND: %d\n", len);
-	return m_sockfd >= 0 ? _Send_(m_sockfd, (char*)buf, len) : -1;
-}
-
-int FastCGI::Recv(const char* buf, unsigned long long len)
-{
-	return m_sockfd >= 0 ? _Recv_(m_sockfd, (char*)buf, len) : -1;
 }
 
 int FastCGI::BeginRequest(unsigned short request_id)
@@ -197,12 +51,10 @@ int FastCGI::BeginRequest(unsigned short request_id)
 	
 	if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 && Send((char*)&begin_request_body, sizeof(FCGI_BeginRequestBody)) >= 0)
 	{
-		//printf("BeginRequest 0\n");
 		return 0;
 	}
 	else
 	{
-		//printf("BeginRequest -1\n");
 		return -1;
 	}
 }
@@ -249,10 +101,8 @@ int FastCGI::SendParams(map<string, string> &params_map)
     fcgi_header.contentLengthB0 = contentLength_16bit & 0x00FF;
 	fcgi_header.contentLengthB1 = (contentLength_16bit & 0xFF00) >> 8;
 	
-	//printf("contentLength_32bit: %d contentLength_16bit: %d\n", contentLength_32bit, contentLength_16bit);
 	if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0)
 	{
-		//printf("fcgi_header: %d %d\n", fcgi_header.contentLengthB0, fcgi_header.contentLengthB1);
 		for(it = params_map.begin(); it != params_map.end(); ++it)
 		{
 			
@@ -260,7 +110,6 @@ int FastCGI::SendParams(map<string, string> &params_map)
 			unsigned int value_len = it->second.length();
 			if(name_len > 0 && value_len > 0)
 			{
-				//printf("name_len: %d value_len: %d\n", name_len, value_len);
 				if(name_len >> 7 == 0 && value_len >> 7 == 0)
 				{
 					FCGI_NameValuePair11 name_value_pair11;
@@ -393,7 +242,6 @@ int FastCGI::Send_STDIN(const char* inbuf, unsigned long inbuf_len)
 	
 	if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
 	{
-	    /* printf("%s\n", inbuf); */
 		Send(inbuf, inbuf_len);
 		return 0;
 	}
@@ -420,10 +268,8 @@ int FastCGI::SendEmpty_STDIN()
 		return -1;
 }
 
-int FastCGI::RecvAppData(string &strout, string& strerr, unsigned int & appstatus, unsigned char & protocolstatus)
+int FastCGI::RecvAppData(vector<char>& appout, string& strerr, unsigned int & appstatus, unsigned char & protocolstatus)
 {
-	strout = "";
-	strerr = "";
 	FCGI_Header fcgi_header;
 	bool bQuit = false;
 	while(!bQuit)
@@ -434,21 +280,18 @@ int FastCGI::RecvAppData(string &strout, string& strerr, unsigned int & appstatu
 		unsigned char paddingLength = 0;
 		if(Recv((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
 		{
-			//printf("%d : %d\n", fcgi_header.contentLengthB1, fcgi_header.contentLengthB0);
 			contentLength = fcgi_header.contentLengthB1;
 			contentLength <<= 8;
 			contentLength += fcgi_header.contentLengthB0;
 			
 			paddingLength = fcgi_header.paddingLength;
 			
-			//printf("contentLength: %d paddingLength: %d\n", contentLength, paddingLength);
 			if(contentLength > 0)
 			{
 				contentBuffer  = new char[contentLength + 1];
 				if(contentBuffer && Recv(contentBuffer, contentLength) >= 0)
 				{
 					contentBuffer[contentLength] = '\0';
-				    //printf("%d - %s\n", contentLength, contentBuffer);
 				}
 				else
 				{
@@ -462,20 +305,21 @@ int FastCGI::RecvAppData(string &strout, string& strerr, unsigned int & appstatu
 			{
 				Recv(paddingBuffer, paddingLength);
 			}
-			//printf("fcgi_header.type: %d\n",fcgi_header.type);
+			
 			switch(fcgi_header.type)
 			{
 				case FCGI_STDOUT:
 					if(contentLength > 0)
 					{
-						strout += contentBuffer;
-						//printf("%s\n", contentBuffer);
-					
+                        for(int x = 0; x < contentLength; x++)
+                            appout.push_back(contentBuffer[x]);
 					}
 				break;
 				case FCGI_STDERR:
 					if(contentLength > 0)
+                    {
 						strerr += contentBuffer;
+                    }
 				break;
 				case FCGI_END_REQUEST:
 					if(contentLength > 0)
@@ -487,7 +331,6 @@ int FastCGI::RecvAppData(string &strout, string& strerr, unsigned int & appstatu
 						appstatus += end_request_body->appStatusB0;
 						
 						protocolstatus = end_request_body->protocolStatus;
-						//printf("appstatus: %d protocolstatus: %d\n", appstatus, protocolstatus);
 					}
 					else
 					{
@@ -497,7 +340,7 @@ int FastCGI::RecvAppData(string &strout, string& strerr, unsigned int & appstatu
 					bQuit = true;
 				break;
 				default:
-				printf("unknown type: %d\n", fcgi_header.type);
+                    fprintf(stderr, "fastcgi: unknown type: %d\n", fcgi_header.type);
 				break;
 				
 			}

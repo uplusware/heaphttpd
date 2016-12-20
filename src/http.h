@@ -52,9 +52,7 @@ public:
 		const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
         const char* fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
-        const char* fastcgi_name, const char* fastcgi_pgm, 
-        const char* fastcgi_socktype, const char* fastcgi_sockfile,
-        const char* fastcgi_addr, unsigned short fastcgi_port,
+        map<string, cgi_cfg_t>* cgi_list,
         const char* private_path, AUTH_SCHEME wwwauth_scheme = asNone,
 		SSL* ssl = NULL, CHttp2* phttp2 = NULL, uint_32 http2_stream_ind = 0);
         
@@ -202,13 +200,8 @@ protected:
 	unsigned short m_fpm_port;
     string m_phpcgi_path;
     string m_private_path;
-
-	string m_fastcgi_name;
-    string m_fastcgi_pgm;    
-    string m_fastcgi_socktype;
-    string m_fastcgi_sockfile;
-	string m_fastcgi_addr;
-	unsigned short m_fastcgi_port;
+   
+    map<string, cgi_cfg_t>* m_cgi_list;
     
     CHttpRequestHdr m_request_hdr;
 	

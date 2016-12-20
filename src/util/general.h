@@ -114,6 +114,36 @@ int __inline__ checkip(const char *addr)
 	return 0;
 }
 
+void __inline__ memsplit2str(const char* buf, unsigned int len, const char* sepstr, string& strleft, const char*& pright, unsigned int& right_len)
+{
+    
+    int sep_len = strlen(sepstr);
+    
+    pright = NULL;
+    right_len = 0;
+    if(len < sep_len)
+    {
+        return;
+    }
+    for(int x = 0; x <= len - sep_len; x++)
+    {
+        if(memcmp(&buf[x], sepstr, strlen(sepstr)) == 0)
+        {
+            if(x > 0)
+            {
+                char* p = (char*)malloc(x + 1);
+                memcpy(p, buf, x);
+                p[x] = '\0';
+                strleft = p;
+                free(p);
+            }
+            pright = &buf[x + sep_len];
+            right_len = len - x - sep_len;
+            break;
+        }
+    }
+}
+
 void __inline__ strcut(const char* text, const char* begstring, const char* endstring ,string& strDest)
 {
 	string strText;
