@@ -346,36 +346,57 @@ void Htdoc::Response()
                 m_session->WriteDataToCGI(fds[0]);
 				shutdown(fds[0], SHUT_WR);
 				
-                string strResponse, strHeader, strBody;
-                m_session->ReadDataFromCGI(fds[0], strResponse);
-				if(strResponse != "")
-				{
-					strcut(strResponse.c_str(), NULL, "\r\n\r\n", strHeader);
-					strcut(strResponse.c_str(), "\r\n\r\n", NULL, strBody);
-					
-					if(strHeader != "")
-					{
-						strHeader += "\r\n";
-					}
-					CHttpResponseHdr header;
-					header.SetStatusCode(SC200);
-					header.SetFields(strHeader.c_str());
-					header.SetField("Content-Length", strBody.length());
-					m_session->SendHeader(header.Text(), header.Length());
-					
-					if(strBody != "" && m_session->GetMethod() != hmHead)
-						m_session->SendContent(strBody.c_str(), strBody.length());
+                BOOL continue_recv;
+                vector<char> binaryResponse;
+                string strHeader;
+                m_session->ReadDataFromCGI(fds[0], binaryResponse, continue_recv);
+				if(binaryResponse.size() > 0)
+                {
+                    const char* pbody;
+                    unsigned int body_len;
+                    memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
+                    
+                    if(strHeader != "")
+                    {
+                        strHeader += "\r\n";
+                    }
+                    
+                    CHttpResponseHdr header;
+                    if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
+                    {
+                        header.SetStatusCode(strHeader.c_str() + strlen("Status: "));
+                        header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2);
+                    }
+                    else
+                    {
+                        header.SetStatusCode(SC200);
+                        header.SetFields(strHeader.c_str());
+                    }
+                    
+                    m_session->SendHeader(header.Text(), header.Length());
+                    
+                    if(body_len > 0 && m_session->GetMethod() != hmHead)
+                        m_session->SendContent(pbody, body_len);
+                    
+                    while(continue_recv)
+                    {
+                        binaryResponse.clear();
+                        m_session->ReadDataFromCGI(fds[0], binaryResponse, continue_recv);
+                        if(binaryResponse.size() > 0 && m_session->GetMethod() != hmHead)
+                            m_session->SendContent(&binaryResponse[0], binaryResponse.size());
+                    }
                 }
-				else
-				{
-					CHttpResponseHdr header;
-					header.SetStatusCode(SC500);
-					
+                else
+                {
+                    CHttpResponseHdr header;
+                    header.SetStatusCode(SC500);
+                    
                     header.SetField("Content-Type", "text/html");
-					header.SetField("Content-Length", header.GetDefaultHTMLLength());
-					m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-					m_session->SendHeader(header.Text(), header.Length());
-				}
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    
+                    m_session->SendHeader(header.Text(), header.Length());
+                    m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                }
                 close(fds[0]);
 				waitpid(cgipid, NULL, 0);
 			}
@@ -436,11 +457,23 @@ void Htdoc::Response()
             
             if(cgi_cfg->second.cgi_type == fastcgi_e)
             {
-                if(strcasecmp(cgi_cfg->second.cgi_socktype.c_str(), "UNIX") == 0)
+                if(cgi_cfg->second.cgi_socktype == unix_socket)
                     cgi_instance = new FastCGI(cgi_cfg->second.cgi_sockfile.c_str());
-                else
+                else if(cgi_cfg->second.cgi_socktype == inet_socket)
                     cgi_instance = new FastCGI(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
-            
+                else
+                {
+                    
+                    CHttpResponseHdr header;
+                    header.SetStatusCode(SC500);
+                    
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    
+                    m_session->SendHeader(header.Text(), header.Length());
+                    m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    return;
+                }
                 FastCGI* fcgi_instance = dynamic_cast<FastCGI*>(cgi_instance);
                 if(fcgi_instance && fcgi_instance->Connect() == 0 && fcgi_instance->BeginRequest(1) == 0)
                 {	
@@ -453,19 +486,20 @@ void Htdoc::Response()
                     }
                     fcgi_instance->SendEmpty_STDIN();
                     
-                    vector<char> cgiResponse;
+                    vector<char> binaryResponse;
                     string strHeader;
                     string strerr;
                     unsigned int appstatus;
                     unsigned char protocolstatus;
+                    BOOL continue_recv;
                     
-                    int t = fcgi_instance->RecvAppData(cgiResponse, strerr, appstatus, protocolstatus);
+                    fcgi_instance->RecvAppData(binaryResponse, strerr, appstatus, protocolstatus, continue_recv);
                     
-                    if(cgiResponse.size() > 0 && protocolstatus == FCGI_REQUEST_COMPLETE)
+                    if(binaryResponse.size() > 0)
                     {
                         const char* pbody;
                         unsigned int body_len;
-                        memsplit2str(&cgiResponse[0], cgiResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
+                        memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
                         
                         if(strHeader != "")
                         {
@@ -484,11 +518,20 @@ void Htdoc::Response()
                             header.SetFields(strHeader.c_str());
                         }
                         
-                        header.SetField("Content-Length", body_len);
-                        
                         m_session->SendHeader(header.Text(), header.Length());
+                        
                         if(body_len > 0 && m_session->GetMethod() != hmHead)
                             m_session->SendContent(pbody, body_len);
+                        
+                        while(continue_recv)
+                        {
+                            binaryResponse.clear();
+                            fcgi_instance->RecvAppData(binaryResponse, strerr, appstatus, protocolstatus, continue_recv);
+                            if(binaryResponse.size() > 0 && m_session->GetMethod() != hmHead)
+                            {
+                                m_session->SendContent(&binaryResponse[0], binaryResponse.size());
+                            }
+                        }
                     }
                     else
                     {
@@ -516,24 +559,35 @@ void Htdoc::Response()
             }
             else if(cgi_cfg->second.cgi_type == scgi_e)
             {
-                if(strcasecmp(cgi_cfg->second.cgi_socktype.c_str(), "UNIX") == 0)
+                if(cgi_cfg->second.cgi_socktype == unix_socket)
                     cgi_instance = new SimpleCGI(cgi_cfg->second.cgi_sockfile.c_str());
-                else
+                else if(cgi_cfg->second.cgi_socktype == inet_socket)
                     cgi_instance = new SimpleCGI(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
-            
+                else
+                {
+                    CHttpResponseHdr header;
+                    header.SetStatusCode(SC500);
+                    
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    
+                    m_session->SendHeader(header.Text(), header.Length());
+                    m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    return;
+                }
                 SimpleCGI* scgi_instance = dynamic_cast<SimpleCGI*>(cgi_instance);
                 if(scgi_instance && scgi_instance->Connect() == 0)
                 {
-                    scgi_instance->SendRequest(m_session->m_cgi.m_meta_var, m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
-                    
-                    vector<char> cgiResponse;
+                    vector<char> binaryResponse;
                     string strHeader;
-                    
-                    if(scgi_instance->RecvResponse(cgiResponse) > 0)
+                    BOOL continue_recv;
+                    if(scgi_instance->SendParamsAndData(m_session->m_cgi.m_meta_var,
+                        m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen()) >= 0
+                        && scgi_instance->RecvAppData(binaryResponse, continue_recv) > 0)
                     {
                         const char* pbody;
                         unsigned int body_len;
-                        memsplit2str(&cgiResponse[0], cgiResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
+                        memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
                         
                         if(strHeader != "")
                         {
@@ -557,6 +611,14 @@ void Htdoc::Response()
                         m_session->SendHeader(header.Text(), header.Length());
                         if(body_len > 0 && m_session->GetMethod() != hmHead)
                             m_session->SendContent(pbody, body_len);
+                        
+                        while(continue_recv)
+                        {
+                            binaryResponse.clear();
+                            scgi_instance->RecvAppData(binaryResponse, continue_recv);
+                            if(binaryResponse.size() > 0 && m_session->GetMethod() != hmHead)
+                                m_session->SendContent(&binaryResponse[0], binaryResponse.size());
+                        }
                     }
                     else
                     {
@@ -582,10 +644,6 @@ void Htdoc::Response()
                     m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                 }
             }
-            /*else if(cgi_cfg->second.cgi_type == uwsgi_e)
-            {
-                RecvResponse
-            }*/
             else
             {
                 CHttpResponseHdr header;
@@ -620,45 +678,59 @@ void Htdoc::Response()
                         m_session->WriteDataToCGI(fds[0]);
                         shutdown(fds[0], SHUT_WR);
                         
-                        string strResponse, strHeader, strBody;
-                        m_session->ReadDataFromCGI(fds[0], strResponse);
-                        if(strResponse != "")
+                        BOOL continue_recv;
+                        vector<char> binaryResponse;
+                        string strHeader;
+                        m_session->ReadDataFromCGI(fds[0], binaryResponse, continue_recv);
+                        if(binaryResponse.size() > 0)
                         {
-                            strcut(strResponse.c_str(), NULL, "\r\n\r\n", strHeader);
-                            strcut(strResponse.c_str(), "\r\n\r\n", NULL, strBody);
+                            const char* pbody;
+                            unsigned int body_len;
+                            memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
                             
                             if(strHeader != "")
                             {
                                 strHeader += "\r\n";
                             }
-                            CHttpResponseHdr header;
-                            header.SetStatusCode(SC200);
-                            header.SetFields(strHeader.c_str());
                             
                             string strWanning, strParseError;
-                            
+                                
                             strcut(strHeader.c_str(), "PHP Warning:", "\n", strWanning);
                             strcut(strHeader.c_str(), "PHP Parse error:", "\n", strParseError);
                             
                             strtrim(strWanning);
                             strtrim(strParseError);
                             
-                            //Replace the body with parse error
+                            if(strWanning != "")
+                                fprintf(stderr, "PHP Warning: %s\n", strWanning.c_str());
                             if(strParseError != "")
+                                fprintf(stderr, "PHP Parse error:: %s\n", strParseError.c_str());
+                            
+                            
+                            CHttpResponseHdr header;
+                            if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
                             {
-                                strBody = strParseError;
+                                header.SetStatusCode(strHeader.c_str() + strlen("Status: "));
+                                header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2);
+                            }
+                            else
+                            {
+                                header.SetStatusCode(SC200);
+                                header.SetFields(strHeader.c_str());
                             }
                             
-                            //Append the warnning
-                            if(strWanning != "")
-                            {
-                                strBody = strWanning + strBody;
-                            }
-                            header.SetField("Content-Length", strBody.length());
-                            //printf("%s", header.Text());
                             m_session->SendHeader(header.Text(), header.Length());
-                            if(strBody != "" && m_session->GetMethod() != hmHead)
-                                m_session->SendContent(strBody.c_str(), strBody.length());
+                            
+                            if(body_len > 0 && m_session->GetMethod() != hmHead)
+                                m_session->SendContent(pbody, body_len);
+                            
+                            while(continue_recv)
+                            {
+                                binaryResponse.clear();
+                                m_session->ReadDataFromCGI(fds[0], binaryResponse, continue_recv);
+                                if(binaryResponse.size() > 0 && m_session->GetMethod() != hmHead)
+                                    m_session->SendContent(&binaryResponse[0], binaryResponse.size());
+                            }
                         }
                         else
                         {
@@ -706,36 +778,49 @@ void Htdoc::Response()
                     m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
                     m_session->SetMetaVar("REDIRECT_STATUS", "200");
                     
-                    FastCGI* fcgi = NULL;
-                    if(strcasecmp(m_fpm_socktype.c_str(), "UNIX") == 0)
-                        fcgi = new FastCGI(m_fpm_sockfile.c_str());
+                    FastCGI* fcgi_instance = NULL;
+                    if(m_fpm_socktype == unix_socket)
+                        fcgi_instance = new FastCGI(m_fpm_sockfile.c_str());
+                    else if(m_fpm_socktype == inet_socket)
+                        fcgi_instance = new FastCGI(m_fpm_addr.c_str(), m_fpm_port);
                     else
-                        fcgi = new FastCGI(m_fpm_addr.c_str(), m_fpm_port);
-                    if(fcgi && fcgi->Connect() == 0 && fcgi->BeginRequest(1) == 0)
+                    {
+                        CHttpResponseHdr header;
+                        header.SetStatusCode(SC500);
+                        
+                        header.SetField("Content-Type", "text/html");
+                        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                        
+                        m_session->SendHeader(header.Text(), header.Length());
+                        m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                        return;
+                    }
+                    if(fcgi_instance && fcgi_instance->Connect() == 0 && fcgi_instance->BeginRequest(1) == 0)
                     {	
                         //printf("BeginRequest end\n");
                         if(m_session->m_cgi.m_meta_var.size() > 0)
-                            fcgi->SendParams(m_session->m_cgi.m_meta_var);
-                        fcgi->SendEmptyParams();
+                            fcgi_instance->SendParams(m_session->m_cgi.m_meta_var);
+                        fcgi_instance->SendEmptyParams();
                         if(m_session->m_cgi.GetDataLen() > 0)
                         {
-                            fcgi->Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
+                            fcgi_instance->Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
                         }
-                        fcgi->SendEmpty_STDIN();
+                        fcgi_instance->SendEmpty_STDIN();
                         
-                        vector<char> cgiResponse;
+                        vector<char> binaryResponse;
                         string strHeader, strDebug;
                         string strerr;
                         unsigned int appstatus;
                         unsigned char protocolstatus;
+                        BOOL continue_recv;
                         
-                        int t = fcgi->RecvAppData(cgiResponse, strerr, appstatus, protocolstatus);
+                        fcgi_instance->RecvAppData(binaryResponse, strerr, appstatus, protocolstatus, continue_recv);
                         
-                        if(cgiResponse.size() > 0 && protocolstatus == FCGI_REQUEST_COMPLETE)
+                        if(binaryResponse.size() > 0)
                         {
                             const char* pbody;
                             unsigned int body_len;
-                            memsplit2str(&cgiResponse[0], cgiResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
+                            memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
                                                             
                             if(strHeader != "")
                             {
@@ -763,19 +848,10 @@ void Htdoc::Response()
                             strtrim(strWanning);
                             strtrim(strParseError);
                             
-                            //Replace the body with parse error
-                            if(strParseError != "")
-                            {
-                                strDebug = strParseError;
-                            }
-                            
-                            //Append the warnning
                             if(strWanning != "")
-                            {
-                                strDebug += strWanning;
-                            }
-                            
-                            header.SetField("Content-Length", body_len + strDebug.length());
+                                fprintf(stderr, "PHP Warning: %s\n", strWanning.c_str());
+                            if(strParseError != "")
+                                fprintf(stderr, "PHP Parse error:: %s\n", strParseError.c_str());
                                 
                             m_session->SendHeader(header.Text(), header.Length());
                             if(body_len > 0 && m_session->GetMethod() != hmHead)
@@ -783,6 +859,13 @@ void Htdoc::Response()
                                 m_session->SendContent(pbody, body_len);
                                 if(strDebug.length() > 0)
                                     m_session->SendContent(strDebug.c_str(), strDebug.length());
+                            }
+                            while(continue_recv)
+                            {
+                                binaryResponse.clear();
+                                fcgi_instance->RecvAppData(binaryResponse, strerr, appstatus, protocolstatus, continue_recv);
+                                if(binaryResponse.size() > 0 && m_session->GetMethod() != hmHead)
+                                    m_session->SendContent(&binaryResponse[0], binaryResponse.size());
                             }
                         }
                         else
@@ -808,8 +891,8 @@ void Htdoc::Response()
                         m_session->SendHeader(header.Text(), header.Length());
                         m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                     }
-                    if(fcgi)
-                        delete fcgi;
+                    if(fcgi_instance)
+                        delete fcgi_instance;
                 
                 }
                 else

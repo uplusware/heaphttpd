@@ -2,19 +2,8 @@
 	Copyright (c) openheap, uplusware
 	uplusware@gmail.com
 */
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdio.h> 
-#include <sys/types.h> 
-#include <netdb.h>
-#include <sys/socket.h> 
-#include <netinet/in.h> 
-#include <arpa/inet.h>
-#include <sys/un.h>
-#include <sys/syscall.h>
-#define gettid() syscall(__NR_gettid) 
+
 #include "fastcgi.h"
-#include "util/general.h"
 
 FastCGI::FastCGI(const char* ipaddr, unsigned short port)
     : cgi_base(ipaddr, port)
@@ -268,91 +257,93 @@ int FastCGI::SendEmpty_STDIN()
 		return -1;
 }
 
-int FastCGI::RecvAppData(vector<char>& appout, string& strerr, unsigned int & appstatus, unsigned char & protocolstatus)
+int FastCGI::RecvAppData(vector<char>& appout, string& strerr, unsigned int & appstatus, unsigned char & protocolstatus,
+    BOOL& continue_recv)
 {
+    continue_recv = FALSE;
 	FCGI_Header fcgi_header;
-	bool bQuit = false;
-	while(!bQuit)
-	{
-		char * contentBuffer = NULL;
-		char paddingBuffer[255];
-		unsigned short contentLength = 0;
-		unsigned char paddingLength = 0;
-		if(Recv((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
-		{
-			contentLength = fcgi_header.contentLengthB1;
-			contentLength <<= 8;
-			contentLength += fcgi_header.contentLengthB0;
-			
-			paddingLength = fcgi_header.paddingLength;
-			
-			if(contentLength > 0)
-			{
-				contentBuffer  = new char[contentLength + 1];
-				if(contentBuffer && Recv(contentBuffer, contentLength) >= 0)
-				{
-					contentBuffer[contentLength] = '\0';
-				}
-				else
-				{
-					if(contentBuffer)
-						delete[] contentBuffer;
-					contentBuffer = NULL;
-					return -1;
-				}
-			}
-			if(paddingLength > 0)
-			{
-				Recv(paddingBuffer, paddingLength);
-			}
-			
-			switch(fcgi_header.type)
-			{
-				case FCGI_STDOUT:
-					if(contentLength > 0)
-					{
-                        for(int x = 0; x < contentLength; x++)
-                            appout.push_back(contentBuffer[x]);
-					}
-				break;
-				case FCGI_STDERR:
-					if(contentLength > 0)
+
+    char * contentBuffer = NULL;
+    char paddingBuffer[255];
+    unsigned short contentLength = 0;
+    unsigned char paddingLength = 0;
+    
+    if(Recv((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
+    {
+        contentLength = fcgi_header.contentLengthB1;
+        contentLength <<= 8;
+        contentLength += fcgi_header.contentLengthB0;
+        
+        paddingLength = fcgi_header.paddingLength;
+        
+        if(contentLength > 0)
+        {
+            contentBuffer  = new char[contentLength];
+            if(!contentBuffer || Recv(contentBuffer, contentLength) < 0)
+            {
+                
+                if(contentBuffer)
+                    delete[] contentBuffer;
+                contentBuffer = NULL;
+                return -1;
+            }
+        }
+        
+        if(paddingLength > 0)
+        {
+            Recv(paddingBuffer, paddingLength);
+        }
+        
+        switch(fcgi_header.type)
+        {
+            case FCGI_STDOUT:
+                if(contentLength > 0)
+                {
+                    for(int x = 0; x < contentLength; x++)
                     {
-						strerr += contentBuffer;
+                        appout.push_back(contentBuffer[x]);
                     }
-				break;
-				case FCGI_END_REQUEST:
-					if(contentLength > 0)
-					{
-						FCGI_EndRequestBody * end_request_body = (FCGI_EndRequestBody*)contentBuffer;
-						appstatus = end_request_body->appStatusB3 << 24;
-						appstatus += end_request_body->appStatusB2 << 16;
-						appstatus += end_request_body->appStatusB1 << 8;
-						appstatus += end_request_body->appStatusB0;
-						
-						protocolstatus = end_request_body->protocolStatus;
-					}
-					else
-					{
-						appstatus = 0;
-						protocolstatus = FCGI_UNKNOWN_STATUS;
-					}
-					bQuit = true;
-				break;
-				default:
-                    fprintf(stderr, "fastcgi: unknown type: %d\n", fcgi_header.type);
-				break;
-				
-			}
-			
-			if(contentBuffer)
-				delete[] contentBuffer;
-			contentBuffer = NULL;			
-		}
-		else
-			return -1;
-	}
-	return 0;
+                }
+                continue_recv = TRUE;
+                break;
+            case FCGI_STDERR:
+                if(contentLength > 0)
+                {
+                    strerr += contentBuffer;
+                }
+                continue_recv = TRUE;
+                break;
+            case FCGI_END_REQUEST:
+                if(contentLength > 0)
+                {
+                    FCGI_EndRequestBody * end_request_body = (FCGI_EndRequestBody*)contentBuffer;
+                    appstatus = end_request_body->appStatusB3 << 24;
+                    appstatus += end_request_body->appStatusB2 << 16;
+                    appstatus += end_request_body->appStatusB1 << 8;
+                    appstatus += end_request_body->appStatusB0;
+                    
+                    protocolstatus = end_request_body->protocolStatus;
+                }
+                else
+                {
+                    appstatus = 0;
+                    protocolstatus = FCGI_UNKNOWN_STATUS;
+                }
+                break;
+            default:
+                fprintf(stderr, "fastcgi: unknown type: %d\n", fcgi_header.type);
+                break;
+            
+        }
+        
+        if(contentBuffer)
+            delete[] contentBuffer;
+        contentBuffer = NULL;			
+    }
+    else
+        return -1;
+    
+	return contentLength;
 }
 
 

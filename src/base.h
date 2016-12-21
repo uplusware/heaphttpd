@@ -489,6 +489,12 @@ public:
 	int dbufsize;
 };
 
+enum cgi_socket_t{
+        inet_socket = 0,
+        unix_socket,
+        unknow_socket
+};
+
 enum cgi_t{
         none_e = 0,
         fastcgi_e,
@@ -499,7 +505,7 @@ typedef struct {
     string   cgi_name;
     cgi_t    cgi_type;
     string   cgi_pgm;
-    string   cgi_socktype;
+    cgi_socket_t   cgi_socktype;
 	string	 cgi_addr;
 	unsigned short cgi_port;
     string   cgi_sockfile;
@@ -542,7 +548,7 @@ public:
 	
     static string   m_phpcgi_path;
 	static string	m_php_mode;
-    static string   m_fpm_socktype;
+    static cgi_socket_t   m_fpm_socktype;
 	static string	m_fpm_addr;
 	static unsigned short m_fpm_port;
     static string   m_fpm_sockfile;

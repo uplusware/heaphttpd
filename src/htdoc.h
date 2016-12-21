@@ -32,7 +32,7 @@ protected:
 	CHttp* m_session; 
 	string m_work_path;
 	string m_php_mode;
-    string m_fpm_socktype;
+    cgi_socket_t m_fpm_socktype;
     string m_fpm_sockfile;
 	string m_fpm_addr;
 	unsigned short m_fpm_port;
@@ -43,7 +43,7 @@ protected:
 	
 public:
 	Htdoc(CHttp* session, const char* work_path, const char* php_mode, 
-        const char* fpm_socktype, const char* fpm_sockfile, 
+        cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list)
 	{

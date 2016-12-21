@@ -130,7 +130,8 @@ public:
 	int SendEmptyParams();
 	int Send_STDIN(const char* inbuf, unsigned long inbuf_len);
 	int SendEmpty_STDIN();
-	int RecvAppData(vector<char>& appout, string& errout, unsigned int& appstatus, unsigned char& protocolstatus);
+	int RecvAppData(vector<char>& appout, string& errout, unsigned int& appstatus, unsigned char& protocolstatus,
+        BOOL& continue_recv);
 	int AbortRequest();
 	int EndRequest(unsigned int app_status, unsigned char protocol_status);
 	int GetAppValue(const char* name, string& value);

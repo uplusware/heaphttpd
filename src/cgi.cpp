@@ -2,20 +2,7 @@
 	Copyright (c) openheap, uplusware
 	uplusware@gmail.com
 */
-
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdio.h> 
-#include <sys/types.h> 
-#include <netdb.h>
-#include <sys/socket.h> 
-#include <netinet/in.h> 
-#include <arpa/inet.h>
-#include <sys/un.h>
-#include <sys/syscall.h>
-#define gettid() syscall(__NR_gettid) 
 #include "cgi.h"
-#include "util/general.h"
 
 cgi_base::cgi_base(const char* ipaddr, unsigned short port)
 {

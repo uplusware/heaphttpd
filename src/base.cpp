@@ -86,7 +86,7 @@ string CHttpBase::m_ca_key_client = "/var/niuhttpd/cert/client.key";
 string CHttpBase::m_ca_password = "";
 
 string	CHttpBase::m_php_mode = "fpm";
-string  CHttpBase::m_fpm_socktype = "UNIX";
+cgi_socket_t  CHttpBase::m_fpm_socktype = unix_socket;
 string	CHttpBase::m_fpm_addr = "127.0.0.1";
 unsigned short CHttpBase::m_fpm_port = 9000;
 string CHttpBase::m_fpm_sockfile = "/var/run/php5-fpm.sock";
@@ -310,9 +310,17 @@ BOOL CHttpBase::LoadConfig()
 				strtrim(m_php_mode);
 			}
             else if(strncasecmp(strline.c_str(), "FPMSockType", strlen("FPMSockType")) == 0)
-			{
-				strcut(strline.c_str(), "=", NULL, m_fpm_socktype);
-				strtrim(m_fpm_socktype);
+			{               
+                string fpm_socktype;
+				strcut(strline.c_str(), "=", NULL, fpm_socktype);
+				strtrim(fpm_socktype);
+                if(strcasecmp(fpm_socktype.c_str(), "UNIX") == 0)
+                    m_fpm_socktype = unix_socket;
+                else if(strcasecmp(fpm_socktype.c_str(), "INET") == 0)
+                    m_fpm_socktype = inet_socket;
+                else
+                    m_fpm_socktype = unknow_socket;
+                
 			}
 			else if(strncasecmp(strline.c_str(), "FPMIPAddr", strlen("FPMIPAddr")) == 0)
 			{
@@ -377,7 +385,12 @@ BOOL CHttpBase::LoadConfig()
 				strtrim(cgi_socktype);
                 if(current_cgi_name != "")
                 {
-                    m_cgi_list[current_cgi_name].cgi_socktype = cgi_socktype;
+                    if(strcasecmp(cgi_socktype.c_str(), "UNIX") == 0)
+                        m_cgi_list[current_cgi_name].cgi_socktype = unix_socket;
+                    else if(strcasecmp(cgi_socktype.c_str(), "INET") == 0)
+                        m_cgi_list[current_cgi_name].cgi_socktype = inet_socket;
+                    else
+                        m_cgi_list[current_cgi_name].cgi_socktype = unknow_socket;
                 }
 			}
 			else if(strncasecmp(strline.c_str(), "Fast", strlen("CGIIPAddr")) == 0)

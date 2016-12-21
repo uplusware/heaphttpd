@@ -3,19 +3,19 @@
 	uplusware@gmail.com
 */
 
-#ifndef _SCGI_H_
-#define _SCGI_H_
+#ifndef _UWSGI_H_
+#define _UWSGI_H_
 
 #include "cgi.h"
 
 #define SCGI_VERSION_1 1
 
-class uWSGI : public cgi_base
+class uwsgi : public cgi_base
 {
 public:
-	uWSGI(const char* ipaddr, unsigned short port);
-	uWSGI(const char* sock_file);
-	virtual ~uWSGI();
+	uwsgi(const char* ipaddr, unsigned short port);
+	uwsgi(const char* sock_file);
+	virtual ~uwsgi();
 };
 
-#endif /* _SCGI_H_ */
+#endif /* _UWSGI_H_ */

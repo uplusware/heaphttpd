@@ -2,7 +2,7 @@
 
 import web
 import string
-urls = ("/webpy/.*", "hello")
+urls = ("/fcgi/.*", "hello")
 app = web.application(urls, globals())
 
 class hello: 
@@ -15,7 +15,7 @@ class hello:
         response_body = 'Hello, POST based on fastcgi! ' + i.abcd + " + " + i.efgh + " = " + str((string.atoi(i.abcd) + string.atoi(i.efgh)))
         web.header('Content-Length', '%d' % len(response_body));
         return response_body
-        
-web.wsgi.runwsgi = lambda func, addr=None: web.wsgi.runfcgi(func, addr)
+
+web.wsgi.runwsgi = lambda func, addr=("127.0.0.1", 9003): web.wsgi.runfcgi(func, addr)
 if __name__ == "__main__":
     app.run()

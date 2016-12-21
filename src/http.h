@@ -50,7 +50,7 @@ public:
 	CHttp(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
-        const char* fpm_socktype, const char* fpm_sockfile, 
+        cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list,
         const char* private_path, AUTH_SCHEME wwwauth_scheme = asNone,
@@ -86,7 +86,7 @@ public:
 	void SetMetaVarsToEnv();
 	void SetMetaVar(const char* name, const char* val);
 	void WriteDataToCGI(int fd);
-    void ReadDataFromCGI(int fd, string& strResponse);
+    void ReadDataFromCGI(int fd, vector<char>& binaryResponse, BOOL& continue_recv);
 	
 	int parse_multipart_value(const char* szKey, fbufseg & seg);
 	int parse_multipart_filename(const char* szKey, string& filename);
@@ -194,7 +194,7 @@ protected:
     string m_work_path;
 
 	string m_php_mode;
-    string m_fpm_socktype;
+    cgi_socket_t m_fpm_socktype;
     string m_fpm_sockfile;
 	string m_fpm_addr;
 	unsigned short m_fpm_port;

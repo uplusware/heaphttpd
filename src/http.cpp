@@ -32,7 +32,7 @@ const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DEL
 CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
 	const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
-    const char* fpm_socktype, const char* fpm_sockfile,
+    cgi_socket_t fpm_socktype, const char* fpm_sockfile,
     const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
     map<string, cgi_cfg_t>* cgi_list,
 	const char* private_path, AUTH_SCHEME wwwauth_scheme, 
@@ -497,7 +497,7 @@ void CHttp::Response()
     if(!skipAction)
     {
         Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), 
-            m_fpm_socktype.c_str(), m_fpm_sockfile.c_str(), 
+            m_fpm_socktype, m_fpm_sockfile.c_str(), 
             m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str(),
             m_cgi_list);
 
@@ -892,16 +892,24 @@ void CHttp::WriteDataToCGI(int fd)
 	Write(fd, m_cgi.GetData(), m_cgi.GetDataLen());
 }
 
-void CHttp::ReadDataFromCGI(int fd, string& strResponse)
+void CHttp::ReadDataFromCGI(int fd, vector<char>& binaryResponse, BOOL& continue_recv)
 {
+    continue_recv = FALSE;
     char szBuf[4096];
     while(1)
     {
         int rlen = read(fd, szBuf, 4095);
         if(rlen > 0)
         {
-            szBuf[rlen] = '\0';
-            strResponse += szBuf;
+            for(int x = 0; x < rlen; x++)
+            {
+                binaryResponse.push_back(szBuf[x]);
+            }
+            if(binaryResponse.size() >= 1024*64) /* 64k */
+            {
+                continue_recv = TRUE;
+                break;
+            }
         }
         else if(rlen <= 0)
             break;

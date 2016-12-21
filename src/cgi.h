@@ -6,12 +6,27 @@
 #ifndef _CGI_H_
 #define _CGI_H_
 
-#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h> 
+#include <sys/types.h> 
+#include <netdb.h>
+#include <sys/socket.h> 
+#include <netinet/in.h> 
+#include <arpa/inet.h>
+#include <sys/un.h>
+#include <sys/syscall.h>
 #include <string.h>
 #include <string>
 #include <vector>
 #include <map>
+
 using namespace std;
+
+#include "util/general.h"
+
+#define gettid() syscall(__NR_gettid)
+
 
 typedef enum {
     INET_SOCK = 0,
