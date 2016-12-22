@@ -299,7 +299,13 @@ int CHttp::SendHeader(const char* buf, int len)
         m_http2->TransHttp1SendHttp2Header(m_http2_stream_ind, strHeader.c_str(), strHeader.length());
     }
     else
+    {
+        if(strstr(strHeader.c_str(), "\r\nContent-Length:") == NULL)
+        {
+            m_keep_alive = FALSE;
+        }
         return HttpSend(strHeader.c_str(), strHeader.length());
+    }
 }
 
 int CHttp::SendContent(const char* buf, int len)
