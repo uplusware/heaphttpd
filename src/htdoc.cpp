@@ -332,7 +332,7 @@ void Htdoc::Response()
 
 		if(access(strcgipath.c_str(), 01) != -1)
 		{
-		    //printf("SCRIPT_NAME: %s PATH_INFO: %s\n", script_name.c_str(), path_info.c_str());
+		    printf("SCRIPT_NAME: %s PATH_INFO: %s\n", script_name.c_str(), path_info.c_str());
 		    m_session->SetMetaVar("SCRIPT_NAME", script_name.c_str());
   		    m_session->SetMetaVar("PATH_INFO", path_info.c_str());
 
@@ -343,19 +343,27 @@ void Htdoc::Response()
 			if(cgipid > 0)
 			{
                 close(fds[1]);
-                m_session->WriteDataToCGI(fds[0]);
+                
+                forkcgi* cgi_instance = new forkcgi(fds[0]);
+                cgi_instance->SendData(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
+                
 				shutdown(fds[0], SHUT_WR);
 				
+                
                 BOOL continue_recv;
                 vector<char> binaryResponse;
                 string strHeader;
-                m_session->ReadDataFromCGI(fds[0], binaryResponse, continue_recv);
+                cgi_instance->ReadAppData(binaryResponse, continue_recv);
 				if(binaryResponse.size() > 0)
                 {
                     const char* pbody;
                     unsigned int body_len;
                     memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
                     
+                    /* memsplit2str removed the \r\n\r\n.
+                       they are the last non-empty line's \r\n and the last empty line in header.
+                       So need to appending \r\n
+                    */
                     if(strHeader != "")
                     {
                         strHeader += "\r\n";
@@ -364,8 +372,14 @@ void Htdoc::Response()
                     CHttpResponseHdr header;
                     if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
                     {
-                        header.SetStatusCode(strHeader.c_str() + strlen("Status: "));
-                        header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2);
+                        unsigned int nStatusCode = 200;
+                        sscanf(strHeader.c_str(), "Status: %d %*", &nStatusCode);
+                        
+                        char szStatusCode[64];
+                        sprintf(szStatusCode, "%u", nStatusCode);
+                        header.SetStatusCode(szStatusCode);
+                        
+                        header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2 /* 2 is length of \r\n */);
                     }
                     else
                     {
@@ -381,7 +395,7 @@ void Htdoc::Response()
                     while(continue_recv)
                     {
                         binaryResponse.clear();
-                        m_session->ReadDataFromCGI(fds[0], binaryResponse, continue_recv);
+                        cgi_instance->ReadAppData(binaryResponse, continue_recv);
                         if(binaryResponse.size() > 0 && m_session->GetMethod() != hmHead)
                             m_session->SendContent(&binaryResponse[0], binaryResponse.size());
                     }
@@ -398,6 +412,8 @@ void Htdoc::Response()
                     m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                 }
                 close(fds[0]);
+                if(cgi_instance)
+                    delete cgi_instance;
 				waitpid(cgipid, NULL, 0);
 			}
 			else if(cgipid == 0)
@@ -501,6 +517,10 @@ void Htdoc::Response()
                         unsigned int body_len;
                         memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
                         
+                        /* memsplit2str removed the \r\n\r\n.
+                           they are the last non-empty line's \r\n and the last empty line in header.
+                           So need to appending \r\n
+                        */
                         if(strHeader != "")
                         {
                             strHeader += "\r\n";
@@ -509,8 +529,14 @@ void Htdoc::Response()
                         CHttpResponseHdr header;
                         if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
                         {
-                            header.SetStatusCode(strHeader.c_str() + strlen("Status: "));
-                            header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2);
+                            unsigned int nStatusCode = 200;
+                            sscanf(strHeader.c_str(), "Status: %d %*", &nStatusCode);
+                            
+                            char szStatusCode[64];
+                            sprintf(szStatusCode, "%u", nStatusCode);
+                            header.SetStatusCode(szStatusCode);
+                            
+                            header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2 /* 2 is length of \r\n */);
                         }
                         else
                         {
@@ -589,6 +615,10 @@ void Htdoc::Response()
                         unsigned int body_len;
                         memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
                         
+                        /* memsplit2str removed the \r\n\r\n.
+                           they are the last non-empty line's \r\n and the last empty line in header.
+                           So need to appending \r\n
+                        */
                         if(strHeader != "")
                         {
                             strHeader += "\r\n";
@@ -597,8 +627,14 @@ void Htdoc::Response()
                         CHttpResponseHdr header;
                         if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
                         {
-                            header.SetStatusCode(strHeader.c_str() + strlen("Status: "));
-                            header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2);
+                            unsigned int nStatusCode = 200;
+                            sscanf(strHeader.c_str(), "Status: %d %*", &nStatusCode);
+                            
+                            char szStatusCode[64];
+                            sprintf(szStatusCode, "%u", nStatusCode);
+                            header.SetStatusCode(szStatusCode);
+                            
+                            header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2 /* 2 is length of \r\n */);
                         }
                         else
                         {
@@ -675,19 +711,25 @@ void Htdoc::Response()
                     if(cgipid > 0)
                     {
                         close(fds[1]);
-                        m_session->WriteDataToCGI(fds[0]);
+                        
+                        forkcgi* cgi_instance = new forkcgi(fds[0]);
+                        cgi_instance->SendData(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
                         shutdown(fds[0], SHUT_WR);
                         
                         BOOL continue_recv;
                         vector<char> binaryResponse;
                         string strHeader;
-                        m_session->ReadDataFromCGI(fds[0], binaryResponse, continue_recv);
+                        cgi_instance->ReadAppData(binaryResponse, continue_recv);
                         if(binaryResponse.size() > 0)
                         {
                             const char* pbody;
                             unsigned int body_len;
                             memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
                             
+                            /* memsplit2str removed the \r\n\r\n.
+                               they are the last non-empty line's \r\n and the last empty line in header.
+                               So need to appending \r\n
+                            */
                             if(strHeader != "")
                             {
                                 strHeader += "\r\n";
@@ -710,8 +752,14 @@ void Htdoc::Response()
                             CHttpResponseHdr header;
                             if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
                             {
-                                header.SetStatusCode(strHeader.c_str() + strlen("Status: "));
-                                header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2);
+                                unsigned int nStatusCode = 200;
+                                sscanf(strHeader.c_str(), "Status: %d %*", &nStatusCode);
+                                
+                                char szStatusCode[64];
+                                sprintf(szStatusCode, "%u", nStatusCode);
+                                header.SetStatusCode(szStatusCode);
+                                
+                                header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2 /* 2 is length of \r\n */);
                             }
                             else
                             {
@@ -727,7 +775,7 @@ void Htdoc::Response()
                             while(continue_recv)
                             {
                                 binaryResponse.clear();
-                                m_session->ReadDataFromCGI(fds[0], binaryResponse, continue_recv);
+                                cgi_instance->ReadAppData(binaryResponse, continue_recv);
                                 if(binaryResponse.size() > 0 && m_session->GetMethod() != hmHead)
                                     m_session->SendContent(&binaryResponse[0], binaryResponse.size());
                             }
@@ -744,6 +792,8 @@ void Htdoc::Response()
                             m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                         }
                         close(fds[0]);
+                        if(cgi_instance)
+                            delete cgi_instance;
                         waitpid(cgipid, NULL, 0);
                     }
                     else if(cgipid == 0)
@@ -797,7 +847,6 @@ void Htdoc::Response()
                     }
                     if(fcgi_instance && fcgi_instance->Connect() == 0 && fcgi_instance->BeginRequest(1) == 0)
                     {	
-                        //printf("BeginRequest end\n");
                         if(m_session->m_cgi.m_meta_var.size() > 0)
                             fcgi_instance->SendParams(m_session->m_cgi.m_meta_var);
                         fcgi_instance->SendEmptyParams();
@@ -821,7 +870,11 @@ void Htdoc::Response()
                             const char* pbody;
                             unsigned int body_len;
                             memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
-                                                            
+                            
+                            /* memsplit2str removed the \r\n\r\n.
+                               they are the last non-empty line's \r\n and the last empty line in header.
+                               So need to appending \r\n
+                            */                            
                             if(strHeader != "")
                             {
                                 strHeader += "\r\n";
@@ -831,8 +884,14 @@ void Htdoc::Response()
                             
                             if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
                             {
-                                header.SetStatusCode(strHeader.c_str() + strlen("Status: "));
-                                header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2);
+                                unsigned int nStatusCode = 200;
+                                sscanf(strHeader.c_str(), "Status: %d %*", &nStatusCode);
+                                
+                                char szStatusCode[64];
+                                sprintf(szStatusCode, "%u", nStatusCode);
+                                header.SetStatusCode(szStatusCode);
+                                
+                                header.SetFields(strstr(strHeader.c_str(), "\r\n") + 2 /* 2 is length of \r\n */);
                             }
                             else
                             {

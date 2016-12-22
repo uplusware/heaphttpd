@@ -85,8 +85,32 @@
         </table>
         </form>
 
-	<p>Spawn-fcgi/Webpy):(<a href="/webpy/">Webpy</a>)</p>
+	<p>Spawn-fcgi/Webpy:(<a href="/webpy/">Webpy</a>)</p>
         <form method="post" action="/webpy/hello" >
+        <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
+                <tr>
+                        <td><input type="text" id="abcd" name="abcd" size="20" onMouseOver="this.focus();this.select()"></td>
+                        <td>+</td>
+                        <td><input type="text" id="efgh" name="efgh" size="20" onMouseOver="this.focus();this.select()"></td>
+                        <td><input type="submit" id="cal" name="cal" size="20" value="="></td>
+                </tr>
+        </table>
+        </form>
+    
+    <p>FastCGI:(<a href="/fcgi/">DEMO for GET</a>)</p>
+        <form method="post" action="/fcgi/hello" >
+        <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
+                <tr>
+                        <td><input type="text" id="abcd" name="abcd" size="20" onMouseOver="this.focus();this.select()"></td>
+                        <td>+</td>
+                        <td><input type="text" id="efgh" name="efgh" size="20" onMouseOver="this.focus();this.select()"></td>
+                        <td><input type="submit" id="cal" name="cal" size="20" value="="></td>
+                </tr>
+        </table>
+        </form>
+    
+    <p>SCGI:(<a href="/scgi/">DEMO for GET</a>)</p>
+        <form method="post" action="/scgi/hello" >
         <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
                 <tr>
                         <td><input type="text" id="abcd" name="abcd" size="20" onMouseOver="this.focus();this.select()"></td>

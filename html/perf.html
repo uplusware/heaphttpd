@@ -53,7 +53,7 @@
 		if(!xmlHttp)
 			return;
 		
-		var qUrl = "/api/perf";
+		var qUrl = "/api/perf?t=" + new Date().getTime();
 		
 	    xmlHttp.onreadystatechange = function()
 		{
@@ -65,15 +65,15 @@
 				}
 			}
 		}
-		xmlHttp.open("GET", qUrl , true);
-		xmlHttp.send("");
+		xmlHttp.open("POST", qUrl , true);
+		xmlHttp.send("data=" + new Date().getTime());
 	}
 
 	function ontimer()
 	{
 		
 		perf_test();
-		setTimeout('ontimer()',10);
+		setTimeout('ontimer()',500);
 	}
 </script>
 <title>Performace Test</title>

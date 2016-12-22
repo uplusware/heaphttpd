@@ -893,35 +893,6 @@ void CHttp::SetMetaVarsToEnv()
 	
 }
 
-void CHttp::WriteDataToCGI(int fd)
-{
-	Write(fd, m_cgi.GetData(), m_cgi.GetDataLen());
-}
-
-void CHttp::ReadDataFromCGI(int fd, vector<char>& binaryResponse, BOOL& continue_recv)
-{
-    continue_recv = FALSE;
-    char szBuf[4096];
-    while(1)
-    {
-        int rlen = read(fd, szBuf, 4095);
-        if(rlen > 0)
-        {
-            for(int x = 0; x < rlen; x++)
-            {
-                binaryResponse.push_back(szBuf[x]);
-            }
-            if(binaryResponse.size() >= 1024*64) /* 64k */
-            {
-                continue_recv = TRUE;
-                break;
-            }
-        }
-        else if(rlen <= 0)
-            break;
-    }
-}
-
 void CHttp::SetServiceObject(const char * objname, SERVICE_OBJECT_HANDLE objptr)
 {
    m_srvobj->SetObj(objname, objptr);

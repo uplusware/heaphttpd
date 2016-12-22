@@ -38,6 +38,7 @@ class cgi_base
 public:
 	cgi_base(const char* ipaddr, unsigned short port);
 	cgi_base(const char* sock_file);
+    cgi_base(int sockfd);
 	virtual ~cgi_base();
 	
 	int Connect();
@@ -50,6 +51,17 @@ private:
 	string m_strSockfile;
 	int m_sockfd;
     CGI_SOCK m_sockType;
+};
+
+
+class forkcgi : public cgi_base
+{
+public:
+	forkcgi(int sockfd);
+	virtual ~forkcgi();
+    
+    int SendData(const char* data, int len);
+    int ReadAppData(vector<char>& binaryResponse, BOOL& continue_recv);
 };
 
 #endif /* _CGI_H_ */

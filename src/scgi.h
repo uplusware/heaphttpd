@@ -18,7 +18,7 @@ public:
 	virtual ~SimpleCGI();
     
     int SendParamsAndData(map<string, string> &params_map, const char* postdata, unsigned int postdata_len);
-    int RecvAppData(vector<char> &appout, BOOL& continue_recv);
+    int RecvAppData(vector<char> &binaryResponse, BOOL& continue_recv);
 };
 
 #endif /* _SCGI_H_ */

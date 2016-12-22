@@ -85,8 +85,6 @@ public:
 	
 	void SetMetaVarsToEnv();
 	void SetMetaVar(const char* name, const char* val);
-	void WriteDataToCGI(int fd);
-    void ReadDataFromCGI(int fd, vector<char>& binaryResponse, BOOL& continue_recv);
 	
 	int parse_multipart_value(const char* szKey, fbufseg & seg);
 	int parse_multipart_filename(const char* szKey, string& filename);

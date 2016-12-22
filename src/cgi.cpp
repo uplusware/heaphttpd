@@ -19,6 +19,12 @@ cgi_base::cgi_base(const char* sock_file)
     m_sockType = UNIX_SOCK;
 }
 
+cgi_base::cgi_base(int sockfd)
+{
+	m_sockfd = sockfd;
+    m_sockType = UNIX_SOCK;
+}
+
 cgi_base::~cgi_base()
 {
 	if(m_sockfd >= 0)
@@ -157,11 +163,55 @@ int cgi_base::Connect()
 
 int cgi_base::Send(const char* buf, unsigned long long len)
 {
-	//printf("SEND: %d\n", len);
 	return m_sockfd >= 0 ? _Send_(m_sockfd, (char*)buf, len) : -1;
 }
 
 int cgi_base::Recv(const char* buf, unsigned long long len)
 {
 	return m_sockfd >= 0 ? _Recv_(m_sockfd, (char*)buf, len) : -1;
+}
+
+// classic cgi mode
+//forkcgi
+
+forkcgi::forkcgi(int sockfd)
+    : cgi_base(sockfd)
+{
+    
+}
+
+forkcgi::~forkcgi()
+{
+    
+}
+
+int forkcgi::SendData(const char* data, int len)
+{
+	return Send(data, len);
+}
+
+int forkcgi::ReadAppData(vector<char>& binaryResponse, BOOL& continue_recv)
+{
+    continue_recv = FALSE;
+    char szBuf[4096];
+    while(1)
+    {
+        int rlen = Recv(szBuf, 4095);
+        if(rlen > 0)
+        {
+            for(int x = 0; x < rlen; x++)
+            {
+                binaryResponse.push_back(szBuf[x]);
+            }
+            if(binaryResponse.size() >= 1024*64) /* 64k */
+            {
+                continue_recv = TRUE;
+                break;
+            }
+        }
+        else if(rlen <= 0)
+            break;
+    }
+    
+    return binaryResponse.size();
 }

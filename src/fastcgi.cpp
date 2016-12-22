@@ -257,7 +257,7 @@ int FastCGI::SendEmpty_STDIN()
 		return -1;
 }
 
-int FastCGI::RecvAppData(vector<char>& appout, string& strerr, unsigned int & appstatus, unsigned char & protocolstatus,
+int FastCGI::RecvAppData(vector<char>& binaryResponse, string& strerr, unsigned int & appstatus, unsigned char & protocolstatus,
     BOOL& continue_recv)
 {
     continue_recv = FALSE;
@@ -301,7 +301,7 @@ int FastCGI::RecvAppData(vector<char>& appout, string& strerr, unsigned int & ap
                 {
                     for(int x = 0; x < contentLength; x++)
                     {
-                        appout.push_back(contentBuffer[x]);
+                        binaryResponse.push_back(contentBuffer[x]);
                     }
                 }
                 continue_recv = TRUE;

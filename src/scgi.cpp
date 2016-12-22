@@ -23,30 +23,36 @@ SimpleCGI::~SimpleCGI()
 int SimpleCGI::SendParamsAndData(map<string, string> &params_map, const char* postdata, unsigned int postdata_len)
 {
     vector<char> scgi_send_data;
-    const char* pc = "CONTENT_LENGTH";
-    for(int x = 0; x <= strlen(pc); x++)
+    //MUST have CONTENT_LENGTH even if the value is 0
+    const char* p_temp = "CONTENT_LENGTH";
+    for(int x = 0; x <= strlen(p_temp); x++)
     {
-        scgi_send_data.push_back(pc[x]);
+        scgi_send_data.push_back(p_temp[x]);
     }
     
-    pc = params_map["CONTENT_LENGTH"].c_str();
+    char szdatalen[64];
+    sprintf(szdatalen, "%u", postdata_len);
+    p_temp = szdatalen;
     
-    for(int x = 0; x <= strlen(pc); x++)
+    for(int x = 0; x <= strlen(p_temp); x++)
     {
-        scgi_send_data.push_back(pc[x]);
+        scgi_send_data.push_back(p_temp[x]);
     }
     
-    pc = "SCGI";
-    for(int x = 0; x <= strlen(pc); x++)
+    //MUST have SCGI and value is 1
+    p_temp = "SCGI";
+    for(int x = 0; x <= strlen(p_temp); x++)
     {
-        scgi_send_data.push_back(pc[x]);
+        scgi_send_data.push_back(p_temp[x]);
     }
     
-    pc = "1";
-    for(int x = 0; x <= strlen(pc); x++)
+    p_temp = "1";
+    for(int x = 0; x <= strlen(p_temp); x++)
     {
-        scgi_send_data.push_back(pc[x]);
+        scgi_send_data.push_back(p_temp[x]);
     }
+    
+    //Other paramters except of CONTENT_LENGTH
     map<string, string>::iterator it;
     for(it = params_map.begin(); it != params_map.end(); ++it)
     {
@@ -54,16 +60,16 @@ int SimpleCGI::SendParamsAndData(map<string, string> &params_map, const char* po
         {
             if(it->second != "")
             {
-                pc = it->first.c_str();
-                for(int x = 0; x <= strlen(pc); x++)
+                p_temp = it->first.c_str();
+                for(int x = 0; x <= strlen(p_temp); x++)
                 {
-                    scgi_send_data.push_back(pc[x]);
+                    scgi_send_data.push_back(p_temp[x]);
                 }
                 
-                pc = it->second.c_str();
-                for(int x = 0; x <= strlen(pc); x++)
+                p_temp = it->second.c_str();
+                for(int x = 0; x <= strlen(p_temp); x++)
                 {
-                    scgi_send_data.push_back(pc[x]);
+                    scgi_send_data.push_back(p_temp[x]);
                 }
             }
         }
@@ -72,10 +78,10 @@ int SimpleCGI::SendParamsAndData(map<string, string> &params_map, const char* po
     char szlen[64];
     sprintf(szlen, "%u:", scgi_send_data.size());
     
-    pc = ",";
-    for(int x = 0; x < strlen(pc); x++) //without <00>
+    p_temp = ",";
+    for(int x = 0; x < strlen(p_temp); x++) //without <00>
     {
-        scgi_send_data.push_back(pc[x]);
+        scgi_send_data.push_back(p_temp[x]);
     }
     
     for(int x = 0; x < postdata_len; x++)
@@ -87,7 +93,7 @@ int SimpleCGI::SendParamsAndData(map<string, string> &params_map, const char* po
     return Send(&scgi_send_data[0], scgi_send_data.size());
 }
 
-int SimpleCGI::RecvAppData(vector<char> &appout, BOOL& continue_recv)
+int SimpleCGI::RecvAppData(vector<char> &binaryResponse, BOOL& continue_recv)
 {
     continue_recv = FALSE;
     char buf[1501];
@@ -99,13 +105,13 @@ int SimpleCGI::RecvAppData(vector<char> &appout, BOOL& continue_recv)
         
         for(int x = 0; x < rlen; x++)
         {        
-            appout.push_back(buf[x]);
+            binaryResponse.push_back(buf[x]);
         }
-        if(appout.size() >= 1024*64) /* 64k */
+        if(binaryResponse.size() >= 1024*64) /* 64k */
         {
             continue_recv = TRUE;
             break;
         }
     }
-    return appout.size();
+    return binaryResponse.size();
 }
