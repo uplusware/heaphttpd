@@ -10,12 +10,12 @@
 
 #define SCGI_VERSION_1 1
 
-class SimpleCGI : public cgi_base
+class scgi : public cgi_base
 {
 public:
-	SimpleCGI(const char* ipaddr, unsigned short port);
-	SimpleCGI(const char* sock_file);
-	virtual ~SimpleCGI();
+	scgi(const char* ipaddr, unsigned short port);
+	scgi(const char* sock_file);
+	virtual ~scgi();
     
     int SendParamsAndData(map<string, string> &params_map, const char* postdata, unsigned int postdata_len);
     int RecvAppData(vector<char> &binaryResponse, BOOL& continue_recv);

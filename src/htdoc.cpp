@@ -474,9 +474,9 @@ void Htdoc::Response()
             if(cgi_cfg->second.cgi_type == fastcgi_e)
             {
                 if(cgi_cfg->second.cgi_socktype == unix_socket)
-                    cgi_instance = new FastCGI(cgi_cfg->second.cgi_sockfile.c_str());
+                    cgi_instance = new fastcgi(cgi_cfg->second.cgi_sockfile.c_str());
                 else if(cgi_cfg->second.cgi_socktype == inet_socket)
-                    cgi_instance = new FastCGI(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
+                    cgi_instance = new fastcgi(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
                 else
                 {
                     
@@ -490,7 +490,7 @@ void Htdoc::Response()
                     m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                     return;
                 }
-                FastCGI* fcgi_instance = dynamic_cast<FastCGI*>(cgi_instance);
+                fastcgi* fcgi_instance = dynamic_cast<fastcgi*>(cgi_instance);
                 if(fcgi_instance && fcgi_instance->Connect() == 0 && fcgi_instance->BeginRequest(1) == 0)
                 {	
                     if(m_session->m_cgi.m_meta_var.size() > 0)
@@ -498,9 +498,9 @@ void Htdoc::Response()
                     fcgi_instance->SendEmptyParams();
                     if(m_session->m_cgi.GetDataLen() > 0)
                     {
-                        fcgi_instance->Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
+                        fcgi_instance->SendRequestData(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
                     }
-                    fcgi_instance->SendEmpty_STDIN();
+                    fcgi_instance->SendEmptyRequestData();
                     
                     vector<char> binaryResponse;
                     string strHeader;
@@ -586,9 +586,9 @@ void Htdoc::Response()
             else if(cgi_cfg->second.cgi_type == scgi_e)
             {
                 if(cgi_cfg->second.cgi_socktype == unix_socket)
-                    cgi_instance = new SimpleCGI(cgi_cfg->second.cgi_sockfile.c_str());
+                    cgi_instance = new scgi(cgi_cfg->second.cgi_sockfile.c_str());
                 else if(cgi_cfg->second.cgi_socktype == inet_socket)
-                    cgi_instance = new SimpleCGI(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
+                    cgi_instance = new scgi(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
                 else
                 {
                     CHttpResponseHdr header;
@@ -601,7 +601,7 @@ void Htdoc::Response()
                     m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                     return;
                 }
-                SimpleCGI* scgi_instance = dynamic_cast<SimpleCGI*>(cgi_instance);
+                scgi* scgi_instance = dynamic_cast<scgi*>(cgi_instance);
                 if(scgi_instance && scgi_instance->Connect() == 0)
                 {
                     vector<char> binaryResponse;
@@ -828,11 +828,11 @@ void Htdoc::Response()
                     m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
                     m_session->SetMetaVar("REDIRECT_STATUS", "200");
                     
-                    FastCGI* fcgi_instance = NULL;
+                    fastcgi* fcgi_instance = NULL;
                     if(m_fpm_socktype == unix_socket)
-                        fcgi_instance = new FastCGI(m_fpm_sockfile.c_str());
+                        fcgi_instance = new fastcgi(m_fpm_sockfile.c_str());
                     else if(m_fpm_socktype == inet_socket)
-                        fcgi_instance = new FastCGI(m_fpm_addr.c_str(), m_fpm_port);
+                        fcgi_instance = new fastcgi(m_fpm_addr.c_str(), m_fpm_port);
                     else
                     {
                         CHttpResponseHdr header;
@@ -852,9 +852,9 @@ void Htdoc::Response()
                         fcgi_instance->SendEmptyParams();
                         if(m_session->m_cgi.GetDataLen() > 0)
                         {
-                            fcgi_instance->Send_STDIN(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
+                            fcgi_instance->SendRequestData(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
                         }
-                        fcgi_instance->SendEmpty_STDIN();
+                        fcgi_instance->SendEmptyRequestData();
                         
                         vector<char> binaryResponse;
                         string strHeader, strDebug;

@@ -4,23 +4,23 @@
 */
 #include "scgi.h"
 
-SimpleCGI::SimpleCGI(const char* ipaddr, unsigned short port)
+scgi::scgi(const char* ipaddr, unsigned short port)
     : cgi_base(ipaddr, port)
 {
     
 }
 
-SimpleCGI::SimpleCGI(const char* sock_file)
+scgi::scgi(const char* sock_file)
     : cgi_base(sock_file)
 {
 }
 
-SimpleCGI::~SimpleCGI()
+scgi::~scgi()
 {
     
 }
 
-int SimpleCGI::SendParamsAndData(map<string, string> &params_map, const char* postdata, unsigned int postdata_len)
+int scgi::SendParamsAndData(map<string, string> &params_map, const char* postdata, unsigned int postdata_len)
 {
     vector<char> scgi_send_data;
     //MUST have CONTENT_LENGTH even if the value is 0
@@ -93,7 +93,7 @@ int SimpleCGI::SendParamsAndData(map<string, string> &params_map, const char* po
     return Send(&scgi_send_data[0], scgi_send_data.size());
 }
 
-int SimpleCGI::RecvAppData(vector<char> &binaryResponse, BOOL& continue_recv)
+int scgi::RecvAppData(vector<char> &binaryResponse, BOOL& continue_recv)
 {
     continue_recv = FALSE;
     char buf[1501];

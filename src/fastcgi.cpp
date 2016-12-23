@@ -5,24 +5,24 @@
 
 #include "fastcgi.h"
 
-FastCGI::FastCGI(const char* ipaddr, unsigned short port)
+fastcgi::fastcgi(const char* ipaddr, unsigned short port)
     : cgi_base(ipaddr, port)
 {
 
 }
 
-FastCGI::FastCGI(const char* sock_file)
+fastcgi::fastcgi(const char* sock_file)
     : cgi_base(sock_file)
 {
 
 }
 
-FastCGI::~FastCGI()
+fastcgi::~fastcgi()
 {
 
 }
 
-int FastCGI::BeginRequest(unsigned short request_id)
+int fastcgi::BeginRequest(unsigned short request_id)
 {
 	m_RequestIDB0 = request_id & 0x00FF;
 	m_RequestIDB1 = (request_id & 0xFF00) >> 8;
@@ -48,7 +48,7 @@ int FastCGI::BeginRequest(unsigned short request_id)
 	}
 }
 
-int FastCGI::SendParams(map<string, string> &params_map)
+int fastcgi::SendParams(map<string, string> &params_map)
 {
 	FCGI_Header fcgi_header;
 	memset(&fcgi_header, 0, sizeof(FCGI_Header));
@@ -141,7 +141,6 @@ int FastCGI::SendParams(map<string, string> &params_map)
 					name_value_pair44.valueLengthB3 = (value_len & 0xFF000000) >> 24;
 					Send((char*)&name_value_pair44, sizeof(FCGI_NameValuePair44));
 				}
-				/* printf("%s = [%s]\n", it->first.c_str(), it->second.c_str()); */
 				Send((char*)it->first.c_str(), it->first.length());
 				Send((char*)it->second.c_str(), it->second.length());
 			}
@@ -152,7 +151,7 @@ int FastCGI::SendParams(map<string, string> &params_map)
 		return -1;
 }
 
-int FastCGI::SendParams(const char* name, unsigned int name_len, const char* value, unsigned int value_len)
+int fastcgi::SendParams(const char* name, unsigned int name_len, const char* value, unsigned int value_len)
 {
 	FCGI_Header fcgi_header;
 	memset(&fcgi_header, 0, sizeof(FCGI_Header));
@@ -197,7 +196,7 @@ int FastCGI::SendParams(const char* name, unsigned int name_len, const char* val
 		return -1;
 }
 
-int FastCGI::SendEmptyParams()
+int fastcgi::SendEmptyParams()
 {
 	FCGI_Header fcgi_header;
 	memset(&fcgi_header, 0, sizeof(FCGI_Header));
@@ -216,7 +215,7 @@ int FastCGI::SendEmptyParams()
 		return -1;
 }
 
-int FastCGI::Send_STDIN(const char* inbuf, unsigned long inbuf_len)
+int fastcgi::SendRequestData(const char* inbuf, unsigned long inbuf_len)
 {
 	FCGI_Header fcgi_header;
 	memset(&fcgi_header, 0, sizeof(FCGI_Header));
@@ -238,7 +237,7 @@ int FastCGI::Send_STDIN(const char* inbuf, unsigned long inbuf_len)
 		return -1;
 }
 
-int FastCGI::SendEmpty_STDIN()
+int fastcgi::SendEmptyRequestData()
 {
 	FCGI_Header fcgi_header;
 	memset(&fcgi_header, 0, sizeof(FCGI_Header));
@@ -257,7 +256,7 @@ int FastCGI::SendEmpty_STDIN()
 		return -1;
 }
 
-int FastCGI::RecvAppData(vector<char>& binaryResponse, string& strerr, unsigned int & appstatus, unsigned char & protocolstatus,
+int fastcgi::RecvAppData(vector<char>& binaryResponse, string& strerr, unsigned int & appstatus, unsigned char & protocolstatus,
     BOOL& continue_recv)
 {
     continue_recv = FALSE;
@@ -347,7 +346,7 @@ int FastCGI::RecvAppData(vector<char>& binaryResponse, string& strerr, unsigned 
 }
 
 
-int FastCGI::AbortRequest()
+int fastcgi::AbortRequest()
 {
 	FCGI_Header fcgi_header;
 	memset(&fcgi_header, 0, sizeof(FCGI_Header));
@@ -363,7 +362,7 @@ int FastCGI::AbortRequest()
 		return -1;
 }
 
-int FastCGI::EndRequest(unsigned int app_status, unsigned char protocol_status)
+int fastcgi::EndRequest(unsigned int app_status, unsigned char protocol_status)
 {
 	FCGI_Header fcgi_header;
 	memset(&fcgi_header, 0, sizeof(FCGI_Header));
@@ -387,7 +386,7 @@ int FastCGI::EndRequest(unsigned int app_status, unsigned char protocol_status)
 		return -1;
 }
 
-int FastCGI::GetAppValue(const char* name, string& value)
+int fastcgi::GetAppValue(const char* name, string& value)
 {
 	FCGI_Header fcgi_header;
 	memset(&fcgi_header, 0, sizeof(FCGI_Header));
@@ -459,4 +458,26 @@ int FastCGI::GetAppValue(const char* name, string& value)
 	else
 		return -1;
 
+}
+
+int fastcgi::SendParamsAndData(map<string, string> &params_map, const char* postdata, unsigned int postdata_len)
+{
+    if(BeginRequest(1) != 0)
+        return -1;
+    
+    if(params_map.size() > 0)
+    {
+        if(SendParams(params_map) < 0)
+            return -1;
+    }
+    
+    if(SendEmptyParams() < 0)
+        return -1;
+    
+    if(postdata_len > 0)
+    {
+        if(SendRequestData(postdata, postdata_len) < 0)
+            return -1;
+    }
+    return SendEmptyRequestData();
 }

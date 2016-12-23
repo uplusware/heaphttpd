@@ -117,19 +117,21 @@ typedef struct {
 	unsigned char valueData[valueLength((B3 & 0x7f) << 24) + (B2 << 16) + (B1 << 8) + B0];*/
 } FCGI_NameValuePair44;
 
-class FastCGI : public cgi_base
+class fastcgi : public cgi_base
 {
 public:
-	FastCGI(const char* ipaddr, unsigned short port);
-	FastCGI(const char* sock_file);
-	virtual ~FastCGI();
+	fastcgi(const char* ipaddr, unsigned short port);
+	fastcgi(const char* sock_file);
+	virtual ~fastcgi();
 	
+    int SendParamsAndData(map<string, string> &params_map, const char* postdata, unsigned int postdata_len);
+    
 	int BeginRequest(unsigned short request_id);
 	int SendParams(map<string, string> &params_map);
 	int SendParams(const char* name, unsigned int name_len, const char* value, unsigned int value_len);
 	int SendEmptyParams();
-	int Send_STDIN(const char* inbuf, unsigned long inbuf_len);
-	int SendEmpty_STDIN();
+	int SendRequestData(const char* inbuf, unsigned long inbuf_len);
+	int SendEmptyRequestData();
 	int RecvAppData(vector<char>& binaryResponse, string& errout, unsigned int& appstatus, unsigned char& protocolstatus,
         BOOL& continue_recv);
 	int AbortRequest();
