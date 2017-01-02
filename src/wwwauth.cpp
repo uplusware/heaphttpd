@@ -130,8 +130,6 @@ bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, const 
 	}
 	else if(scheme == asDigest)
 	{
-        //printf("[%s]\n", authinfo);
-        
 		map<string, string> DigestMap;
 		char where = 'K'; /* K is for key, V is for value*/
 		DigestMap.clear();
