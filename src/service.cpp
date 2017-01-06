@@ -746,12 +746,14 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
     if(CHttpBase::m_instance_balance_scheme[0] == 'R')
     {
         m_next_process++;
-        m_next_process = m_next_process % m_work_processes.size();
     }
     else
     {
-        m_next_process = ip_lowbytes % m_work_processes.size();
+        m_next_process = ip_lowbytes;
     }
+    
+    m_next_process = m_next_process % m_work_processes.size();
+    
     string client_ip = szclientip;
     int access_result;
     if(CHttpBase::m_permit_list.size() > 0)

@@ -10,7 +10,7 @@
 //TODO: DEMO
 bool niuhttpd_usrdef_get_password(const char* username, string& password)
 {
-//demo code    
+// Demo code    
 //    if(strcasecmp(username, "admin") == 0)
 //    {
 //        password = "Passw0rd";
