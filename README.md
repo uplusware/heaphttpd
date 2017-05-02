@@ -4,4 +4,4 @@
 * Support  MySQL/MariaDB, MongoDB and etc.
 * [Project Wiki](https://github.com/uplusware/niuhttpd/wiki/)
 
-###niu means 钮(niǔ).
+### niu means 钮(niǔ).
