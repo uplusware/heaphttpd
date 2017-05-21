@@ -125,5 +125,19 @@
     <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
     <tr><td><input type="text" name="ghi" id="ghi"></td><td><a href="javascript:WebSocketSample()">Send</a></td><td>Replied by Web Server:</td><td><div name="ghi_reply" id="ghi_reply"></div></td></tr>
     </table>
+    
+    <p>File Upload DEMO:</p>
+    <form id="upfileform" name="upfileform" method="POST" enctype="multipart/form-data" action="/api/upload">
+        <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
+        <tr> 
+          <td valign="middle" align="left">
+            <input type="file" id="ATTACHFILEBODY" name="ATTACHFILEBODY" size="60">
+          </td>
+          <td width="100" valign="left" align="center">
+            <input type="submit" value="Upload" >
+          </td>
+        </tr>
+        </table>
+    </form>
 </body>
 </html>

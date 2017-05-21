@@ -409,7 +409,6 @@ void CHttp::RecvPostData()
             while(1)
             {
                 char rbuf[1449];
-                memset(rbuf, 0, 1449);
                 int rlen = HttpRecv(rbuf, 1448);
                 if(rlen > 0)
                 {
@@ -429,7 +428,6 @@ void CHttp::RecvPostData()
                 if(nRecv == m_content_length)
                     break;
                 char rbuf[1449];
-                memset(rbuf, 0, 1449);
                 int rlen = HttpRecv(rbuf, (m_content_length - nRecv) > 1448 ? 1448 : ( m_content_length - nRecv));
                 if(rlen > 0)
                 {
@@ -805,7 +803,6 @@ int CHttp::parse_multipart_value(const char* szKey, fbufseg & seg)
 			}
 			else
 			{
-				
 				free(szHeader);
 			}
 		}

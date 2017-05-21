@@ -6,6 +6,9 @@ HTTPAPIOBJS = sample.o
 PERFAPI = libperf.so
 PERFAPIOBJS = perf.o
 
+UPLOAD = libupload.so
+UPLOADOBJS = upload.o
+
 ifdef MONGODB
     DB_DEF = _MONGODB_
 else
@@ -13,7 +16,11 @@ ifdef MYSQLDB
     DB_DEF = _MARIADB_
     DB_INCDIR = -I/usr/include/mariadb/
 else
+ifdef UPLOAD
+    DB_DEF = _UPLOAD_
+else
 	DB_DEF = _SAMPLE_
+endif
 endif
 endif
 
@@ -43,9 +50,16 @@ all: apiperf
 install: all
 	cp libperf.so /var/niuhttpd/api/
 else
+ifdef UPLOADSAMPLE
+all: apiupload
+install: all
+	cp libupload.so /var/niuhttpd/api/
+	test -x /var/niuhttpd/html/upload || mkdir /var/niuhttpd/html/upload
+else
 all: apisample
 install: all
 	cp libsample.so /var/niuhttpd/api/
+endif
 endif
 endif
 endif
@@ -55,7 +69,11 @@ apisample: $(HTTPAPI)
 apimysqldemo: $(MYSQLDEMOAPI)
 apimongodemo: $(MONGODEMOAPI)
 apiperf: $(PERFAPI)
+apiupload: $(UPLOAD)
 
+$(UPLOAD): $(UPLOADOBJS)
+	$(CC) -shared -W -fPIC -o $@ $(UPLOADOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp 
+    
 $(PERFAPI): $(PERFAPIOBJS)
 	$(CC) -shared -W -fPIC -o $@ $(PERFAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp 
     
@@ -76,4 +94,4 @@ else
 	$(CC) $(INCDIR) -D$(DB_DEF) $(FLAGS) -c $< -o $@
 endif
 clean:
-	-rm -f $(HTTPAPI) $(HTTPAPIOBJS) $(MYSQLDEMOAPI) $(MYSQLDEMOAPIOBJS) $(MONGODEMOAPI) $(MONGODEMOAPIOBJS)  *.elf *.gdb *.o *.a *.so
+	-rm -f $(HTTPAPI) $(UPLOADOBJS) $(HTTPAPIOBJS) $(MYSQLDEMOAPI) $(MYSQLDEMOAPIOBJS) $(MONGODEMOAPI) $(MONGODEMOAPIOBJS)  *.elf *.gdb *.o *.a *.so

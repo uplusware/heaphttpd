@@ -91,12 +91,11 @@ public:
 	int drecv(char* pbuf, int blen)
 	{
 		int rlen = 0;
-		
 		if(blen <= dlen)
 		{
 			memcpy(pbuf, dbuf, blen);
 
-			memmove(dbuf + blen, dbuf, dlen - blen);
+			memmove(dbuf, dbuf + blen , dlen - blen);
 			dlen = dlen - blen;
 			
 			rlen = blen;
@@ -108,7 +107,7 @@ public:
 			rlen = dlen;
 			dlen = 0;
 			
-			int len = _Recv_(sockfd, pbuf + dlen, blen - dlen);
+			int len = _Recv_(sockfd, pbuf + rlen, blen - rlen);
 			if(len > 0)
 			{
 				rlen = rlen + len;	
@@ -223,7 +222,6 @@ public:
 			else if(res == 0)
 			{
 				taketime = taketime + 1;
-                //printf("%p: %d %d\n", this, sockfd, taketime);
 				if(taketime > MAX_TRY_TIMEOUT)
 				{
 					close(sockfd);
@@ -238,7 +236,6 @@ public:
 			}
 			
 		}
-		
 		return nRecv;
 	}
 
@@ -280,7 +277,7 @@ public:
 		{
 			memcpy(pbuf, dbuf, blen);
 
-			memmove(dbuf + blen, dbuf, dlen - blen);
+			memmove(dbuf, dbuf + blen, dlen - blen);
 			dlen = dlen - blen;
 			
 			rlen = blen;

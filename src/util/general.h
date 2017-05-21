@@ -292,7 +292,6 @@ int __inline__ _Recv_(int sockfd, char* buf, unsigned int buf_len)
 		}
 		else if(res == 0)
 		{
-			//printf("taketime: %d/%d %d\n", taketime, MAX_TRY_TIMEOUT, nRecv);
 			taketime = taketime + WAIT_TIME_INTERVAL;
 			if(taketime > MAX_TRY_TIMEOUT)
 			{

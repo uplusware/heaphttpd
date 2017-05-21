@@ -30,8 +30,9 @@ void ApiMongoDemo::Response()
     }
     else
     {
-        strDatabases = header.GetDefaultHTML();
         header.SetStatusCode(SC500);
+        strDatabases = header.GetDefaultHTML();
+        
 		header.SetField("Content-Type", "text/html");
 		header.SetField("Content-Length", strDatabases.length());
     }

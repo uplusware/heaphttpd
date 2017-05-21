@@ -31,8 +31,8 @@ public:
 		string eboundary = "--";
 		eboundary += boundary;
 		eboundary += "--\r\n";
-
-		formparamter parmeter;
+        
+        formparamter parmeter;
 		parmeter.m_seg.m_byte_beg = 0;
 		parmeter.m_seg.m_byte_end = 0;
 		parmeter.m_header.m_byte_beg = 0;
@@ -40,12 +40,13 @@ public:
 		parmeter.m_data.m_byte_beg = 0;
 		parmeter.m_data.m_byte_end = 0;
 		BOOL isHeader = FALSE;
-		int x = 0;
+        int x = 0;
 		while(x < buflen)
 		{
-			if((memcmp(buf + x, sboundary.c_str(), sboundary.length()) == 0) && (memcmp(buf + x, eboundary.c_str(), eboundary.length()) != 0))
+			if((memcmp(buf + x, sboundary.c_str(), sboundary.length()) == 0) &&
+                (memcmp(buf + x, eboundary.c_str(), eboundary.length()) != 0))
 			{
-				if((parmeter.m_seg.m_byte_beg == 0) && (parmeter.m_seg.m_byte_end == 0))
+				if(x == 0)
 				{
 					parmeter.m_seg.m_byte_beg = x + sboundary.length();
 					parmeter.m_header.m_byte_beg = parmeter.m_seg.m_byte_beg;
@@ -66,7 +67,7 @@ public:
 			else if(memcmp(buf + x, eboundary.c_str(), eboundary.length()) == 0)
 			{
 				parmeter.m_seg.m_byte_end = x - 1;
-				parmeter.m_data.m_byte_end = parmeter.m_seg.m_byte_end - 2;				
+				parmeter.m_data.m_byte_end = parmeter.m_seg.m_byte_end - 2;	   
 				m_paramters.push_back(parmeter);
 				
 				x += eboundary.length();
