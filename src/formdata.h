@@ -32,7 +32,7 @@ public:
 		eboundary += boundary;
 		eboundary += "--\r\n";
         
-        formparamter parmeter;
+		formparamter parmeter;
 		parmeter.m_seg.m_byte_beg = 0;
 		parmeter.m_seg.m_byte_end = 0;
 		parmeter.m_header.m_byte_beg = 0;
