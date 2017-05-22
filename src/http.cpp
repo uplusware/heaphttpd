@@ -39,6 +39,8 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	SSL* ssl, CHttp2* phttp2, uint_32 http2_stream_ind)
 {	
     m_srvobj = srvobj;
+    m_protocol_upgrade = FALSE;
+    m_upgrade_protocol = "";
     m_web_socket_handshake = Websocket_None;
     m_keep_alive = TRUE; //HTTP/1.1 Keep-Alive is enabled as default
     m_enabled_keep_alive = TRUE; //default is true in a session
@@ -551,7 +553,7 @@ Http_Connection CHttp::LineParse(const char* text)
         m_line_text = m_line_text.substr(new_line + 1);
 
         strtrim(strtext);
-        /* printf("<<<< %s\r\n", strtext.c_str()); */
+        // printf("<<<< %s\r\n", strtext.c_str());
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)
         {
@@ -679,11 +681,29 @@ Http_Connection CHttp::LineParse(const char* text)
                 {
                     m_keep_alive = TRUE;
                 }
-                else if(strcasestr(strConnection.c_str(), "Upgrade") != NULL)
+                
+                if(strcasestr(strConnection.c_str(), "Upgrade") != NULL)
                 {
-                    m_web_socket_handshake = Websocket_Sync;
+                    m_protocol_upgrade = TRUE;
+                    //in case "Upgrade: websocket" is in front of "Connection: ... Upgrade ..."
+                    if(m_upgrade_protocol != "" && strcasecmp(m_upgrade_protocol.c_str(), "websocket") == 0)
+                    {
+                        m_web_socket_handshake = Websocket_Sync;
+                    }
                 }
                 
+            }
+            else if(strncasecmp(strtext.c_str(),"Upgrade:", 8) == 0)
+            {
+                if(m_protocol_upgrade)
+                {
+                    strcut(strtext.c_str(), "Upgrade:", NULL, m_upgrade_protocol);
+                    strtrim(m_upgrade_protocol);
+                    if(strcasecmp(m_upgrade_protocol.c_str(), "websocket") == 0)
+                    {
+                        m_web_socket_handshake = Websocket_Sync;
+                    }
+                }
             }
             else if(strncasecmp(strtext.c_str(),"Content-Length:", 15) == 0)
             {
@@ -777,93 +797,43 @@ Http_Connection CHttp::LineParse(const char* text)
 	return httpContinue;
 }
 
-int CHttp::parse_multipart_value(const char* szKey, fbufseg & seg)
+int CHttp::parse_multipart_formdata(const char* content_name, string& content_filename, string& content_filetype, const char* &content_valbuf, int& content_vallen)
 {
-	if(m_content_type == multipart_form_data)
+    if(m_content_type == multipart_form_data)
 	{
-		for(int x = 0; x < m_formdata->m_paramters.size(); x++)
-		{
-			char* szHeader = (char*)malloc(m_formdata->m_paramters[x].m_header.m_byte_end - m_formdata->m_paramters[x].m_header.m_byte_beg + 2);
-			memcpy(szHeader, m_formdata->c_buffer() + m_formdata->m_paramters[x].m_header.m_byte_beg, m_formdata->m_paramters[x].m_header.m_byte_end - m_formdata->m_paramters[x].m_header.m_byte_beg + 1);
-			szHeader[m_formdata->m_paramters[x].m_header.m_byte_end - m_formdata->m_paramters[x].m_header.m_byte_beg + 1] = '\0';
-			string name;
-			fnfy_strcut(szHeader, " name=", " \t\r\n\"", "\r\n\";", name);
-			if(name == "")
-				fnfy_strcut(szHeader, "\tname=", " \t\r\n\"", "\r\n\";", name);
-				if(name == "")
-					fnfy_strcut(szHeader, ";name=", " \t\r\n\"", "\r\n\";", name);
-					if(name == "")
-						fnfy_strcut(szHeader, "name=", " \t\r\n\"", "\r\n\";", name);
-			if(strcmp(name.c_str(), szKey) == 0)
-			{
-				seg.m_byte_beg = m_formdata->m_paramters[x].m_data.m_byte_beg;
-				seg.m_byte_end = m_formdata->m_paramters[x].m_data.m_byte_end;
-				free(szHeader);
-				return 0;
-			}
-			else
-			{
-				free(szHeader);
-			}
-		}
-	}
-	return -1;
-}
-
-int CHttp::parse_multipart_filename(const char* szKey, string& filename)
-{
-	if(m_content_type == multipart_form_data)
-	{
+        content_filename = "";
+        content_filetype = "";
+        content_valbuf = NULL;
+        content_vallen = 0;
+        
 		for(int x = 0; x < m_formdata->m_paramters.size(); x++)
 		{			
 			char* szHeader = (char*)malloc(m_formdata->m_paramters[x].m_header.m_byte_end - m_formdata->m_paramters[x].m_header.m_byte_beg + 2);
 			memcpy(szHeader, m_formdata->c_buffer() + m_formdata->m_paramters[x].m_header.m_byte_beg, m_formdata->m_paramters[x].m_header.m_byte_end - m_formdata->m_paramters[x].m_header.m_byte_beg + 1);
 			szHeader[m_formdata->m_paramters[x].m_header.m_byte_end - m_formdata->m_paramters[x].m_header.m_byte_beg + 1] = '\0';
-			string name;
-			fnfy_strcut(szHeader, " name=", " \t\r\n\"", "\r\n\";", name);
-			if(name == "")
-				fnfy_strcut(szHeader, "\tname=", " \t\r\n\"", "\r\n\";", name);
-				if(name == "")
-					fnfy_strcut(szHeader, ";name=", " \t\r\n\"", "\r\n\";", name);
-					if(name == "")
-						fnfy_strcut(szHeader, "name=", " \t\r\n\"", "\r\n\";", name);
-			if(strcmp(name.c_str(), szKey) == 0)
+			string current_name;
+			fnfy_strcut(szHeader, " name=", " \t\r\n\"", "\r\n\";", current_name);
+			if(current_name == "")
+            {
+				fnfy_strcut(szHeader, "\tname=", " \t\r\n\"", "\r\n\";", current_name);
+				if(current_name == "")
+                {
+					fnfy_strcut(szHeader, ";name=", " \t\r\n\"", "\r\n\";", current_name);
+					if(current_name == "")
+                    {
+						fnfy_strcut(szHeader, "name=", " \t\r\n\"", "\r\n\";", current_name);
+                    }
+                }
+            }
+			if(strcmp(current_name.c_str(), content_name) == 0)
 			{
-				fnfy_strcut(szHeader, "filename=", " \t\r\n\"", "\r\n\";", filename);
-				free(szHeader);
-				return 0;
-			}
-			else
-			{
-				free(szHeader);
-			}
-		}
-	}
-	return -1;
-}
-
-int CHttp::parse_multipart_type(const char* szKey, string & type)
-{
-	if(m_content_type == multipart_form_data)
-	{
-		for(int x = 0; x < m_formdata->m_paramters.size(); x++)
-		{
-			
-			char* szHeader = (char*)malloc(m_formdata->m_paramters[x].m_header.m_byte_end - m_formdata->m_paramters[x].m_header.m_byte_beg + 2);
-			memcpy(szHeader, m_formdata->c_buffer() + m_formdata->m_paramters[x].m_header.m_byte_beg, m_formdata->m_paramters[x].m_header.m_byte_end - m_formdata->m_paramters[x].m_header.m_byte_beg + 1);
-			szHeader[m_formdata->m_paramters[x].m_header.m_byte_end - m_formdata->m_paramters[x].m_header.m_byte_beg + 1] = '\0';
-			
-			string name;
-			fnfy_strcut(szHeader, " name=", " \t\r\n\"", "\r\n\";", name);
-			if(name == "")
-				fnfy_strcut(szHeader, "\tname=", " \t\r\n\"", "\r\n\";", name);
-				if(name == "")
-					fnfy_strcut(szHeader, ";name=", " \t\r\n\"", "\r\n\";", name);
-					if(name == "")
-						fnfy_strcut(szHeader, "name=", " \t\r\n\"", "\r\n\";", name);
-			if(strcmp(name.c_str(), szKey) == 0)
-			{
-				fnfy_strcut(szHeader, "Content-Type:", " \t\r\n\"", "\r\n\";", type);
+				fnfy_strcut(szHeader, "filename=", " \t\r\n\"", "\r\n\";", content_filename);
+                fnfy_strcut(szHeader, "Content-Type:", " \t\r\n\"", "\r\n\";", content_filetype);
+                
+                content_valbuf = (char* )GetFormData()->c_buffer() + m_formdata->m_paramters[x].m_data.m_byte_beg;
+                content_vallen = m_formdata->m_paramters[x].m_data.m_byte_end >= m_formdata->m_paramters[x].m_data.m_byte_beg ? (m_formdata->m_paramters[x].m_data.m_byte_end - m_formdata->m_paramters[x].m_data.m_byte_beg + 1) : 0;
+                
+                free(szHeader);
 				return 0;
 			}
 			else

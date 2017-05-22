@@ -86,10 +86,7 @@ public:
 	void SetMetaVarsToEnv();
 	void SetMetaVar(const char* name, const char* val);
 	
-	int parse_multipart_value(const char* szKey, fbufseg & seg);
-	int parse_multipart_filename(const char* szKey, string& filename);
-	int parse_multipart_type(const char* szKey, string& type);
-
+    int parse_multipart_formdata(const char* content_name, string& content_filename, string& content_filetype, const char* &content_valbuf, int& content_vallen);
 	
 	const char* GetResource() { return m_resource.c_str(); }
 	const char* GetUserName() { return m_username.c_str(); }
@@ -205,6 +202,8 @@ protected:
 	
 	BOOL m_passed_wwwauth;
 	AUTH_SCHEME m_wwwauth_scheme;
+    BOOL m_protocol_upgrade;
+    string m_upgrade_protocol;
     
     BOOL m_keep_alive;
     BOOL m_enabled_keep_alive;

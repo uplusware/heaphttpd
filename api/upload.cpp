@@ -13,151 +13,128 @@ void ApiUpload::Response()
     header.SetField("Content-Type", "text/html");
     
     string strResp;
-    strResp = "<html></head><title>API Sample</title></head><body><h1>niuhttpd web server/0.3</h1>Upload Sample:";
+    strResp = "<html></head><title>API Sample</title></head><body><h1>niuhttpd web server/0.3</h1>";
     
-    fbufseg segAttach;
-    if(m_session->parse_multipart_value("ATTACHFILEBODY1", segAttach) == 0)
+    string filename;
+    string filetype;
+    const char* valbuf;
+    int vallen;
+    
+    if(m_session->parse_multipart_formdata("ATTACHFILEDESC", filename, filetype, valbuf, vallen) == 0)
 	{
-        string filename, filetype;
-        if(m_session->parse_multipart_filename("ATTACHFILEBODY1", filename) != -1 &&
-            m_session->parse_multipart_type("ATTACHFILEBODY1", filetype) !=  -1)
-        {
-            char* buf = (char*)m_session->GetFormData()->c_buffer() + segAttach.m_byte_beg;
-            int len = segAttach.m_byte_end - segAttach.m_byte_beg + 1;
-            string strFilePath;
-            strFilePath = "/var/niuhttpd/html/upload/";
-            strFilePath += filename;
-            ofstream* attachfd =  new ofstream(strFilePath.c_str(), ios_base::binary|ios::out|ios::trunc);		
-            if(buf && len > 0 && attachfd && attachfd->is_open())
-            {             
-                char szLen[64];
-                sprintf(szLen, "%d", len);
-                do {
-                    attachfd->write(buf + attachfd->tellp(), len - attachfd->tellp());
-                } while(attachfd->tellp() != len);
-                attachfd->close();
-
-                string strEscapedFilename, strEscapedFiletype;
-                escapeHTML(filename.c_str(), strEscapedFilename);
-                escapeHTML(filetype.c_str(), strEscapedFiletype);
-                strResp += "<p><b>";
-                strResp += strEscapedFilename;
-                strResp += "</b> [";
-                strResp += strEscapedFiletype;
-                strResp += "] (";
-                strResp += szLen;
-                strResp += "bytes) ";
-                strResp += "has been uploaded to /var/niuhttpd/html/upload/";
-                strResp += strEscapedFilename;
-                if(strncasecmp(filetype.c_str(), "image/", sizeof("image/") - 1) == 0)
-                {
-                    strResp += "<hr><img src=\"/upload/";
-                    strResp += filename;
-                    strResp += "\" />";
-                }
-                
-                
-            
-            }
-            if(attachfd)
-                delete attachfd;
-        }
+        char* desc = (char*)malloc(vallen + 1);
+        memcpy(desc, valbuf, vallen);
+        desc[vallen] = '\0';
+        strResp += desc;
+        strResp += "<hr>";
+        free(desc);
     }
     
-    if(m_session->parse_multipart_value("ATTACHFILEBODY2", segAttach) == 0)
+    if(m_session->parse_multipart_formdata("ATTACHFILEBODY1", filename, filetype, valbuf, vallen) == 0)
 	{
-        string filename, filetype;
-        if(m_session->parse_multipart_filename("ATTACHFILEBODY2", filename) != -1 &&
-            m_session->parse_multipart_type("ATTACHFILEBODY2", filetype) !=  -1)
-        {
-            char* buf = (char*)m_session->GetFormData()->c_buffer() + segAttach.m_byte_beg;
-            int len = segAttach.m_byte_end - segAttach.m_byte_beg + 1;
-            string strFilePath;
-            strFilePath = "/var/niuhttpd/html/upload/";
-            strFilePath += filename;
-            ofstream* attachfd =  new ofstream(strFilePath.c_str(), ios_base::binary|ios::out|ios::trunc);		
-            if(buf && len > 0 && attachfd && attachfd->is_open())
-            {             
-                char szLen[64];
-                sprintf(szLen, "%d", len);
-                do {
-                    attachfd->write(buf + attachfd->tellp(), len - attachfd->tellp());
-                } while(attachfd->tellp() != len);
-                attachfd->close();
+        string strFilePath;
+        strFilePath = "/var/niuhttpd/html/upload/";
+        strFilePath += filename;
+        
+        ofstream* attachfd =  new ofstream(strFilePath.c_str(), ios_base::binary|ios::out|ios::trunc);		
+        if(valbuf && vallen > 0 && attachfd && attachfd->is_open())
+        {             
+            char szLen[64];
+            sprintf(szLen, "%d", vallen);
+            do {
+                attachfd->write(valbuf + attachfd->tellp(), vallen - attachfd->tellp());
+            } while(attachfd->tellp() != vallen);
+            attachfd->close();
 
-                string strEscapedFilename, strEscapedFiletype;
-                escapeHTML(filename.c_str(), strEscapedFilename);
-                escapeHTML(filetype.c_str(), strEscapedFiletype);
-                strResp += "<p><b>";
-                strResp += strEscapedFilename;
-                strResp += "</b> [";
-                strResp += strEscapedFiletype;
-                strResp += "] (";
-                strResp += szLen;
-                strResp += "bytes) ";
-                strResp += "has been uploaded to /var/niuhttpd/html/upload/";
-                strResp += strEscapedFilename;
-                if(strncasecmp(filetype.c_str(), "image/", sizeof("image/") - 1) == 0)
-                {
-                    strResp += "<hr><img src=\"/upload/";
-                    strResp += filename;
-                    strResp += "\" />";
-                }
-                
-                
-            
+            string strEscapedFilename, strEscapedFiletype;
+            escapeHTML(filename.c_str(), strEscapedFilename);
+            escapeHTML(filetype.c_str(), strEscapedFiletype);
+            strResp += "<p><b>Path:</b> /var/niuhttpd/html/upload/";
+            strResp += strEscapedFilename;
+            strResp += "<br><b>Type:</b> ";
+            strResp += strEscapedFiletype;
+            strResp += "<br><b>Size:</b> ";
+            strResp += szLen;
+            strResp += "bytes";
+            if(strncasecmp(filetype.c_str(), "image/", sizeof("image/") - 1) == 0)
+            {
+                strResp += "<hr><img src=\"/upload/";
+                strResp += filename;
+                strResp += "\" />";
             }
-            if(attachfd)
-                delete attachfd;
         }
+        if(attachfd)
+            delete attachfd;
     }
     
-    if(m_session->parse_multipart_value("ATTACHFILEBODY3", segAttach) == 0)
+    if(m_session->parse_multipart_formdata("ATTACHFILEBODY2", filename, filetype, valbuf, vallen) == 0)
 	{
-        string filename, filetype;
-        if(m_session->parse_multipart_filename("ATTACHFILEBODY3", filename) != -1 &&
-            m_session->parse_multipart_type("ATTACHFILEBODY3", filetype) !=  -1)
-        {
-            char* buf = (char*)m_session->GetFormData()->c_buffer() + segAttach.m_byte_beg;
-            int len = segAttach.m_byte_end - segAttach.m_byte_beg + 1;
-            string strFilePath;
-            strFilePath = "/var/niuhttpd/html/upload/";
-            strFilePath += filename;
-            ofstream* attachfd =  new ofstream(strFilePath.c_str(), ios_base::binary|ios::out|ios::trunc);		
-            if(buf && len > 0 && attachfd && attachfd->is_open())
-            {             
-                char szLen[64];
-                sprintf(szLen, "%d", len);
-                do {
-                    attachfd->write(buf + attachfd->tellp(), len - attachfd->tellp());
-                } while(attachfd->tellp() != len);
-                attachfd->close();
+        string strFilePath = "/var/niuhttpd/html/upload/";
+        strFilePath += filename;
+        ofstream* attachfd =  new ofstream(strFilePath.c_str(), ios_base::binary|ios::out|ios::trunc);		
+        if(valbuf && vallen > 0 && attachfd && attachfd->is_open())
+        {             
+            char szLen[64];
+            sprintf(szLen, "%d", vallen);
+            do {
+                attachfd->write(valbuf + attachfd->tellp(), vallen - attachfd->tellp());
+            } while(attachfd->tellp() != vallen);
+            attachfd->close();
 
-                string strEscapedFilename, strEscapedFiletype;
-                escapeHTML(filename.c_str(), strEscapedFilename);
-                escapeHTML(filetype.c_str(), strEscapedFiletype);
-                strResp += "<p><b>";
-                strResp += strEscapedFilename;
-                strResp += "</b> [";
-                strResp += strEscapedFiletype;
-                strResp += "] (";
-                strResp += szLen;
-                strResp += "bytes) ";
-                strResp += "has been uploaded to /var/niuhttpd/html/upload/";
-                strResp += strEscapedFilename;
-                if(strncasecmp(filetype.c_str(), "image/", sizeof("image/") - 1) == 0)
-                {
-                    strResp += "<hr><img src=\"/upload/";
-                    strResp += filename;
-                    strResp += "\" />";
-                }
-                
-                
-            
+            string strEscapedFilename, strEscapedFiletype;
+            escapeHTML(filename.c_str(), strEscapedFilename);
+            escapeHTML(filetype.c_str(), strEscapedFiletype);
+            strResp += "<p><b>Path:</b> /var/niuhttpd/html/upload/";
+            strResp += strEscapedFilename;
+            strResp += "<br><b>Type:</b> ";
+            strResp += strEscapedFiletype;
+            strResp += "<br><b>Size:</b> ";
+            strResp += szLen;
+            strResp += "bytes";
+            if(strncasecmp(filetype.c_str(), "image/", sizeof("image/") - 1) == 0)
+            {
+                strResp += "<hr><img src=\"/upload/";
+                strResp += filename;
+                strResp += "\" />";
             }
-            if(attachfd)
-                delete attachfd;
         }
+        if(attachfd)
+            delete attachfd;
+    }
+    
+    if(m_session->parse_multipart_formdata("ATTACHFILEBODY3", filename, filetype, valbuf, vallen) == 0)
+	{
+        string strFilePath = "/var/niuhttpd/html/upload/";
+        strFilePath += filename;
+        ofstream* attachfd =  new ofstream(strFilePath.c_str(), ios_base::binary|ios::out|ios::trunc);		
+        if(valbuf && vallen > 0 && attachfd && attachfd->is_open())
+        {             
+            char szLen[64];
+            sprintf(szLen, "%d", vallen);
+            do {
+                attachfd->write(valbuf + attachfd->tellp(), vallen - attachfd->tellp());
+            } while(attachfd->tellp() != vallen);
+            attachfd->close();
+
+            string strEscapedFilename, strEscapedFiletype;
+            escapeHTML(filename.c_str(), strEscapedFilename);
+            escapeHTML(filetype.c_str(), strEscapedFiletype);
+            strResp += "<p><b>Path:</b> /var/niuhttpd/html/upload/";
+            strResp += strEscapedFilename;
+            strResp += "<br><b>Type:</b> ";
+            strResp += strEscapedFiletype;
+            strResp += "<br><b>Size:</b> ";
+            strResp += szLen;
+            strResp += "bytes";
+            if(strncasecmp(filetype.c_str(), "image/", sizeof("image/") - 1) == 0)
+            {
+                strResp += "<hr><img src=\"/upload/";
+                strResp += filename;
+                strResp += "\" />";
+            }
+        }
+        if(attachfd)
+            delete attachfd;
     }
     strResp += "</body></html>";
     header.SetField("Content-Length", strResp.length());

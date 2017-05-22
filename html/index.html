@@ -129,20 +129,33 @@
     <p>File Upload DEMO:</p>
     <form id="upfileform" name="upfileform" method="POST" enctype="multipart/form-data" action="/api/upload">
         <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
-        <tr> 
-          <td valign="middle" align="left">
-            <input type="file" id="ATTACHFILEBODY1" name="ATTACHFILEBODY1" size="60">
-          </td>
-          <td valign="middle" align="left">
-            <input type="file" id="ATTACHFILEBODY2" name="ATTACHFILEBODY2" size="60">
-          </td>
-          <td valign="middle" align="left">
-            <input type="file" id="ATTACHFILEBODY3" name="ATTACHFILEBODY3" size="60">
-          </td>
-          <td width="100" valign="left" align="center">
-            <input type="submit" value="Upload" >
-          </td>
-        </tr>
+            <tr>
+              <td>1st:</td>
+              <td valign="middle" align="left">
+                <input type="file" id="ATTACHFILEBODY1" name="ATTACHFILEBODY1" size="80">
+              </td>
+            </tr>
+            <tr>
+              <td>2nd:</td>
+              <td valign="middle" align="left">
+                <input type="file" id="ATTACHFILEBODY2" name="ATTACHFILEBODY2" size="80">
+              </td>
+            </tr>
+            <tr>
+              <td>3rd:</td>
+              <td valign="middle" align="left">
+                <input type="file" id="ATTACHFILEBODY3" name="ATTACHFILEBODY3" size="80">
+              </td>
+            </tr>
+            <tr>
+              <td>Desc.:</td>
+              <td width="100" valign="middle" align="left">
+                <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF"><tr>
+                    <td><input type="text" id="desc" name="ATTACHFILEDESC" size="32" value="I would like to upload some images!"></td>
+                    <td><input type="submit" value="Upload" ></td>
+                </tr></table>
+              </td>
+            </tr>
         </table>
     </form>
 </body>
