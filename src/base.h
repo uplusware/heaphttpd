@@ -289,8 +289,7 @@ public:
 			rlen = dlen;
 			dlen = 0;
 			
-			int len = SSLRead(sockfd, sslhd, pbuf + dlen, blen - dlen);
-			//printf("SSLRead: %d\n", len);
+			int len = SSLRead(sockfd, sslhd, pbuf + rlen, blen - rlen);
 			if(len > 0)
 			{
 				rlen = rlen + len;	
@@ -367,7 +366,6 @@ public:
 			FD_SET(sockfd, &mask);
 			res = select(sockfd + 1, &mask, NULL, NULL, &timeout);
             
-            //printf("%d %d\n", sockfd, res);
 			if( res == 1) 
 			{
 				taketime = 0;
