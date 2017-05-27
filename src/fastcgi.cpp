@@ -211,10 +211,16 @@ int fastcgi::SendRequestData(const char* inbuf, unsigned long inbuf_len)
 	unsigned short contentLength_16bit = inbuf_len > 0xFFFF ? 0xFFFF : inbuf_len;
     fcgi_header.contentLengthB0 = contentLength_16bit & 0x00FF;
 	fcgi_header.contentLengthB1 = (contentLength_16bit & 0xFF00) >> 8;
-	
+	fcgi_header.paddingLength = (8 - contentLength_16bit % 8) % 8;
     if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
 	{
 		Send(inbuf, inbuf_len);
+        if(fcgi_header.paddingLength > 0)
+        {
+            char pad_data[8];
+            memset(pad_data, 0, fcgi_header.paddingLength);
+            Send(pad_data, fcgi_header.paddingLength);
+        }
 		return 0;
 	}
 	else
