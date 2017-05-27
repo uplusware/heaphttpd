@@ -80,11 +80,20 @@
                         <td><input type="text" id="abc" name="abc" size="20" onMouseOver="this.focus();this.select()"></td>
                         <td>+</td>
                         <td><input type="text" id="def" name="def" size="20" onMouseOver="this.focus();this.select()"></td>
-                        <td><input type="submit" id="cal" name="cal" size="20" value="="></td>
+                        <td><input type="submit" id="cal" name="cal" size="20" value="POST"></td>
                 </tr>
         </table>
         </form>
-
+        <form method="get" action="/sample.php" >
+        <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">
+                <tr>
+                        <td><input type="text" id="abc" name="abc" size="20" onMouseOver="this.focus();this.select()"></td>
+                        <td>+</td>
+                        <td><input type="text" id="def" name="def" size="20" onMouseOver="this.focus();this.select()"></td>
+                        <td><input type="submit" id="cal" name="cal" size="20" value="GET"></td>
+                </tr>
+        </table>
+        </form>
 	<p>Spawn-fcgi/Webpy:(<a href="/webpy/">Webpy</a>)</p>
         <form method="post" action="/webpy/hello" >
         <table border="0" cellpadding="2" cellspacing="2" bgcolor="#FFFFFF">

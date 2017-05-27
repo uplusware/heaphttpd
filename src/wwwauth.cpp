@@ -106,7 +106,7 @@ void __inline__ _strtrim_dquote_(string &src) /* icnluding double quote mark*/
 	}
 }
 
-bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, const char* method)
+bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, string &keywords, const char* method)
 {
 	string password, real_password;
 	if(scheme == asBasic)
@@ -122,14 +122,21 @@ bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, const 
 
 		strcut(strauth.c_str(), NULL, ":", username);
 		strcut(strauth.c_str(), ":", NULL, password);
-
+        
+        keywords = password;
+        
 		if(niuhttpd_usrdef_get_password(username.c_str(), real_password) && password == real_password)
+        {
+            keywords = real_password;
 			return true;
+        }
 		else
 			return false;
 	}
 	else if(scheme == asDigest)
 	{
+        keywords = authinfo;
+        
 		map<string, string> DigestMap;
 		char where = 'K'; /* K is for key, V is for value*/
 		DigestMap.clear();

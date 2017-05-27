@@ -128,7 +128,6 @@ public:
     
 	int BeginRequest(unsigned short request_id);
 	int SendParams(map<string, string> &params_map);
-	int SendParams(const char* name, unsigned int name_len, const char* value, unsigned int value_len);
 	int SendEmptyParams();
 	int SendRequestData(const char* inbuf, unsigned long inbuf_len);
 	int SendEmptyRequestData();

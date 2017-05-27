@@ -33,7 +33,7 @@ int fastcgi::BeginRequest(unsigned short request_id)
     fcgi_header.requestIdB0 = m_RequestIDB0;
 	fcgi_header.requestIdB1 = m_RequestIDB1;
     fcgi_header.contentLengthB0 = sizeof(FCGI_BeginRequestBody);
-	
+	fcgi_header.contentLengthB1 = 0;
 	FCGI_BeginRequestBody begin_request_body;
 	memset(&begin_request_body, 0, sizeof(FCGI_BeginRequestBody));
 	begin_request_body.roleB0 = FCGI_RESPONDER;
@@ -56,7 +56,8 @@ int fastcgi::SendParams(map<string, string> &params_map)
 	fcgi_header.type = FCGI_PARAMS;
     fcgi_header.requestIdB0 = m_RequestIDB0;
 	fcgi_header.requestIdB1 = m_RequestIDB1;
-	
+	fcgi_header.paddingLength = 0;
+    
 	unsigned long contentLength_32bit = 0;
 	unsigned short contentLength_16bit = 0;
 	map<string, string>::iterator it;
@@ -66,40 +67,47 @@ int fastcgi::SendParams(map<string, string> &params_map)
 		unsigned int value_len = it->second.length();
 		if(name_len > 0 && value_len > 0)
 		{
-			contentLength_32bit += name_len + value_len;
-			if(name_len >> 7 == 0 && value_len >> 7 == 0)
+			if(name_len < 0x80 && value_len < 0x80)
 			{
-				contentLength_32bit += sizeof(FCGI_NameValuePair11);
+                contentLength_32bit += sizeof(FCGI_NameValuePair11);
 			}
-			else if(name_len >> 7 == 0 && value_len >> 7 == 1)
+			else if(name_len < 0x80 && value_len > 0x80)
 			{
-				contentLength_32bit += sizeof(FCGI_NameValuePair14);
+                contentLength_32bit += sizeof(FCGI_NameValuePair14);
 			}
-			else if(name_len >> 7 == 1 && value_len >> 7 == 0)
+			else if(name_len > 0x80 && value_len < 0x80)
 			{
-				contentLength_32bit += sizeof(FCGI_NameValuePair41);
+                contentLength_32bit += sizeof(FCGI_NameValuePair41);
 			}
-			else if(name_len >> 7 == 1 && value_len >> 7 == 1)
+			else if(name_len > 0x80 && value_len > 0x80)
 			{
-				contentLength_32bit += sizeof(FCGI_NameValuePair44);
+                contentLength_32bit += sizeof(FCGI_NameValuePair44);
 			}
+            else
+            {
+                fprintf(stderr, "fcgi: wrong param, %d %d\n", name_len, value_len);
+                continue;
+            }
+            contentLength_32bit += name_len;
+            contentLength_32bit += value_len;
 		}
 	}
 	
-	contentLength_16bit = contentLength_32bit > 65535 ? 65535 : contentLength_32bit;
+	contentLength_16bit = contentLength_32bit > 0xFFFF ? 0xFFFF : contentLength_32bit;
     fcgi_header.contentLengthB0 = contentLength_16bit & 0x00FF;
 	fcgi_header.contentLengthB1 = (contentLength_16bit & 0xFF00) >> 8;
 	
+    fcgi_header.paddingLength = (8 - contentLength_16bit % 8) % 8;
+    
 	if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0)
 	{
 		for(it = params_map.begin(); it != params_map.end(); ++it)
 		{
-			
 			unsigned int name_len = it->first.length();
 			unsigned int value_len = it->second.length();
 			if(name_len > 0 && value_len > 0)
 			{
-				if(name_len >> 7 == 0 && value_len >> 7 == 0)
+				if(name_len < 0x80 && value_len < 0x80)
 				{
 					FCGI_NameValuePair11 name_value_pair11;
 					name_value_pair11.nameLengthB0 = name_len;
@@ -107,89 +115,65 @@ int fastcgi::SendParams(map<string, string> &params_map)
 					
 					Send((char*)&name_value_pair11, sizeof(FCGI_NameValuePair11));
 				}
-				else if(name_len >> 7 == 0 && value_len >> 7 == 1)
+				else if(name_len < 0x80 && value_len > 0x80)
 				{
 					FCGI_NameValuePair14 name_value_pair14;
 					name_value_pair14.nameLengthB0 = name_len;
+                    
 					name_value_pair14.valueLengthB0 = value_len & 0x000000FF;
-					name_value_pair14.valueLengthB1 = (value_len & 0x0000FF00) >>8;
-					name_value_pair14.valueLengthB2 = (value_len & 0x00FF0000) >>16;
-					name_value_pair14.valueLengthB3 = (value_len & 0xFF000000) >>24;
+					name_value_pair14.valueLengthB1 = (value_len & 0x0000FF00) >> 8;
+					name_value_pair14.valueLengthB2 = (value_len & 0x00FF0000) >> 16;
+					name_value_pair14.valueLengthB3 = (value_len & 0xFF000000) >> 24;
+                    name_value_pair14.valueLengthB3 |= 0x80;
 					
 					Send((char*)&name_value_pair14, sizeof(FCGI_NameValuePair14));
 				}
-				else if(name_len >> 7 == 1 && value_len >> 7 == 0)
+				else if(name_len > 0x80 && value_len < 0x80)
 				{
 					FCGI_NameValuePair41 name_value_pair41;
 					name_value_pair41.nameLengthB0 = name_len & 0x000000FF;
 					name_value_pair41.nameLengthB1 = (name_len & 0x0000FF00) >> 8;
 					name_value_pair41.nameLengthB2 = (name_len & 0x00FF0000) >> 16;
 					name_value_pair41.nameLengthB3 = (name_len & 0xFF000000) >> 24;
+                    name_value_pair41.nameLengthB3 |= 0x80;
+                    
 					name_value_pair41.valueLengthB0 = value_len;
+                    
 					Send((char*)&name_value_pair41, sizeof(FCGI_NameValuePair41));
 				}
-				else if(name_len >> 7 == 1 && value_len >> 7 == 1)
+				else if(name_len > 0x80 && value_len > 0x80)
 				{
 					FCGI_NameValuePair44 name_value_pair44;
 					name_value_pair44.nameLengthB0 = name_len & 0x000000FF;
 					name_value_pair44.nameLengthB1 = (name_len & 0x0000FF00) >> 8;
 					name_value_pair44.nameLengthB2 = (name_len & 0x00FF0000) >> 16;
-					name_value_pair44.nameLengthB3 = (name_len & 0xFF000000) >>24;
-					name_value_pair44.valueLengthB0 = value_len & 0x000000FF;
+					name_value_pair44.nameLengthB3 = (name_len & 0xFF000000) >> 24;
+					name_value_pair44.nameLengthB3 |= 0x80;
+                    
+                    name_value_pair44.valueLengthB0 = value_len & 0x000000FF;
 					name_value_pair44.valueLengthB1 = (value_len & 0x0000FF00) >> 8;
 					name_value_pair44.valueLengthB2 = (value_len & 0x00FF0000) >> 16;
 					name_value_pair44.valueLengthB3 = (value_len & 0xFF000000) >> 24;
+                    name_value_pair44.valueLengthB3 |= 0x80;
+                    
 					Send((char*)&name_value_pair44, sizeof(FCGI_NameValuePair44));
 				}
-				Send((char*)it->first.c_str(), it->first.length());
+                else
+                {
+                    fprintf(stderr, "fcgi: wrong param, %d %d\n", name_len, value_len);
+                    continue;
+                }
+                Send((char*)it->first.c_str(), it->first.length());
 				Send((char*)it->second.c_str(), it->second.length());
 			}
 		}
-		return 0;
-	}
-	else
-		return -1;
-}
-
-int fastcgi::SendParams(const char* name, unsigned int name_len, const char* value, unsigned int value_len)
-{
-	FCGI_Header fcgi_header;
-	memset(&fcgi_header, 0, sizeof(FCGI_Header));
-	fcgi_header.version = FCGI_VERSION_1;
-	fcgi_header.type = FCGI_PARAMS;
-    fcgi_header.requestIdB0 = m_RequestIDB0;
-	fcgi_header.requestIdB1 = m_RequestIDB1;
-	
-	unsigned long contentLength_32bit = 0;
-	unsigned short contentLength_16bit = 0;
-	
-	contentLength_32bit = name_len + value_len;
-	if(name_len >> 7 == 0 && value_len >> 7 == 0)
-	{
-		contentLength_32bit += sizeof(FCGI_NameValuePair11);
-	}
-	else if(name_len >> 7 == 0 && value_len >> 7 == 1)
-	{
-		contentLength_32bit += sizeof(FCGI_NameValuePair14);
-	}
-	else if(name_len >> 7 == 1 && value_len >> 7 == 0)
-	{
-		contentLength_32bit += sizeof(FCGI_NameValuePair41);
-	}
-	else if(name_len >> 7 == 1 && value_len >> 7 == 1)
-	{
-		contentLength_32bit += sizeof(FCGI_NameValuePair44);
-	}
-	
-	contentLength_16bit = contentLength_32bit > 0xFFFF ? 0xFFFF : contentLength_32bit;
-    fcgi_header.contentLengthB0 = contentLength_16bit & 0x00FF;
-	fcgi_header.contentLengthB1 = (contentLength_16bit & 0xFF00) >> 8;
-	
-	if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
-	{
-		Send((char*)name, name_len);
-		Send((char*)value, value_len);
-	
+        
+        if(fcgi_header.paddingLength > 0)
+        {
+            char pad_data[8];
+            memset(pad_data, 0, fcgi_header.paddingLength);
+            Send(pad_data, fcgi_header.paddingLength);
+        }
 		return 0;
 	}
 	else
@@ -206,10 +190,10 @@ int fastcgi::SendEmptyParams()
 	fcgi_header.requestIdB1 = m_RequestIDB1;
     fcgi_header.contentLengthB0 = 0;
 	fcgi_header.contentLengthB1 = 0;
-	
+    fcgi_header.paddingLength = 0;
 	if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
 	{
-		return 0;
+        return 0;
 	}
 	else
 		return -1;
@@ -228,7 +212,7 @@ int fastcgi::SendRequestData(const char* inbuf, unsigned long inbuf_len)
     fcgi_header.contentLengthB0 = contentLength_16bit & 0x00FF;
 	fcgi_header.contentLengthB1 = (contentLength_16bit & 0xFF00) >> 8;
 	
-	if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
+    if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
 	{
 		Send(inbuf, inbuf_len);
 		return 0;
@@ -247,10 +231,9 @@ int fastcgi::SendEmptyRequestData()
 	fcgi_header.requestIdB1 = m_RequestIDB1;
     fcgi_header.contentLengthB0 = 0;
 	fcgi_header.contentLengthB1 = 0;
-	
-	if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
+    if(Send((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
 	{
-		return 0;
+    	return 0;
 	}
 	else
 		return -1;
@@ -267,7 +250,8 @@ int fastcgi::RecvAppData(vector<char>& binaryResponse, string& strerr, unsigned 
     unsigned short contentLength = 0;
     unsigned char paddingLength = 0;
     
-    if(Recv((char*)&fcgi_header, sizeof(FCGI_Header)) >= 0 )
+    int nlen = Recv((char*)&fcgi_header, sizeof(FCGI_Header));
+    if( nlen == sizeof(FCGI_Header) )
     {
         contentLength = fcgi_header.contentLengthB1;
         contentLength <<= 8;
@@ -340,7 +324,10 @@ int fastcgi::RecvAppData(vector<char>& binaryResponse, string& strerr, unsigned 
         contentBuffer = NULL;			
     }
     else
+    {
+        fprintf(stderr, "fastcgi: recv header length (%d)\n", nlen);
         return -1;
+    }
     
 	return contentLength;
 }

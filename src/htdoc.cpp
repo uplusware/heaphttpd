@@ -332,7 +332,6 @@ void Htdoc::Response()
 
 		if(access(strcgipath.c_str(), 01) != -1)
 		{
-		    printf("SCRIPT_NAME: %s PATH_INFO: %s\n", script_name.c_str(), path_info.c_str());
 		    m_session->SetMetaVar("SCRIPT_NAME", script_name.c_str());
   		    m_session->SetMetaVar("PATH_INFO", path_info.c_str());
 
@@ -464,7 +463,7 @@ void Htdoc::Response()
         {
             string pyfile =  m_work_path.c_str();
             pyfile += m_session->GetResource();
-            
+            Replace(pyfile, "//", "/");
             m_session->SetMetaVar("SCRIPT_FILENAME", cgi_cfg->second.cgi_pgm.c_str());
             m_session->SetMetaVar("REDIRECT_STATUS", "200");
             
@@ -801,7 +800,7 @@ void Htdoc::Response()
                         string phpfile = m_work_path.c_str();
                         phpfile += "/html/";
                         phpfile += m_session->GetResource();
-                        
+                        Replace(phpfile, "//", "/");
                         close(fds[0]);
                         m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
                         m_session->SetMetaVar("REDIRECT_STATUS", "200");
@@ -825,6 +824,7 @@ void Htdoc::Response()
                     string phpfile =  m_work_path.c_str();
                     phpfile += "/html/";
                     phpfile += m_session->GetResource();
+                    Replace(phpfile, "//", "/");
                     m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
                     m_session->SetMetaVar("REDIRECT_STATUS", "200");
                     

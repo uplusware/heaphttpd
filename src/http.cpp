@@ -759,22 +759,33 @@ Http_Connection CHttp::LineParse(const char* text)
 
                 m_cgi.SetMeta("AUTH_TYPE", "Basic");
                 
-                if(WWW_Auth(asBasic, strauth.c_str(), m_username))
-                    m_passed_wwwauth = TRUE;
+                string php_auth_pwd;
                 
-                m_cgi.SetMeta("REMOTE_USER", m_username.c_str());
+                if(WWW_Auth(asBasic, strauth.c_str(), m_username, php_auth_pwd))
+                {
+                    m_passed_wwwauth = TRUE;
+                    m_cgi.SetMeta("REMOTE_USER", m_username.c_str());
+                }
+                m_cgi.SetMeta("PHP_AUTH_USER", m_username.c_str());
+                m_cgi.SetMeta("PHP_AUTH_UPW", php_auth_pwd.c_str());
+                
             }
             else if(strncasecmp(strtext.c_str(), "Authorization: Digest", 21) == 0)
             {
                 string strauth;
                 strcut(strtext.c_str(), "Authorization: Digest ", NULL, strauth);
                 
+                string php_digest;
+                
                 m_cgi.SetMeta("AUTH_TYPE", "Digest");
                 
-                if(WWW_Auth(asDigest, strauth.c_str(), m_username, HTTP_METHOD_NAME[m_http_method]))
+                if(WWW_Auth(asDigest, strauth.c_str(), m_username, php_digest, HTTP_METHOD_NAME[m_http_method]))
+                {
                     m_passed_wwwauth = TRUE;
+                    m_cgi.SetMeta("REMOTE_USER", m_username.c_str());
+                }
                 
-                m_cgi.SetMeta("REMOTE_USER", m_username.c_str());
+                m_cgi.SetMeta("PHP_AUTH_DIGEST", php_digest.c_str());
             }
             else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Key", 17) == 0)
             {

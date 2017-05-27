@@ -17,6 +17,6 @@ typedef enum
 	asDigest
 } AUTH_SCHEME;
 
-bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, const char* method = "GET");
+bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, string &keywords, const char* method = "GET");
 
 #endif /* _WWW_AUTH_ */
