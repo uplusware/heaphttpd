@@ -31,7 +31,7 @@ const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DEL
 
 CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
-	const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
+	const char* work_path, vector<string>* default_webpages, vector<stExtension>* ext_list, const char* php_mode, 
     cgi_socket_t fpm_socktype, const char* fpm_sockfile,
     const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
     map<string, cgi_cfg_t>* cgi_list,
@@ -49,7 +49,8 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	m_cache = ch;
 
     m_ext_list = ext_list;
-
+    m_default_webpages = default_webpages;
+    
     m_client_cert = client_cert;
     
 	m_sockfd = sockfd;
@@ -502,7 +503,7 @@ void CHttp::Response()
 
     if(!skipAction)
     {
-        Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_php_mode.c_str(), 
+        Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_default_webpages, m_php_mode.c_str(), 
             m_fpm_socktype, m_fpm_sockfile.c_str(), 
             m_fpm_addr.c_str(), m_fpm_port, m_phpcgi_path.c_str(),
             m_cgi_list);

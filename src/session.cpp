@@ -47,7 +47,7 @@ void Session::Process()
             {
                 pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
                     m_clientip.c_str(), m_client_cert, m_cache,
-					CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(),
+					CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(),
                     CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
                     CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
                     &CHttpBase::m_cgi_list,
@@ -59,7 +59,7 @@ void Session::Process()
                 {
                     pProtocol = new CHttp2(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
                         m_clientip.c_str(), m_client_cert, m_cache,
-                        CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
+                        CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
                         CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
                         CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
                         &CHttpBase::m_cgi_list,
@@ -69,7 +69,7 @@ void Session::Process()
                 {
                     pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
                         m_clientip.c_str(), m_client_cert, m_cache,
-                        CHttpBase::m_work_path.c_str(), &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
+                        CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
                         CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
                         CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
                         &CHttpBase::m_cgi_list,

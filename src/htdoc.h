@@ -38,17 +38,19 @@ protected:
 	unsigned short m_fpm_port;
 
     map<string, cgi_cfg_t>* m_cgi_list;
+    vector<string>* m_default_webpages;
     
 	string m_phpcgi_path;
 	
 public:
-	Htdoc(CHttp* session, const char* work_path, const char* php_mode, 
+	Htdoc(CHttp* session, const char* work_path, vector<string>* default_webpages, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list)
 	{
 		m_session = session;
         m_work_path = work_path;
+        m_default_webpages = default_webpages;
 		m_php_mode = php_mode;
         m_fpm_socktype = fpm_socktype;
         m_fpm_sockfile = fpm_sockfile;

@@ -198,7 +198,7 @@ void Htdoc::Response()
             }
         }
     }
-	//printf("%d\n", m_session->GetMethod());
+
 	if(m_session->GetMethod() != hmPost && m_session->GetMethod() != hmGet && m_session->GetMethod() != hmHead)
 	{
         CHttpResponseHdr header;
@@ -215,12 +215,8 @@ void Htdoc::Response()
 	strResp.clear();
 	vector <string> vPath;
 	
-	if(strResource == "")
-	{
-		strResource = "index.html";
-		
-	}
-	else
+    //printf("%s\n", strResource.c_str());
+	if(strResource != "")
 	{
 		vSplitString(strResource, vPath, "/", TRUE, 0x7FFFFFFF);
 		
@@ -243,15 +239,13 @@ void Htdoc::Response()
 		}
 		if(nCDUP >= nCDIN)
 		{
-			strResource = "index.html";
+			strResource = "/";
 		}
 	}
 	
     //printf("%s\n", strResource.c_str());
 	m_session->SetResource(strResource.c_str());
-	
-
-	
+		
 	if(strncmp(strResource.c_str(), "/api/", 5) == 0)
 	{
         string strApiName = strResource.c_str() + 5; /* length of "/api/" */
@@ -259,8 +253,6 @@ void Htdoc::Response()
 		strLibName += "/api/lib";
 		strLibName += strApiName;
 		strLibName += ".so";
-		
-		//printf("%s\n", strLibName.c_str());
 		
 		struct stat statbuf;
         if(stat(strLibName.c_str(), &statbuf) < 0)
@@ -274,7 +266,6 @@ void Htdoc::Response()
     		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
             return;
         }
-                
 		
 		void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
 		if(!lhandle)
@@ -695,10 +686,40 @@ void Htdoc::Response()
         }
         else
         {
+            
+            string resoucefile = m_work_path.c_str();
+            resoucefile += "/html/";
+            resoucefile += m_session->GetResource();
+            Replace(resoucefile, "//", "/");
+            
+            struct stat resource_statbuf;
+            if(stat(resoucefile.c_str(), &resource_statbuf) == 0)
+            {
+                if(S_ISDIR(resource_statbuf.st_mode))
+                {
+                    vector<string>::iterator it_dftpage;
+                    for(it_dftpage = (*m_default_webpages).begin(); it_dftpage != (*m_default_webpages).end(); it_dftpage++)
+                    {
+                        string default_resoucefile = resoucefile;
+                        default_resoucefile += "/";
+                        default_resoucefile += (*it_dftpage).c_str();
+                        if(stat(default_resoucefile.c_str(), &resource_statbuf) == 0 && !S_ISDIR(resource_statbuf.st_mode))
+                        {
+                            string strDefaultResource = m_session->GetResource();
+                            strDefaultResource += "/";
+                            strDefaultResource += (*it_dftpage).c_str();
+                            Replace(strDefaultResource, "//", "/");
+                            m_session->SetResource(strDefaultResource.c_str());
+                            break;
+                        }
+                    }
+                }
+            }
+                        
             string strResource, strExtName;
             lowercase(m_session->GetResource(), strResource);
             get_extend_name(strResource.c_str(), strExtName);
-            
+
             if(strExtName == "php")
             {
                 if(strcasecmp(m_php_mode.c_str(), "cgi") == 0)

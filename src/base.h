@@ -531,6 +531,8 @@ public:
 	static string   m_https_cipher;
     static string   m_http2_tls_cipher;
     
+    static vector<string> m_default_webpages;
+    
 	static string 	m_www_authenticate;
 	static BOOL 	m_client_cer_check;
 	static string	m_ca_crt_root;

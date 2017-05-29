@@ -883,32 +883,30 @@ void __inline__ vSplitString( string strSrc ,vector<string>& vecDest ,const char
       string::size_type size_pos = 0;
       string::size_type size_prev_pos = 0;
         
-      while( (size_pos = strSrc.find_first_of( szSeparator ,size_pos)) != string::npos)
+      while((size_pos = strSrc.find_first_of( szSeparator ,size_pos)) != string::npos)
       {
-      	   if(count <=0)
+      	   if(count <= 0)
 		   		break;
            string strTemp=  strSrc.substr(size_prev_pos , size_pos-size_prev_pos );
-           if((strTemp == "")&&(emptyignore))
+           if(strTemp == "" && emptyignore)
 		   {
-
+               //do nothing
 		   }
 		   else
 		   {
            	vecDest.push_back(strTemp);
-           	//cout << "string = ["<< strTemp <<"]"<< endl;
 		   }
-           size_prev_pos =++ size_pos;
+           size_prev_pos = ++size_pos;
 		   count--;
       }
 
-	  if((strcmp(&strSrc[size_prev_pos], "") == 0)&&(emptyignore))
+	  if(strcmp(&strSrc[size_prev_pos], "") == 0 && emptyignore)
 	  {
-
+          //do nothing
 	  }
 	  else
 	  {
-      	vecDest.push_back(&strSrc[size_prev_pos]);
-      	//cout << "end string = ["<< &strSrc[size_prev_pos] <<"]"<< endl;
+          vecDest.push_back(&strSrc[size_prev_pos]);
 	  }
 };
 

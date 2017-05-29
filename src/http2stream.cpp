@@ -6,7 +6,7 @@
 http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, ServiceObjMap* srvobj, int sockfd,
         const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
-		const char* work_path, vector<stExtension>* ext_list, const char* php_mode, 
+		const char* work_path, vector<string>* default_webpages, vector<stExtension>* ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list,
@@ -36,6 +36,7 @@ http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_3
     m_phpcgi_path = phpcgi_path;
     
     m_cgi_list = cgi_list;
+    m_default_webpages = default_webpages;
     m_private_path = private_path;
     m_wwwauth_scheme = wwwauth_scheme;
     m_ssl = ssl;
@@ -50,6 +51,7 @@ http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_3
                             m_client_cert,
                             m_ch,
                             m_work_path.c_str(),
+                            m_default_webpages,
                             m_ext_list,
                             m_php_mode.c_str(),
                             m_fpm_socktype,
