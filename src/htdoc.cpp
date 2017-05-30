@@ -127,10 +127,9 @@ void Htdoc::Response()
                 m_session->SetWebSocketHandShake(Websocket_Ack);
                 
                 /* - WebSocket handshake finishes, begin to communication -*/
-                
                 string strResource = m_session->GetResource();
                 strtrim(strResource, "/");
-                //printf("%s\n", strResource.c_str());
+
                 if(strResource != "")
                 {
                     string strWSFunctionName = "ws_";
@@ -215,7 +214,6 @@ void Htdoc::Response()
 	strResp.clear();
 	vector <string> vPath;
 	
-    //printf("%s\n", strResource.c_str());
 	if(strResource != "")
 	{
 		vSplitString(strResource, vPath, "/", TRUE, 0x7FFFFFFF);
@@ -243,7 +241,6 @@ void Htdoc::Response()
 		}
 	}
 	
-    //printf("%s\n", strResource.c_str());
 	m_session->SetResource(strResource.c_str());
 		
 	if(strncmp(strResource.c_str(), "/api/", 5) == 0)
@@ -453,8 +450,17 @@ void Htdoc::Response()
         if(cgi_cfg != (*m_cgi_list).end())
         {
             string pyfile =  m_work_path.c_str();
+            
+            if(pyfile[pyfile.length() - 1] == '/')
+                pyfile += "html";
+            else
+                pyfile += "/html";
+            
+            if(m_session->GetResource()[0] != '/')
+                pyfile += "/";
+                    
             pyfile += m_session->GetResource();
-            Replace(pyfile, "//", "/");
+            
             m_session->SetMetaVar("SCRIPT_FILENAME", cgi_cfg->second.cgi_pgm.c_str());
             m_session->SetMetaVar("REDIRECT_STATUS", "200");
             
@@ -688,27 +694,49 @@ void Htdoc::Response()
         {
             
             string resoucefile = m_work_path.c_str();
-            resoucefile += "/html/";
+            
+            if(resoucefile[resoucefile.length() - 1] == '/')
+                resoucefile += "html";
+            else
+                resoucefile += "/html";
+            
+            if(m_session->GetResource()[0] != '/')
+                resoucefile += "/";
+                    
             resoucefile += m_session->GetResource();
-            Replace(resoucefile, "//", "/");
             
             struct stat resource_statbuf;
             if(stat(resoucefile.c_str(), &resource_statbuf) == 0)
             {
                 if(S_ISDIR(resource_statbuf.st_mode))
                 {
+                    if(resoucefile[resoucefile.length() - 1] != '/')
+                    {
+                        CHttpResponseHdr header;
+                        header.SetStatusCode(SC403);
+                        
+                        header.SetField("Content-Type", "text/html");
+                        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                        
+                        m_session->SendHeader(header.Text(), header.Length());
+                        m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                        return;
+                    }
                     vector<string>::iterator it_dftpage;
                     for(it_dftpage = (*m_default_webpages).begin(); it_dftpage != (*m_default_webpages).end(); it_dftpage++)
                     {
                         string default_resoucefile = resoucefile;
-                        default_resoucefile += "/";
+                        if(default_resoucefile[default_resoucefile.length() - 1] != '/')
+                            default_resoucefile += "/";
                         default_resoucefile += (*it_dftpage).c_str();
                         if(stat(default_resoucefile.c_str(), &resource_statbuf) == 0 && !S_ISDIR(resource_statbuf.st_mode))
                         {
                             string strDefaultResource = m_session->GetResource();
-                            strDefaultResource += "/";
+                            
+                            if(strDefaultResource[strDefaultResource.length() - 1] != '/')
+                                strDefaultResource += "/";
+            
                             strDefaultResource += (*it_dftpage).c_str();
-                            Replace(strDefaultResource, "//", "/");
                             m_session->SetResource(strDefaultResource.c_str());
                             break;
                         }
@@ -819,9 +847,17 @@ void Htdoc::Response()
                     else if(cgipid == 0)
                     {
                         string phpfile = m_work_path.c_str();
-                        phpfile += "/html/";
+                        
+                        if(phpfile[phpfile.length() - 1] == '/')
+                            phpfile += "html";
+                        else
+                            phpfile += "/html";
+                        
+                        if(m_session->GetResource()[0] != '/')
+                            phpfile += "/";
+                    
                         phpfile += m_session->GetResource();
-                        Replace(phpfile, "//", "/");
+                        
                         close(fds[0]);
                         m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
                         m_session->SetMetaVar("REDIRECT_STATUS", "200");
@@ -843,9 +879,17 @@ void Htdoc::Response()
                 else if(strcasecmp(m_php_mode.c_str(), "fpm") == 0)
                 {
                     string phpfile =  m_work_path.c_str();
-                    phpfile += "/html/";
+                    
+                    if(phpfile[phpfile.length() - 1] == '/')
+                          phpfile += "html";
+                    else
+                          phpfile += "/html";
+                    
+                    if(m_session->GetResource()[0] != '/')
+                        phpfile += "/";
+                    
                     phpfile += m_session->GetResource();
-                    Replace(phpfile, "//", "/");
+                    
                     m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
                     m_session->SetMetaVar("REDIRECT_STATUS", "200");
                     
