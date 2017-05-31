@@ -61,38 +61,38 @@ Cookie::Cookie(const char* szSetCookie)
         }
         else
         {
-            if(strncasecmp(strField.c_str(), "Version", strlen("Version")) == 0)
+            if(strncasecmp(strField.c_str(), "Version", sizeof("Version") - 1) == 0)
 		    {
 			    strcut(strField.c_str(), "=", NULL, m_Version);
 			    strtrim(m_Version);
 		    }
-		    else if(strncasecmp(strField.c_str(), "Expires", strlen("Expires")) == 0)
+		    else if(strncasecmp(strField.c_str(), "Expires", sizeof("Expires") - 1) == 0)
 		    {
 			    strcut(strField.c_str(), "=", NULL, m_Expires);
 			    strtrim(m_Expires);
 		    }
-		    else if(strncasecmp(strField.c_str(), "Path", strlen("Path")) == 0)
+		    else if(strncasecmp(strField.c_str(), "Path", sizeof("Path") - 1) == 0)
 		    {
 			    strcut(strField.c_str(), "=", NULL, m_Path);
 			    strtrim(m_Path);
 		    }
-		    else if(strncasecmp(strField.c_str(), "Domain", strlen("Domain")) == 0)
+		    else if(strncasecmp(strField.c_str(), "Domain", sizeof("Domain") - 1) == 0)
 		    {
 			    strcut(strField.c_str(), "=", NULL, m_Domain);
 			    strtrim(m_Domain);
 		    }
-		    else if(strncasecmp(strField.c_str(), "MaxAge", strlen("MaxAge")) == 0)
+		    else if(strncasecmp(strField.c_str(), "MaxAge", sizeof("MaxAge") - 1) == 0)
 		    {
 		        string strMaxAge;
 			    strcut(strField.c_str(), "=", NULL, strMaxAge);
 			    strtrim(strMaxAge);
 			    m_MaxAge = atoi(strMaxAge.c_str());
 		    }
-		    else if(strncasecmp(strField.c_str(), "Secure", strlen("Secure")) == 0)
+		    else if(strncasecmp(strField.c_str(), "Secure", sizeof("Secure") - 1) == 0)
 		    {
 		        m_Secure = TRUE;
 		    }
-		    else if(strncasecmp(strField.c_str(), "HttpOnly", strlen("HttpOnly")) == 0)
+		    else if(strncasecmp(strField.c_str(), "HttpOnly", sizeof("HttpOnly") - 1) == 0)
 		    {
 		        m_HttpOnly = TRUE;
 		    }

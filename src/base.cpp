@@ -6,6 +6,7 @@
 #include "base.h"
 #include "util/security.h"
 #include "tinyxml/tinyxml.h"
+#include "posixname.h"
 
 //////////////////////////////////////////////////////////////////////////
 //CHttpBase
@@ -488,7 +489,7 @@ BOOL CHttpBase::LoadAccessList()
 	sem_t* plock = NULL;
 	///////////////////////////////////////////////////////////////////////////////
 	// GLOBAL_REJECT_LIST
-	plock = sem_open("/.NIUHTTPD_GLOBAL_REJECT_LIST.sem", O_CREAT | O_RDWR, 0644, 1);
+	plock = sem_open(NIUHTTPD_GLOBAL_REJECT_LIST, O_CREAT | O_RDWR, 0644, 1);
 	if(plock != SEM_FAILED)
 	{
 		sem_wait(plock);
@@ -500,7 +501,7 @@ BOOL CHttpBase::LoadAccessList()
 	}
 	/////////////////////////////////////////////////////////////////////////////////
 	// GLOBAL_PERMIT_LIST
-	plock = sem_open("/.NIUHTTPD_GLOBAL_PERMIT_LIST.sem", O_CREAT | O_RDWR, 0644, 1);
+	plock = sem_open(NIUHTTPD_GLOBAL_PERMIT_LIST, O_CREAT | O_RDWR, 0644, 1);
 	if(plock != SEM_FAILED)
 	{
 		sem_wait(plock);

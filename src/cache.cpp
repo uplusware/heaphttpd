@@ -345,7 +345,7 @@ void memory_cache::_reload_session_vars_()
 		    if(dirp->d_type == DT_REG)
 		    {
 		    	int name_len = strlen(dirp->d_name);
-	            int exte_len = strlen(".session");
+	            int exte_len = sizeof(".session") - 1;
 	            
 	            if(name_len > exte_len 
 	                && dirp->d_name[name_len - 1] == 'n'
@@ -647,7 +647,7 @@ void memory_cache::_reload_server_vars_()
 		    if(dirp->d_type == DT_REG)
 		    {
 		    	int name_len = strlen(dirp->d_name);
-	            int exte_len = strlen(".server");
+	            int exte_len = sizeof(".server") - 1;
 	            
 	            if(name_len > exte_len 
 	                && dirp->d_name[name_len - 1] == 'r'
@@ -913,7 +913,7 @@ void memory_cache::_reload_cookies_()
 		    if(dirp->d_type == DT_REG)
 		    {
 		    	int name_len = strlen(dirp->d_name);
-	            int exte_len = strlen(".cookie");
+	            int exte_len = sizeof(".cookie") - 1;
 	            
 	            if(name_len > exte_len 
 	                && dirp->d_name[name_len - 1] == 'e'
@@ -1293,8 +1293,8 @@ void memory_cache::load_http2_push_list(const char* dir_path)
 		    if(dirp->d_type == DT_REG)
 		    {
 		    	int name_len = strlen(dirp->d_name);
-	            int css_len = strlen(".css");
-                int js_len = strlen(".js");
+	            int css_len = sizeof(".css") - 1;
+                int js_len = sizeof(".js") - 1;
 	            
                 BOOL is_pushed = FALSE;
                 if(name_len > css_len 

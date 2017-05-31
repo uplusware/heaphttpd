@@ -720,11 +720,11 @@ Http_Connection CHttp::LineParse(const char* text)
                 strtrim(strType);
                 m_cgi.SetMeta("CONTENT_TYPE", strType.c_str());
                 
-                if(strtext.find("application/x-www-form-urlencoded", 0, strlen("application/x-www-form-urlencoded")) != string::npos)
+                if(strtext.find("application/x-www-form-urlencoded", 0, sizeof("application/x-www-form-urlencoded") - 1) != string::npos)
                 {
                     m_content_type = application_x_www_form_urlencoded;
                 }
-                else if(strtext.find("multipart/form-data", 0, strlen("multipart/form-data")) != string::npos) 
+                else if(strtext.find("multipart/form-data", 0, sizeof("multipart/form-data") - 1) != string::npos) 
                 {
                     m_content_type = multipart_form_data;
                     strcut(strtext.c_str(), "boundary=", NULL, m_boundary);

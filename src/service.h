@@ -24,11 +24,9 @@
 #include <semaphore.h>
 #include "cache.h"
 #include "serviceobj.h"
+#include "posixname.h"
 
 #define DEFAULT_WORK_PROCESS_NUM 1
-
-static char LOGNAME[256] = "/var/log/niuhttpd/service.log";
-static char LCKNAME[256] = "/.niuhttpd_sys.lock";
 
 static const char* SVR_NAME_TBL[] = {NULL, "HTTP", NULL};
 static const char* SVR_DESP_TBL[] = {NULL, "HTTP", NULL};

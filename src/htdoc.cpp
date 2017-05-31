@@ -357,7 +357,7 @@ void Htdoc::Response()
                     }
                     
                     CHttpResponseHdr header;
-                    if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
+                    if(strncasecmp(strHeader.c_str(), "Status: ", sizeof("Status: ") - 1) == 0)
                     {
                         unsigned int nStatusCode = 200;
                         sscanf(strHeader.c_str(), "Status: %d %*", &nStatusCode);
@@ -523,7 +523,7 @@ void Htdoc::Response()
                         }
                         
                         CHttpResponseHdr header;
-                        if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
+                        if(strncasecmp(strHeader.c_str(), "Status: ", sizeof("Status: ") - 1) == 0)
                         {
                             unsigned int nStatusCode = 200;
                             sscanf(strHeader.c_str(), "Status: %d %*", &nStatusCode);
@@ -621,7 +621,7 @@ void Htdoc::Response()
                         }
                         
                         CHttpResponseHdr header;
-                        if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
+                        if(strncasecmp(strHeader.c_str(), "Status: ", sizeof("Status: ") - 1) == 0)
                         {
                             unsigned int nStatusCode = 200;
                             sscanf(strHeader.c_str(), "Status: %d %*", &nStatusCode);
@@ -798,7 +798,7 @@ void Htdoc::Response()
                             
                             
                             CHttpResponseHdr header;
-                            if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
+                            if(strncasecmp(strHeader.c_str(), "Status: ", sizeof("Status: ") - 1) == 0)
                             {
                                 unsigned int nStatusCode = 200;
                                 sscanf(strHeader.c_str(), "Status: %d %*", &nStatusCode);
@@ -947,7 +947,7 @@ void Htdoc::Response()
                             
                             CHttpResponseHdr header;
                             
-                            if(strncasecmp(strHeader.c_str(), "Status: ", strlen("Status: ")) == 0)
+                            if(strncasecmp(strHeader.c_str(), "Status: ", sizeof("Status: ") - 1) == 0)
                             {
                                 unsigned int nStatusCode = 200;
                                 sscanf(strHeader.c_str(), "Status: %d %*", &nStatusCode);
