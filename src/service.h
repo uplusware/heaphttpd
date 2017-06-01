@@ -23,7 +23,7 @@
 #include <mqueue.h>
 #include <semaphore.h>
 #include "cache.h"
-#include "serviceobj.h"
+#include "serviceobjmap.h"
 #include "posixname.h"
 
 #define DEFAULT_WORK_PROCESS_NUM 1

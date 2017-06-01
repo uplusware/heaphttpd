@@ -22,7 +22,7 @@
 #include "http2comm.h"
 #include "util/general.h"
 #include "niuapi.h"
-#include "serviceobj.h"
+#include "serviceobjmap.h"
 
 #define MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN (1024*1024*4)
 #define MAX_MULTIPART_FORM_DATA_LEN (1024*1024*4)
@@ -872,12 +872,12 @@ void CHttp::SetMetaVarsToEnv()
 	
 }
 
-void CHttp::SetServiceObject(const char * objname, SERVICE_OBJECT_HANDLE objptr)
+void CHttp::SetServiceObject(const char * objname, IServiceObj* objptr)
 {
    m_srvobj->SetObj(objname, objptr);
 }
 
-void* CHttp::GetServiceObject(const char * objname)
+IServiceObj* CHttp::GetServiceObject(const char * objname)
 {
    return m_srvobj->GetObj(objname);
 }

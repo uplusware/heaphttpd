@@ -11,7 +11,7 @@
 #include "cache.h"
 #include "webcgi.h"
 #include "wwwauth.h"
-#include "serviceobj.h"
+#include "serviceobjmap.h"
 #include "extension.h"
 
 enum WebSocket_HandShake
@@ -132,8 +132,8 @@ public:
 	
 	int GetSocket() { return m_sockfd; }
     SSL* GetSSL() { return m_ssl; }
-    void SetServiceObject(const char * objname, SERVICE_OBJECT_HANDLE objptr);
-    void* GetServiceObject(const char* objname);
+    void SetServiceObject(const char * objname, IServiceObj* objptr);
+    IServiceObj* GetServiceObject(const char* objname);
 	WebCGI m_cgi;
 	
 	X509* GetClientX509Cert() { return m_client_cert; }

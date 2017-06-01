@@ -14,7 +14,7 @@
 #include "base.h"
 #include "http.h"
 #include "cache.h"
-#include "serviceobj.h"
+#include "serviceobjmap.h"
 #include "util/trace.h"
 
 typedef enum

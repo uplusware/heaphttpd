@@ -14,7 +14,6 @@
 #include "webdoc.h"
 #include "niuapi.h"
 #include "stgengine.h"
-#include "database.h"
 
 class ApiMongoDemo : public doc
 {

@@ -100,8 +100,9 @@ typedef struct {
 	unsigned char nameLengthB0;
 	unsigned char valueLengthB0; /* valueLengthB0 >> 7 == 0 */
 	/*
-	unsigned char nameData[nameLength((B3 & 0x7f) << 24) + (B2 << 16) + (B1 << 8) + B0];
-	unsigned char valueData[valueLength]; */
+        unsigned char nameData[nameLength((B3 & 0x7f) << 24) + (B2 << 16) + (B1 << 8) + B0];
+        unsigned char valueData[valueLength];
+    */
 } FCGI_NameValuePair41;
 typedef struct {
 	unsigned char nameLengthB3; /* nameLengthB3 >> 7 == 1 */
@@ -113,8 +114,9 @@ typedef struct {
 	unsigned char valueLengthB1;
 	unsigned char valueLengthB0;
 	/*
-	unsigned char nameData[nameLength((B3 & 0x7f) << 24) + (B2 << 16) + (B1 << 8) + B0];
-	unsigned char valueData[valueLength((B3 & 0x7f) << 24) + (B2 << 16) + (B1 << 8) + B0];*/
+        unsigned char nameData[nameLength((B3 & 0x7f) << 24) + (B2 << 16) + (B1 << 8) + B0];
+        unsigned char valueData[valueLength((B3 & 0x7f) << 24) + (B2 << 16) + (B1 << 8) + B0];
+    */
 } FCGI_NameValuePair44;
 
 class fastcgi : public cgi_base

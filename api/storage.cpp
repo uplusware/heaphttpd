@@ -9,61 +9,38 @@
 #include <string.h>
 
 #ifndef _MONGODB_
-static const char *server_args[] = {
-	"this_program", /* this string is not used */
-	"--datadir=.",
-	"--key_buffer_size=32M"
-};
-
-static const char *server_groups[] = {
-	"embedded",
-	"server",
-	"this_program_SERVER",
-	(char *)NULL
-	};
-
-void DBStorage::SqlSafetyString(string& strInOut)
+void DatabaseStorage::SqlSafetyString(string& strInOut)
 {
 	char * szOut = new char[strInOut.length()* 2 + 1];
 	mysql_escape_string(szOut, strInOut.c_str(), strInOut.length());
 	strInOut = szOut;
 	delete szOut;
 }
-
 #endif /* _MONGODB_ */
 
-DBStorage::DBStorage(const char* encoding, const char* private_path)
+DatabaseStorage::DatabaseStorage(const char* encoding, const char* private_path)
 {
     m_encoding = encoding;
     m_private_path = private_path;
-    
 	m_bOpened = FALSE;
 #ifdef _MONGODB_
     mongoc_init();
     m_hMongoDB = NULL;
     m_hDatabase = NULL;
 #else
-	if(mysql_library_init(sizeof(server_args)/sizeof(char *), (char**)server_args, (char**)server_groups))
-	{
-		exit(1);
-	}
     m_hMySQL = NULL;
 #endif /* _MONGODB_*/
-    pthread_mutex_init(&m_thread_pool_mutex, NULL);
 }
 
-DBStorage::~DBStorage()
+DatabaseStorage::~DatabaseStorage()
 {
 	Close();
 #ifdef _MONGODB_
     mongoc_cleanup();
-#else
-	mysql_library_end();
 #endif /* _MONGODB_ */
-    pthread_mutex_destroy(&m_thread_pool_mutex);
 }
 
-int DBStorage::Connect(const char * host, const char* username, const char* password, const char* database, unsigned short port)
+int DatabaseStorage::Connect(const char * host, const char* username, const char* password, const char* database, const char* unix_socket, unsigned short port)
 {
 	if(m_bOpened)
 	{
@@ -75,7 +52,7 @@ int DBStorage::Connect(const char * host, const char* username, const char* pass
         m_port = port;
         m_username = username;
 		m_password = password;
-
+        m_unix_socket = unix_socket;
         if(database != NULL)
 			m_database = database;
 			
@@ -96,7 +73,6 @@ int DBStorage::Connect(const char * host, const char* username, const char* pass
             mongodb_uri += ":";
             mongodb_uri += sz_port;
         }
-        //printf("%s\n", mongodb_uri.c_str());
         
         m_hMongoDB = mongoc_client_new (mongodb_uri.c_str());
         if(!m_hMongoDB)
@@ -115,11 +91,9 @@ int DBStorage::Connect(const char * host, const char* username, const char* pass
         return 0;
 
 #else
-		mysql_thread_init();
-        
-        m_hMySQL = mysql_init(NULL);
+		m_hMySQL = mysql_init(NULL);
 
-		if(mysql_real_connect(m_hMySQL, host, username, password, database, port ,NULL ,0) != NULL)
+		if(mysql_real_connect(m_hMySQL, host, username, password, database, port , unix_socket, 0) != NULL)
 		{			
 			mysql_set_character_set(m_hMySQL, m_encoding.c_str());
 			m_bOpened = TRUE;
@@ -127,7 +101,7 @@ int DBStorage::Connect(const char * host, const char* username, const char* pass
 		}
 		else
 		{
-            printf("mysql_real_connect %s\n", mysql_error(m_hMySQL));
+            fprintf(stderr, "mysql_real_connect %s\n", mysql_error(m_hMySQL));
 			
 			m_bOpened = FALSE;
             m_hMySQL = NULL;
@@ -137,7 +111,7 @@ int DBStorage::Connect(const char * host, const char* username, const char* pass
 	}
 }
 
-void DBStorage::Close()
+void DatabaseStorage::Close()
 {
 	if(m_bOpened)
 	{
@@ -149,16 +123,14 @@ void DBStorage::Close()
         m_hDatabase = NULL;
         m_hMongoDB = NULL;
 #else
-		//printf("mysql closed\n");
         if(m_hMySQL)
             mysql_close(m_hMySQL);
         m_hMySQL = NULL;
-		mysql_thread_end();
 #endif /* _MONGODB_ */	
     }
 }
 
-int DBStorage::Ping()
+int DatabaseStorage::Ping()
 {
 	if(m_bOpened)
 	{
@@ -216,30 +188,16 @@ int DBStorage::Ping()
 	}
 }
 
-void DBStorage::KeepLive()
+void DatabaseStorage::KeepLive()
 {
 	if(Ping() != 0)
 	{
 		Close();
-		Connect(m_host.c_str(), m_username.c_str(), m_password.c_str(), m_database.c_str());
+		Connect(m_host.c_str(), m_username.c_str(), m_password.c_str(), m_database.c_str(), m_unix_socket.c_str(), m_port);
 	}
 }
 
-void DBStorage::EntryThread()
-{
-#ifndef _MONGODB_
-	mysql_thread_init();
-#endif /* _MONGODB_ */
-}
-
-void DBStorage::LeaveThread()
-{
-#ifndef _MONGODB_
-	mysql_thread_end();
-#endif /* _MONGODB_ */
-}
-
-int DBStorage::ShowDatabases(string &databases)
+int DatabaseStorage::ShowDatabases(string &databases)
 {
 #ifdef _MONGODB_
    bson_error_t error;
@@ -265,12 +223,10 @@ int DBStorage::ShowDatabases(string &databases)
     //Transaction begin
 	mysql_autocommit(m_hMySQL, 0);
 	sprintf(sqlcmd,"show databases");
-	pthread_mutex_lock(&m_thread_pool_mutex);
 	mysql_real_query(m_hMySQL, sqlcmd, strlen(sqlcmd));
     MYSQL_RES *qResult;
 	MYSQL_ROW row;
 	qResult = mysql_store_result(m_hMySQL);
-	pthread_mutex_unlock(&m_thread_pool_mutex);
     if(qResult)
     {			
         while((row = mysql_fetch_row(qResult)))

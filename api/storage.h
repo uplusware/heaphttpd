@@ -20,22 +20,21 @@
 
 using namespace std; 
 
-class DBStorage
+class DatabaseStorage
 {
 public:
-	DBStorage(const char* encoding, const char* private_path);
-	virtual ~DBStorage();
+	DatabaseStorage(const char* encoding, const char* private_path);
+	virtual ~DatabaseStorage();
 
 	//system
-	int Connect(const char * host, const char* username, const char* password, const char* database, unsigned short port = 0);
+	int Connect(const char * host, const char* username, const char* password, const char* database,
+        const char* unix_socket, unsigned short port = 0);
+        
 	void Close();
+    
 	int Ping();
 	
 	void KeepLive();
-	
-	void EntryThread();
-
-	void LeaveThread();
 	
 	int ShowDatabases(string& databases);
 	
@@ -56,6 +55,8 @@ protected:
 	string m_password;
 	string m_database;
     unsigned short m_port;
+    string m_unix_socket;
+    
     string m_encoding;
     string m_private_path;
     
