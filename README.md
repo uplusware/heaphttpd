@@ -4,4 +4,4 @@
 * Support Service Object (For example, a persistent MariabDB or MongoDB connection)
 * [Project Wiki](https://github.com/uplusware/niuhttpd/wiki/)
 
-### niǔ means 钮(niǔ). It's a Chinese character which means button.
+### niu means 钮(niǔ). It's a Chinese character which means button.
