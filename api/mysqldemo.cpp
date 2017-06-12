@@ -26,7 +26,7 @@ void ApiMySQLDemo::Response()
     
     if(database_instance && database_instance->ShowDatabases(strDatabases) == 0)
     {
-        strDatabases = "<html><head><title>CGI sample</title></head><h1>heaphttpd web server/0.3</h1>Show databases: " + strDatabases;
+        strDatabases = "<html><head><title>CGI sample</title></head><h1>Heaphttpd web server/1.0</h1>Show databases: " + strDatabases;
         strDatabases += "</body></html>";
         
         header.SetStatusCode(SC200);

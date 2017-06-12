@@ -13,7 +13,7 @@ void ApiUpload::Response()
     header.SetField("Content-Type", "text/html");
     
     string strResp;
-    strResp = "<html></head><title>API Sample</title></head><body><h1>heaphttpd web server/0.3</h1>";
+    strResp = "<html></head><title>API Sample</title></head><body><h1>Heaphttpd web server/1.0</h1>";
     
     string filename;
     string filetype;
