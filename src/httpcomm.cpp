@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "httpcomm.h"
+#include "version.h"
 
 void _gen_http_date_string_(unsigned int nTime, string & strTime)
 {
@@ -93,7 +94,7 @@ CHttpResponseHdr::CHttpResponseHdr()
 	m_mapHeader.insert(map<string, string>::value_type("Refresh", ""));
 	m_mapHeader.insert(map<string, string>::value_type("Retry-After", ""));
 	
-	m_mapHeader.insert(map<string, string>::value_type("Server", "Heaphttpd web server/1.0"));
+	m_mapHeader.insert(map<string, string>::value_type("Server", VERSION_STRING));
 	m_mapHeader.insert(map<string, string>::value_type("Set-Cookie", ""));
 	m_mapHeader.insert(map<string, string>::value_type("Strict-Transport-Security", ""));
 	

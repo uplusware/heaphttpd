@@ -4,6 +4,7 @@
 */
 
 #include "webcgi.h"
+#include "version.h"
 
 WebCGI::WebCGI()
 {
@@ -24,7 +25,7 @@ WebCGI::WebCGI()
      m_meta_var.insert(map<string, string>::value_type("SERVER_NAME", ""));
      m_meta_var.insert(map<string, string>::value_type("SERVER_PORT", ""));
      m_meta_var.insert(map<string, string>::value_type("SERVER_PROTOCOL", "HTTP/1.1"));
-     m_meta_var.insert(map<string, string>::value_type("SERVER_SOFTWARE", "Heaphttpd web server/1.0"));
+     m_meta_var.insert(map<string, string>::value_type("SERVER_SOFTWARE", VERSION_STRING));
 }
 void WebCGI::SetMeta(const char* varname, const char* varvalue)
 {

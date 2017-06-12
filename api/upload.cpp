@@ -4,6 +4,7 @@
 */
 #include <stdio.h>
 #include "upload.h"
+#include "version.h"
 
 //API upload
 void ApiUpload::Response()
@@ -13,7 +14,7 @@ void ApiUpload::Response()
     header.SetField("Content-Type", "text/html");
     
     string strResp;
-    strResp = "<html></head><title>API Sample</title></head><body><h1>Heaphttpd web server/1.0</h1>";
+    strResp = "<html></head><title>API Sample</title></head><body><h1>"VERSION_STRING"</h1>";
     
     string filename;
     string filetype;

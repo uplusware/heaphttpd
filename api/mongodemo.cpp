@@ -4,6 +4,7 @@
 */
 #include <stdio.h>
 #include "mongodemo.h"
+#include "version.h"
 
 //API sample
 #define MONGO_SERVICE_OBJ_NAME  "root$mongodb$heaphttpd@"
@@ -26,7 +27,7 @@ void ApiMongoDemo::Response()
     
     if(database_instance && database_instance->ShowDatabases(strDatabases) == 0)
     {
-        strDatabases = "<html><head><title>CGI sample</title></head><h1>Heaphttpd web server/1.0</h1>Show databases: " + strDatabases;
+        strDatabases = "<html><head><title>CGI sample</title></head><h1>"VERSION_STRING"</h1>Show databases: " + strDatabases;
         strDatabases += "</body></html>";
         
         header.SetStatusCode(SC200);

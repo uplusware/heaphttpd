@@ -9,6 +9,7 @@
 #include <string>
 #include <iostream>
 #include "heapapi.h"
+#include "version.h"
 
 using namespace std;
 
