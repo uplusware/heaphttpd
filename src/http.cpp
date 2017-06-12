@@ -21,7 +21,7 @@
 #include "http2.h"
 #include "http2comm.h"
 #include "util/general.h"
-#include "niuapi.h"
+#include "heapapi.h"
 #include "serviceobjmap.h"
 
 #define MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN (1024*1024*4)
@@ -291,7 +291,7 @@ int CHttp::SendHeader(const char* buf, int len)
 	
 	if(m_session_var_uid != "")
 	{
-	    strHeader += "Set-Cookie: __niuhttpd_session__=";
+	    strHeader += "Set-Cookie: __heaphttpd_session__=";
 		strHeader += m_session_var_uid;
 		strHeader += "\r\n";
 	}
@@ -459,7 +459,7 @@ void CHttp::Response()
         map<string, string>::iterator iter_c;
         for(iter_c = _COOKIE_VARS_.begin(); iter_c != _COOKIE_VARS_.end(); iter_c++)
         {
-            if(iter_c->first == "__niuhttpd_session__")
+            if(iter_c->first == "__heaphttpd_session__")
             {
                 m_session_var_uid = iter_c->second;
                 break;

@@ -19,7 +19,7 @@ public:
     http_server_group()
     {
         TiXmlDocument xmlFileterDoc;
-        xmlFileterDoc.LoadFile("/etc/niuhttpd/extension/httpbalancer.xml");
+        xmlFileterDoc.LoadFile("/etc/heaphttpd/extension/httpbalancer.xml");
         TiXmlElement * pRootElement = xmlFileterDoc.RootElement();
         if(pRootElement)
         {

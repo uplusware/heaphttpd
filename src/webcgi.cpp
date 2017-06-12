@@ -24,7 +24,7 @@ WebCGI::WebCGI()
      m_meta_var.insert(map<string, string>::value_type("SERVER_NAME", ""));
      m_meta_var.insert(map<string, string>::value_type("SERVER_PORT", ""));
      m_meta_var.insert(map<string, string>::value_type("SERVER_PROTOCOL", "HTTP/1.1"));
-     m_meta_var.insert(map<string, string>::value_type("SERVER_SOFTWARE", "niuhttpd web server/0.3"));
+     m_meta_var.insert(map<string, string>::value_type("SERVER_SOFTWARE", "heaphttpd web server/1.0"));
 }
 void WebCGI::SetMeta(const char* varname, const char* varvalue)
 {

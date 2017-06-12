@@ -5,10 +5,10 @@
 #ifndef _MAILSYS_H_
 #define _MAILSYS_H_
 
-#define CONFIG_FILTER_PATH	"/etc/niuhttpd/mfilter.xml"
-#define CONFIG_FILE_PATH	"/etc/niuhttpd/niuhttpd.conf"
-#define PERMIT_FILE_PATH	"/etc/niuhttpd/permit.list"
-#define REJECT_FILE_PATH	"/etc/niuhttpd/reject.list"
+#define CONFIG_FILTER_PATH	"/etc/heaphttpd/mfilter.xml"
+#define CONFIG_FILE_PATH	"/etc/heaphttpd/heaphttpd.conf"
+#define PERMIT_FILE_PATH	"/etc/heaphttpd/permit.list"
+#define REJECT_FILE_PATH	"/etc/heaphttpd/reject.list"
 
 #include <openssl/rsa.h>     
 #include <openssl/crypto.h>

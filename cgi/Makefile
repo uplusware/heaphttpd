@@ -1,6 +1,6 @@
 CC = gcc
 CGIPGM = sample.cgi
-CGIPGMOBJS = sample.o ../src/niuapi.o
+CGIPGMOBJS = sample.o ../src/heapapi.o
 
 MDEF = _LINUX_OS_
 INCDIR = -I../src
@@ -12,7 +12,7 @@ FLAGS = -O2 -fPIC -w
 all: pgm
 
 install: all
-	cp sample.cgi /var/niuhttpd/cgi-bin
+	cp sample.cgi /var/heaphttpd/cgi-bin
     
 pgm: $(CGIPGM)
 	

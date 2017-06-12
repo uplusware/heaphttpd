@@ -1,20 +1,20 @@
 CC = gcc
-HTTPSRV = niuhttpd
+HTTPSRV = heaphttpd
 HTTPSRVOBJS = mainsrv.o service.o session.o pool.o base.o
 
-NIUTOOL = niutool
-NIUTOOLOBJS = niutool.o util/DES.o
+NIUTOOL = heaptool
+NIUTOOLOBJS = heaptool.o util/DES.o
 
-AUTHLIB = libniuauth.so
-AUTHLIBOBJS = niuauth.o
+AUTHLIB = libheapauth.so
+AUTHLIBOBJS = heapauth.o
 
-WSLIB = libniuwebsocket.so
+WSLIB = libheapwebsocket.so
 WSLIBOBJS = websocket.o
 
-HTTPLIB = libniuhttp.so
+HTTPLIB = libheaphttp.so
 HTTPLIBOBJS =   httpsessionvar.o httpservervar.o cookie.o   \
                 http.o httpcomm.o cache.o htdoc.o http2.o http2comm.o hpack.o http2stream.o   \
-                fstring.o webdoc.o webcgi.o niuapi.o wwwauth.o cgi.o fastcgi.o scgi.o serviceobj.o	\
+                fstring.o webdoc.o webcgi.o heapapi.o wwwauth.o cgi.o fastcgi.o scgi.o serviceobj.o	\
                 util/trace.o	            \
                 util/digcalc.o	            \
                 util/sha1.o                 \
@@ -41,14 +41,14 @@ INCDIR = -I../$(OPENSSL_DIR)/include
 LDDIRS = -L.
     
 ifdef memcached
-    LDLIST_HTTP = -lstdc++ -lmemcached -lniuauth -lniuwebsocket
+    LDLIST_HTTP = -lstdc++ -lmemcached -lheapauth -lheapwebsocket
     MEMCACHED_DEF = _WITH_MEMCACHED_
 else
-    LDLIST_HTTP = -lstdc++ -lniuauth -lniuwebsocket
+    LDLIST_HTTP = -lstdc++ -lheapauth -lheapwebsocket
     MEMCACHED_DEF = _WITHOUT_MEMCACHED_
 endif
 
-LDLIST_SVR = ../$(OPENSSL_DIR)/libssl.a ../$(OPENSSL_DIR)/libcrypto.a -lstdc++ -lrt -ldl -lpthread -lniuhttp -lniuauth -lniuwebsocket
+LDLIST_SVR = ../$(OPENSSL_DIR)/libssl.a ../$(OPENSSL_DIR)/libcrypto.a -lstdc++ -lrt -ldl -lpthread -lheaphttp -lheapauth -lheapwebsocket
 LDLIST_TOOL = -lstdc++
 LDLIST_AUTH = -lstdc++
 LDLIST_WS = -lstdc++

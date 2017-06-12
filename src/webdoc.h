@@ -8,7 +8,7 @@
 
 #include "http.h"
 #include "httpcomm.h"
-#include "niuapi.h"
+#include "heapapi.h"
 
 class doc
 {

@@ -3,11 +3,11 @@ Certificate:
         Version: 3 (0x2)
         Serial Number: 2 (0x2)
     Signature Algorithm: sha256WithRSAEncryption
-        Issuer: C=CN, ST=BJ, O=Uplusware, OU=niuhttpd, CN=localhost
+        Issuer: C=CN, ST=BJ, O=Uplusware, OU=heaphttpd, CN=localhost
         Validity
             Not Before: May 31 02:06:20 2016 GMT
             Not After : May 29 02:06:20 2026 GMT
-        Subject: C=CN, ST=BJ, O=Uplusware, OU=niuhttpd, CN=127.0.0.1
+        Subject: C=CN, ST=BJ, O=Uplusware, OU=heaphttpd, CN=127.0.0.1
         Subject Public Key Info:
             Public Key Algorithm: rsaEncryption
                 Public-Key: (1024 bit)

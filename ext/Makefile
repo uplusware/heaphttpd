@@ -24,30 +24,30 @@ LDDIRS = -L../src/
 all: ext
 
 install: all
-	cp libextsample1.so /var/niuhttpd/ext/
-	cp libextsample2.so /var/niuhttpd/ext/
-	cp libextsample3.so /var/niuhttpd/ext/
+	cp libextsample1.so /var/heaphttpd/ext/
+	cp libextsample2.so /var/heaphttpd/ext/
+	cp libextsample3.so /var/heaphttpd/ext/
 
 bal_install: bal
-	cp libhttpbalancer.so /var/niuhttpd/ext/
-	test -x /etc/niuhttpd/extension/ || mkdir /etc/niuhttpd/extension/
-	cp httpbalancer.xml /etc/niuhttpd/extension/httpbalancer.xml
+	cp libhttpbalancer.so /var/heaphttpd/ext/
+	test -x /etc/heaphttpd/extension/ || mkdir /etc/heaphttpd/extension/
+	cp httpbalancer.xml /etc/heaphttpd/extension/httpbalancer.xml
     
 ext: $(EXT1) $(EXT2) $(EXT3)
 
 bal: $(HTTP_BALANCER)
 
 $(EXT1): $(EXTOBJ1)
-	$(CC) -shared -W -fPIC -o $@ $(EXTOBJ1) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp
+	$(CC) -shared -W -fPIC -o $@ $(EXTOBJ1) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp
 
 $(EXT2): $(EXTOBJ2)
-	$(CC) -shared -W -fPIC -o $@ $(EXTOBJ2) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp
+	$(CC) -shared -W -fPIC -o $@ $(EXTOBJ2) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp
 
 $(EXT3): $(EXTOBJ3)
-	$(CC) -shared -W -fPIC -o $@ $(EXTOBJ3) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp
+	$(CC) -shared -W -fPIC -o $@ $(EXTOBJ3) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp
 
 $(HTTP_BALANCER): $(HTTP_BALANCER_OBJ)
-	$(CC) -shared -W -fPIC -o $@ $(HTTP_BALANCER_OBJ) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp
+	$(CC) -shared -W -fPIC -o $@ $(HTTP_BALANCER_OBJ) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp
     
 %.o : %.cpp
 	$(CC) $(INCDIR) $(FLAGS) -c $< -o $@

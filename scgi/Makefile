@@ -1,3 +1,3 @@
 install:
-	cp main.py /var/niuhttpd/scgi/
-	chmod a+x /var/niuhttpd/scgi/main.py
+	cp main.py /var/heaphttpd/scgi/
+	chmod a+x /var/heaphttpd/scgi/main.py

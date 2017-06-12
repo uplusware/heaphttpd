@@ -38,27 +38,27 @@ LDDIRS = -L../src/ -L/usr/lib/x86_64-linux-gnu/ -L.
 ifdef MONGODB
 all: apimongodemo
 install: all
-	cp libmongodemo.so /var/niuhttpd/api/
+	cp libmongodemo.so /var/heaphttpd/api/
 else
 ifdef MYSQLDB
 all: apimysqldemo
 install: all
-	cp libmysqldemo.so /var/niuhttpd/api/
+	cp libmysqldemo.so /var/heaphttpd/api/
 else
 ifdef PERF
 all: apiperf
 install: all
-	cp libperf.so /var/niuhttpd/api/
+	cp libperf.so /var/heaphttpd/api/
 else
 ifdef UPLOADSAMPLE
 all: apiupload
 install: all
-	cp libupload.so /var/niuhttpd/api/
-	test -x /var/niuhttpd/html/upload || mkdir /var/niuhttpd/html/upload
+	cp libupload.so /var/heaphttpd/api/
+	test -x /var/heaphttpd/html/upload || mkdir /var/heaphttpd/html/upload
 else
 all: apisample
 install: all
-	cp libsample.so /var/niuhttpd/api/
+	cp libsample.so /var/heaphttpd/api/
 endif
 endif
 endif
@@ -72,19 +72,19 @@ apiperf: $(PERFAPI)
 apiupload: $(UPLOAD)
 
 $(UPLOAD): $(UPLOADOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(UPLOADOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp 
+	$(CC) -shared -W -fPIC -o $@ $(UPLOADOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp 
     
 $(PERFAPI): $(PERFAPIOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(PERFAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp 
+	$(CC) -shared -W -fPIC -o $@ $(PERFAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp 
     
 $(HTTPAPI): $(HTTPAPIOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(HTTPAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp 
+	$(CC) -shared -W -fPIC -o $@ $(HTTPAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp 
 
 $(MYSQLDEMOAPI): $(MYSQLDEMOAPIOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(MYSQLDEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp -lmariadb
+	$(CC) -shared -W -fPIC -o $@ $(MYSQLDEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp -lmariadb
 
 $(MONGODEMOAPI): $(MONGODEMOAPIOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(MONGODEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuhttp `pkg-config --libs-only-l libmongoc-1.0`
+	$(CC) -shared -W -fPIC -o $@ $(MONGODEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp `pkg-config --libs-only-l libmongoc-1.0`
 
 ifdef MONGODB	
 %.o : %.cpp

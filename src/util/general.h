@@ -3,8 +3,8 @@
 	uplusware@gmail.com
 */
 
-#ifndef _NIUHTTPD_GENERAL_H_
-#define _NIUHTTPD_GENERAL_H_
+#ifndef _HEAPHTTPD_GENERAL_H_
+#define _HEAPHTTPD_GENERAL_H_
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -1532,6 +1532,6 @@ time_t __inline__ ParseCookieDateTimeString(const char* szDateTime)
 	
 	return mktime(&tm1);
 }
-#endif /* _NIUHTTPD_GENERAL_H_ */
+#endif /* _HEAPHTTPD_GENERAL_H_ */
 
 

@@ -6,7 +6,7 @@
 #include "mysqldemo.h"
 
 //API sample
-#define MYSQL_SERVICE_OBJ_NAME  "root$mysql$niuhttpd@"
+#define MYSQL_SERVICE_OBJ_NAME  "root$mysql$heaphttpd@"
 
 void ApiMySQLDemo::Response()
 {
@@ -15,7 +15,7 @@ void ApiMySQLDemo::Response()
 	StorageEngine* stg_engine = (StorageEngine*)m_session->GetServiceObject(strObjName.c_str());
 	if(stg_engine == NULL)
 	{
-		stg_engine = new StorageEngine("localhost", "root", "123456", "", "/var/run/mysqld/mysqld.sock", 0, "UTF-8", "/var/niuhttpd/private");
+		stg_engine = new StorageEngine("localhost", "root", "123456", "", "/var/run/mysqld/mysqld.sock", 0, "UTF-8", "/var/heaphttpd/private");
 		m_session->SetServiceObject(strObjName.c_str(), stg_engine);		
 	}
     
@@ -26,7 +26,7 @@ void ApiMySQLDemo::Response()
     
     if(database_instance && database_instance->ShowDatabases(strDatabases) == 0)
     {
-        strDatabases = "<html><head><title>CGI sample</title></head><h1>niuhttpd web server/0.3</h1>Show databases: " + strDatabases;
+        strDatabases = "<html><head><title>CGI sample</title></head><h1>heaphttpd web server/0.3</h1>Show databases: " + strDatabases;
         strDatabases += "</body></html>";
         
         header.SetStatusCode(SC200);

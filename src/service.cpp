@@ -224,7 +224,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		ssl_ctx = SSL_CTX_new(meth);
 		if(!ssl_ctx)
 		{
-			CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+			CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
             uTrace.Write(Trace_Error, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
@@ -237,7 +237,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		SSL_CTX_load_verify_locations(ssl_ctx, session_param->ca_crt_root.c_str(), NULL);
 		if(SSL_CTX_use_certificate_file(ssl_ctx, session_param->ca_crt_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
-			CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+			CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
             uTrace.Write(Trace_Error, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
@@ -245,14 +245,14 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		SSL_CTX_set_default_passwd_cb_userdata(ssl_ctx, (char*)session_param->ca_password.c_str());
 		if(SSL_CTX_use_PrivateKey_file(ssl_ctx, session_param->ca_key_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
-			CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+			CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
             uTrace.Write(Trace_Error, "SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 
 		}
 		if(!SSL_CTX_check_private_key(ssl_ctx))
 		{
-			CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+			CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
             uTrace.Write(Trace_Error, "SSL_CTX_check_private_key: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
@@ -262,7 +262,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, CHttpBase::m_https_cipher.c_str());
         if(ssl_rc == 0)
         {
-            CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+            CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
             uTrace.Write(Trace_Error, "SSL_CTX_set_cipher_list: %s", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl3;
         }
@@ -275,14 +275,14 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		ssl = SSL_new(ssl_ctx);
 		if(!ssl)
 		{
-			CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+			CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
             uTrace.Write(Trace_Error, "SSL_new: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl2;
 		}
 		ssl_rc = SSL_set_fd(ssl, session_param->sockfd);
         if(ssl_rc == 0)
         {
-            CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+            CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
             uTrace.Write(Trace_Error, "SSL_set_fd: %s", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl2;
         }
@@ -292,7 +292,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             ssl_rc = SSL_set_cipher_list(ssl, CHttpBase::m_https_cipher.c_str());
         if(ssl_rc == 0)
         {
-            CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+            CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
             uTrace.Write(Trace_Error, "SSL_set_cipher_list: %s", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl2;
         }
@@ -309,25 +309,25 @@ re_ssl_accept:
             {
                 if(ERR_get_error() == 0)
                 {
-                    CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+                    CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
                     uTrace.Write(Trace_Error, "SSL_accept(%d): shutdown by peer", ssl_rc);
                 }
                 else
                 {
-                    CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+                    CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
                     uTrace.Write(Trace_Error, "SSL_accept(%d): SSL_ERROR_SYSCALL %s", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
                 }
             }
             else
             {
-                CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+                CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
                 uTrace.Write(Trace_Error, "SSL_accept(%d): %s, SSL_get_error: %d", ssl_rc, ERR_error_string(ERR_get_error(),NULL), ret);
             }
 			goto clean_ssl2;
 		}
         else if(ssl_rc = 0)
 		{
-		    CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+		    CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
             uTrace.Write(Trace_Error, "SSL_accept(%d): %s", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl1;
 		}
@@ -338,7 +338,7 @@ re_ssl_accept:
             ssl_rc = SSL_get_verify_result(ssl);
             if(ssl_rc != X509_V_OK)
             {
-                CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+                CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
                 uTrace.Write(Trace_Error, "SSL_get_verify_result: %s", ERR_error_string(ERR_get_error(),NULL));
                 goto clean_ssl1;
             }
@@ -348,7 +348,7 @@ re_ssl_accept:
 			client_cert = SSL_get_peer_certificate(ssl);
 			if (client_cert == NULL)
 			{
-				CUplusTrace uTrace(NIUHTTPD_SSLERR_LOGNAME, NIUHTTPD_SSLERR_LCKNAME);
+				CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
                 uTrace.Write(Trace_Error, "SSL_get_peer_certificate: %s", ERR_error_string(ERR_get_error(),NULL));
 				goto clean_ssl1;
 			}
@@ -442,7 +442,7 @@ static void LEAVE_THREAD_POOL_HANDLER()
 	sem_close(&STATIC_THREAD_POOL_SEM);
 
     char local_sockfile[256];
-    sprintf(local_sockfile, "/tmp/niuhttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
+    sprintf(local_sockfile, "/tmp/heaphttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
 
     unlink(local_sockfile);
 
@@ -566,13 +566,13 @@ Service::~Service()
 
 void Service::Stop()
 {
-	string strqueue = NIUHTTPD_POSIX_PREFIX;
+	string strqueue = HEAPHTTPD_POSIX_PREFIX;
 	strqueue += m_service_name;
-	strqueue += NIUHTTPD_POSIX_QUEUE_SUFFIX;
+	strqueue += HEAPHTTPD_POSIX_QUEUE_SUFFIX;
 
-	string strsem = NIUHTTPD_POSIX_PREFIX;
+	string strsem = HEAPHTTPD_POSIX_PREFIX;
 	strsem += m_service_name;
-	strsem += NIUHTTPD_POSIX_SEMAPHORE_SUFFIX;
+	strsem += HEAPHTTPD_POSIX_SEMAPHORE_SUFFIX;
 	
 	m_service_qid = mq_open(strqueue.c_str(), O_RDWR);
 	m_service_sid = sem_open(strsem.c_str(), O_RDWR);
@@ -596,13 +596,13 @@ void Service::Stop()
 
 void Service::ReloadConfig()
 {
-	string strqueue = NIUHTTPD_POSIX_PREFIX;
+	string strqueue = HEAPHTTPD_POSIX_PREFIX;
 	strqueue += m_service_name;
-	strqueue += NIUHTTPD_POSIX_QUEUE_SUFFIX;
+	strqueue += HEAPHTTPD_POSIX_QUEUE_SUFFIX;
 
-	string strsem = NIUHTTPD_POSIX_PREFIX;
+	string strsem = HEAPHTTPD_POSIX_PREFIX;
 	strsem += m_service_name;
-	strsem += NIUHTTPD_POSIX_SEMAPHORE_SUFFIX;
+	strsem += HEAPHTTPD_POSIX_SEMAPHORE_SUFFIX;
 	
 	m_service_qid = mq_open(strqueue.c_str(), O_RDWR);
 	m_service_sid = sem_open(strsem.c_str(), O_RDWR);
@@ -626,13 +626,13 @@ void Service::ReloadConfig()
 
 void Service::ReloadAccess()
 {
-	string strqueue = NIUHTTPD_POSIX_PREFIX;
+	string strqueue = HEAPHTTPD_POSIX_PREFIX;
 	strqueue += m_service_name;
-	strqueue += NIUHTTPD_POSIX_QUEUE_SUFFIX;
+	strqueue += HEAPHTTPD_POSIX_QUEUE_SUFFIX;
 
-	string strsem = NIUHTTPD_POSIX_PREFIX;
+	string strsem = HEAPHTTPD_POSIX_PREFIX;
 	strsem += m_service_name;
-	strsem += NIUHTTPD_POSIX_SEMAPHORE_SUFFIX;
+	strsem += HEAPHTTPD_POSIX_SEMAPHORE_SUFFIX;
 	
 	m_service_qid = mq_open(strqueue.c_str(), O_RDWR);
 	m_service_sid = sem_open(strsem.c_str(), O_RDWR);
@@ -654,13 +654,13 @@ void Service::ReloadAccess()
 
 void Service::AppendReject(const char* data)
 {
-	string strqueue = NIUHTTPD_POSIX_PREFIX;
+	string strqueue = HEAPHTTPD_POSIX_PREFIX;
 	strqueue += m_service_name;
-	strqueue += NIUHTTPD_POSIX_QUEUE_SUFFIX;
+	strqueue += HEAPHTTPD_POSIX_QUEUE_SUFFIX;
 
-	string strsem = NIUHTTPD_POSIX_PREFIX;
+	string strsem = HEAPHTTPD_POSIX_PREFIX;
 	strsem += m_service_name;
-	strsem += NIUHTTPD_POSIX_SEMAPHORE_SUFFIX;
+	strsem += HEAPHTTPD_POSIX_SEMAPHORE_SUFFIX;
 	
 	m_service_qid = mq_open(strqueue.c_str(), O_RDWR);
 	m_service_sid = sem_open(strsem.c_str(), O_RDWR);
@@ -685,13 +685,13 @@ void Service::AppendReject(const char* data)
 
 void Service::ReloadExtension()
 {
-	string strqueue = NIUHTTPD_POSIX_PREFIX;
+	string strqueue = HEAPHTTPD_POSIX_PREFIX;
 	strqueue += m_service_name;
-	strqueue += NIUHTTPD_POSIX_QUEUE_SUFFIX;
+	strqueue += HEAPHTTPD_POSIX_QUEUE_SUFFIX;
 
-	string strsem = NIUHTTPD_POSIX_PREFIX;
+	string strsem = HEAPHTTPD_POSIX_PREFIX;
 	strsem += m_service_name;
-	strsem += NIUHTTPD_POSIX_SEMAPHORE_SUFFIX;
+	strsem += HEAPHTTPD_POSIX_SEMAPHORE_SUFFIX;
 	
 	m_service_qid = mq_open(strqueue.c_str(), O_RDWR);
 	m_service_sid = sem_open(strsem.c_str(), O_RDWR);
@@ -798,7 +798,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
     else
     {					                    
         char pid_file[1024];
-        sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid",
+        sprintf(pid_file, "/tmp/heaphttpd/%s_WORKER%d.pid",
             m_service_name.c_str(), m_next_process);
         if(check_pid_file(pid_file) == true) /* The related process had crashed */
         {
@@ -879,17 +879,17 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
 
 int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned short https_port)
 {	
-    CUplusTrace uTrace(NIUHTTPD_SERVICE_LOGNAME, NIUHTTPD_SERVICE_LCKNAME);
+    CUplusTrace uTrace(HEAPHTTPD_SERVICE_LOGNAME, HEAPHTTPD_SERVICE_LCKNAME);
     
 	m_child_list.clear();
 	unsigned int result = 0;
-	string strqueue = NIUHTTPD_POSIX_PREFIX;
+	string strqueue = HEAPHTTPD_POSIX_PREFIX;
 	strqueue += m_service_name;
-	strqueue += NIUHTTPD_POSIX_QUEUE_SUFFIX;
+	strqueue += HEAPHTTPD_POSIX_QUEUE_SUFFIX;
 
-	string strsem = NIUHTTPD_POSIX_PREFIX;
+	string strsem = HEAPHTTPD_POSIX_PREFIX;
 	strsem += m_service_name;
-	strsem += NIUHTTPD_POSIX_SEMAPHORE_SUFFIX;
+	strsem += HEAPHTTPD_POSIX_SEMAPHORE_SUFFIX;
 	
 	mq_attr attr;
 	attr.mq_maxmsg = 8;
@@ -927,7 +927,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 	for(int i = 0; i < CHttpBase::m_max_instance_num; i++)
 	{
 		char pid_file[1024];
-		sprintf(pid_file, "/tmp/niuhttpd/%s_WORKER%d.pid", m_service_name.c_str(), i);
+		sprintf(pid_file, "/tmp/heaphttpd/%s_WORKER%d.pid", m_service_name.c_str(), i);
 		unlink(pid_file);
 		WORK_PROCESS_INFO  wpinfo;
         wpinfo.sockfds[0] = -1;

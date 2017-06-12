@@ -1,3 +1,3 @@
 install:
-	cp main.py /var/niuhttpd/fcgi/
-	chmod a+x /var/niuhttpd/fcgi/main.py
+	cp main.py /var/heaphttpd/fcgi/
+	chmod a+x /var/heaphttpd/fcgi/main.py

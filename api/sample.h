@@ -11,7 +11,7 @@
 #include <string.h>
 #include "http.h"
 #include "webdoc.h"
-#include "niuapi.h"
+#include "heapapi.h"
 
 class ApiSample : public doc
 {

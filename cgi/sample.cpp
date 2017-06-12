@@ -8,7 +8,7 @@
 #include <string.h>
 #include <string>
 #include <iostream>
-#include "niuapi.h"
+#include "heapapi.h"
 
 using namespace std;
 

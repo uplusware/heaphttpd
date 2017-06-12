@@ -70,7 +70,7 @@ void ApiSample::Response()
         escapeHTML(strServerValue2.c_str(), strEscapedServerValue2);
         escapeHTML(strServerValue3.c_str(), strEscapedServerValue3);
         
-		strResp = "<html></head><title>API Sample</title></head><body><h1>niuhttpd web server/0.3</h1>API Sample: ";
+		strResp = "<html></head><title>API Sample</title></head><body><h1>heaphttpd web server/0.3</h1>API Sample: ";
 		strResp += abc;
 		strResp += " + ";
 		strResp += def;

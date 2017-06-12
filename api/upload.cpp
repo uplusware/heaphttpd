@@ -13,7 +13,7 @@ void ApiUpload::Response()
     header.SetField("Content-Type", "text/html");
     
     string strResp;
-    strResp = "<html></head><title>API Sample</title></head><body><h1>niuhttpd web server/0.3</h1>";
+    strResp = "<html></head><title>API Sample</title></head><body><h1>heaphttpd web server/0.3</h1>";
     
     string filename;
     string filetype;
@@ -33,7 +33,7 @@ void ApiUpload::Response()
     if(m_session->parse_multipart_formdata("ATTACHFILEBODY1", filename, filetype, valbuf, vallen) == 0)
 	{
         string strFilePath;
-        strFilePath = "/var/niuhttpd/html/upload/";
+        strFilePath = "/var/heaphttpd/html/upload/";
         strFilePath += filename;
         
         ofstream* attachfd =  new ofstream(strFilePath.c_str(), ios_base::binary|ios::out|ios::trunc);		
@@ -49,7 +49,7 @@ void ApiUpload::Response()
             string strEscapedFilename, strEscapedFiletype;
             escapeHTML(filename.c_str(), strEscapedFilename);
             escapeHTML(filetype.c_str(), strEscapedFiletype);
-            strResp += "<p><b>Path:</b> /var/niuhttpd/html/upload/";
+            strResp += "<p><b>Path:</b> /var/heaphttpd/html/upload/";
             strResp += strEscapedFilename;
             strResp += "<br><b>Type:</b> ";
             strResp += strEscapedFiletype;
@@ -69,7 +69,7 @@ void ApiUpload::Response()
     
     if(m_session->parse_multipart_formdata("ATTACHFILEBODY2", filename, filetype, valbuf, vallen) == 0)
 	{
-        string strFilePath = "/var/niuhttpd/html/upload/";
+        string strFilePath = "/var/heaphttpd/html/upload/";
         strFilePath += filename;
         ofstream* attachfd =  new ofstream(strFilePath.c_str(), ios_base::binary|ios::out|ios::trunc);		
         if(valbuf && vallen > 0 && attachfd && attachfd->is_open())
@@ -84,7 +84,7 @@ void ApiUpload::Response()
             string strEscapedFilename, strEscapedFiletype;
             escapeHTML(filename.c_str(), strEscapedFilename);
             escapeHTML(filetype.c_str(), strEscapedFiletype);
-            strResp += "<p><b>Path:</b> /var/niuhttpd/html/upload/";
+            strResp += "<p><b>Path:</b> /var/heaphttpd/html/upload/";
             strResp += strEscapedFilename;
             strResp += "<br><b>Type:</b> ";
             strResp += strEscapedFiletype;
@@ -104,7 +104,7 @@ void ApiUpload::Response()
     
     if(m_session->parse_multipart_formdata("ATTACHFILEBODY3", filename, filetype, valbuf, vallen) == 0)
 	{
-        string strFilePath = "/var/niuhttpd/html/upload/";
+        string strFilePath = "/var/heaphttpd/html/upload/";
         strFilePath += filename;
         ofstream* attachfd =  new ofstream(strFilePath.c_str(), ios_base::binary|ios::out|ios::trunc);		
         if(valbuf && vallen > 0 && attachfd && attachfd->is_open())
@@ -119,7 +119,7 @@ void ApiUpload::Response()
             string strEscapedFilename, strEscapedFiletype;
             escapeHTML(filename.c_str(), strEscapedFilename);
             escapeHTML(filetype.c_str(), strEscapedFiletype);
-            strResp += "<p><b>Path:</b> /var/niuhttpd/html/upload/";
+            strResp += "<p><b>Path:</b> /var/heaphttpd/html/upload/";
             strResp += strEscapedFilename;
             strResp += "<br><b>Type:</b> ";
             strResp += strEscapedFiletype;

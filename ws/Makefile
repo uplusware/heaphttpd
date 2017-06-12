@@ -11,12 +11,12 @@ LDDIRS = -L../src/
 all: ws
 
 install: all
-	cp libecho.so /var/niuhttpd/ws/
+	cp libecho.so /var/heaphttpd/ws/
     
 ws: $(HTTPWS)
 
 $(HTTPWS): $(HTTPWSOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(HTTPWSOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lniuwebsocket
+	$(CC) -shared -W -fPIC -o $@ $(HTTPWSOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheapwebsocket
 	
 %.o : %.cpp
 	$(CC) $(INCDIR) $(FLAGS) -c $< -o $@

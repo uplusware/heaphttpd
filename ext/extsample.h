@@ -12,7 +12,7 @@
 #include "http.h"
 #include "htdoc.h"
 #include "webdoc.h"
-#include "niuapi.h"
+#include "heapapi.h"
 
 #ifdef __cplusplus
 extern "C"

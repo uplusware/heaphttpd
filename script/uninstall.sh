@@ -9,30 +9,30 @@ if [ `id -u` -ne 0 ]; then
 fi
 
 #
-# uninstall the niuhttpd web server
+# uninstall the heaphttpd web server
 #
 
-echo "Sure to remove niuhttpd from you computer? [yes/no]"
+echo "Sure to remove heaphttpd from you computer? [yes/no]"
 read uack
 if [ ${uack} = "yes" ]
 then
-	echo "Remove the niuhttpd...."
+	echo "Remove the heaphttpd...."
 else
 	exit 1
 fi
 
-/etc/init.d/niuhttpd stop
+/etc/init.d/heaphttpd stop
 
-rm -rf /usr/bin/niuhttpd
-rm -rf /etc/init.d/niuhttpd
-rm -rf /etc/niuhttpd
+rm -rf /usr/bin/heaphttpd
+rm -rf /etc/init.d/heaphttpd
+rm -rf /etc/heaphttpd
 
-rm -f /etc/rc0.d/K60niuhttpd
-rm -f /etc/rc1.d/S60niuhttpd
-rm -f /etc/rc2.d/S60niuhttpd
-rm -f /etc/rc3.d/S60niuhttpd
-rm -f /etc/rc4.d/S60niuhttpd
-rm -f /etc/rc5.d/S60niuhttpd
-rm -f /etc/rc6.d/K60niuhttpd
+rm -f /etc/rc0.d/K60heaphttpd
+rm -f /etc/rc1.d/S60heaphttpd
+rm -f /etc/rc2.d/S60heaphttpd
+rm -f /etc/rc3.d/S60heaphttpd
+rm -f /etc/rc4.d/S60heaphttpd
+rm -f /etc/rc5.d/S60heaphttpd
+rm -f /etc/rc6.d/K60heaphttpd
 
 echo "Done"

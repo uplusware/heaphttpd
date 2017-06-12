@@ -105,7 +105,7 @@ int cgi_base::Connect()
     else
     {
         char local_sockfile[256];
-        sprintf(local_sockfile, "/tmp/niuhttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
+        sprintf(local_sockfile, "/tmp/heaphttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
 
         //printf("local sock file: %s\n", local_sockfile);        
         memset(&ser_unix, 0, sizeof(ser_unix));

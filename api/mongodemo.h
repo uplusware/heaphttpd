@@ -12,7 +12,7 @@
 
 #include "http.h"
 #include "webdoc.h"
-#include "niuapi.h"
+#include "heapapi.h"
 #include "stgengine.h"
 
 class ApiMongoDemo : public doc

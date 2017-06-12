@@ -5,7 +5,7 @@
 
 void usage()
 {
-	printf("Usage:niutool --encode\n");
+	printf("Usage:heaptool --encode\n");
 }
 
 int main(int argc, char* argv[])

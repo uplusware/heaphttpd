@@ -12,15 +12,15 @@
 //CHttpBase
 //
 //Software Version
-string CHttpBase::m_sw_version = "0.3";
+string CHttpBase::m_sw_version = "1.0";
 
 //Global
 BOOL CHttpBase::m_close_stderr = TRUE;
 string CHttpBase::m_encoding = "UTF-8";
 
-string CHttpBase::m_private_path = "/tmp/niuhttpd/private";
-string CHttpBase::m_work_path = "/var/niuhttpd/";
-string CHttpBase::m_ext_list_file = "/etc/niuhttpd/extension.xml";
+string CHttpBase::m_private_path = "/tmp/heaphttpd/private";
+string CHttpBase::m_work_path = "/var/heaphttpd/";
+string CHttpBase::m_ext_list_file = "/etc/heaphttpd/extension.xml";
 vector<stExtension> CHttpBase::m_ext_list;
 
 string CHttpBase::m_localhostname = "localhost";
@@ -79,11 +79,11 @@ string   CHttpBase::m_http2_tls_cipher = "ECDHE-RSA-AES128-GCM-SHA256:ALL";
 
 string CHttpBase::m_www_authenticate = "";
 BOOL   CHttpBase::m_client_cer_check = FALSE;
-string CHttpBase::m_ca_crt_root   = "/var/niuhttpd/cert/ca.crt";
-string CHttpBase::m_ca_crt_server = "/var/niuhttpd/cert/server.crt";
-string CHttpBase::m_ca_key_server = "/var/niuhttpd/cert/server.key";
-string CHttpBase::m_ca_crt_client = "/var/niuhttpd/cert/client.crt";
-string CHttpBase::m_ca_key_client = "/var/niuhttpd/cert/client.key";
+string CHttpBase::m_ca_crt_root   = "/var/heaphttpd/cert/ca.crt";
+string CHttpBase::m_ca_crt_server = "/var/heaphttpd/cert/server.crt";
+string CHttpBase::m_ca_key_server = "/var/heaphttpd/cert/server.key";
+string CHttpBase::m_ca_crt_client = "/var/heaphttpd/cert/client.crt";
+string CHttpBase::m_ca_key_client = "/var/heaphttpd/cert/client.key";
 string CHttpBase::m_ca_password = "";
 
 string	CHttpBase::m_php_mode = "fpm";
@@ -489,7 +489,7 @@ BOOL CHttpBase::LoadAccessList()
 	sem_t* plock = NULL;
 	///////////////////////////////////////////////////////////////////////////////
 	// GLOBAL_REJECT_LIST
-	plock = sem_open(NIUHTTPD_GLOBAL_REJECT_LIST, O_CREAT | O_RDWR, 0644, 1);
+	plock = sem_open(HEAPHTTPD_GLOBAL_REJECT_LIST, O_CREAT | O_RDWR, 0644, 1);
 	if(plock != SEM_FAILED)
 	{
 		sem_wait(plock);
@@ -501,7 +501,7 @@ BOOL CHttpBase::LoadAccessList()
 	}
 	/////////////////////////////////////////////////////////////////////////////////
 	// GLOBAL_PERMIT_LIST
-	plock = sem_open(NIUHTTPD_GLOBAL_PERMIT_LIST, O_CREAT | O_RDWR, 0644, 1);
+	plock = sem_open(HEAPHTTPD_GLOBAL_PERMIT_LIST, O_CREAT | O_RDWR, 0644, 1);
 	if(plock != SEM_FAILED)
 	{
 		sem_wait(plock);

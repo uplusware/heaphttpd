@@ -3,7 +3,7 @@
 	uplusware@gmail.com
 */
 
-#include "niuapi.h"
+#include "heapapi.h"
 
 bool __inline__ _lendian_()
 {

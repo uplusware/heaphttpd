@@ -37,7 +37,7 @@ using namespace std;
 
 static void usage()
 {
-	printf("Usage:niuhttpd start | stop | status | reload | access | reject [ip] | extension | version\n");
+	printf("Usage:heaphttpd start | stop | status | reload | access | reject [ip] | extension | version\n");
 }
 
 //set to daemon mode
@@ -52,7 +52,7 @@ static void daemon_init()
         close(STDERR_FILENO);
 }
 
-char PIDFILE[256] = "/tmp/niuhttpd/niuhttpd.pid";
+char PIDFILE[256] = "/tmp/heaphttpd/heaphttpd.pid";
 
 static int Run()
 {
@@ -71,7 +71,7 @@ static int Run()
 			if(http_pid == 0)
 			{
 				char szFlag[128];
-				sprintf(szFlag, "/tmp/niuhttpd/%s.pid", SVR_NAME_TBL[stHTTP]);
+				sprintf(szFlag, "/tmp/heaphttpd/%s.pid", SVR_NAME_TBL[stHTTP]);
 				if(lock_pid_file(szFlag) == false)  
 				{   
 					printf("%s is aready runing.\n", SVR_DESP_TBL[stHTTP]);   
@@ -118,7 +118,7 @@ static int Run()
 
 static int Stop()
 {
-	printf("Stop niuhttpd service ...\n");
+	printf("Stop heaphttpd service ...\n");
 	
 	Service http_svr(stHTTP);
 	http_svr.Stop();	
@@ -131,7 +131,7 @@ static void Version()
 
 static int Reload()
 {
-	printf("Reload niuhttpd configuration ...\n");
+	printf("Reload heaphttpd configuration ...\n");
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadConfig();
@@ -139,7 +139,7 @@ static int Reload()
 
 static int ReloadAccess()
 {
-	printf("Reload niuhttpd access list ...\n");
+	printf("Reload heaphttpd access list ...\n");
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadAccess();
@@ -147,7 +147,7 @@ static int ReloadAccess()
 
 static int AppendReject(const char* data)
 {
-	printf("Append niuhttpd reject list ...\n");
+	printf("Append heaphttpd reject list ...\n");
 
 	Service http_svr(stHTTP);
 	http_svr.AppendReject(data);
@@ -155,7 +155,7 @@ static int AppendReject(const char* data)
 
 static int ReloadExtension()
 {
-	printf("Reload niuhttpd extension ...\n");
+	printf("Reload heaphttpd extension ...\n");
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadExtension();
@@ -196,7 +196,7 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 	else if(strcasecmp(cmd, "status") == 0)
 	{
 		char szFlag[128];
-		sprintf(szFlag, "/tmp/niuhttpd/%s.pid", SVR_NAME_TBL[stHTTP]);
+		sprintf(szFlag, "/tmp/heaphttpd/%s.pid", SVR_NAME_TBL[stHTTP]);
 		if(check_pid_file(szFlag) == false)    
 		{   
 			printf("%s is runing.\n", SVR_DESP_TBL[stHTTP]);   
@@ -229,10 +229,10 @@ static void handle_signal(int sid)
 
 int main(int argc, char* argv[])
 {
-    mkdir("/tmp/niuhttpd", 0777);
-    chmod("/tmp/niuhttpd", 0777);
+    mkdir("/tmp/heaphttpd", 0777);
+    chmod("/tmp/heaphttpd", 0777);
 
-    mkdir("/var/log/niuhttpd/", 0744);
+    mkdir("/var/log/heaphttpd/", 0744);
     
     // Set up the signal handler
     signal(SIGPIPE, SIG_IGN);

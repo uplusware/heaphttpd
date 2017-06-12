@@ -8,7 +8,7 @@ _COUNTRY_="CN"
 _ST_="BJ"
 _COMMON_NAME_="localhost"
 _ORG_="Uplusware"
-_ORG_UNIT_="niuhttpd"
+_ORG_UNIT_="heaphttpd"
 
 test -x demoCA || mkdir demoCA
 test -x demoCA/newcerts || mkdir demoCA/newcerts

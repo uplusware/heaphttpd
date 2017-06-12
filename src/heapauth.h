@@ -9,6 +9,6 @@
 #include <string>
 using namespace std;
 
-extern "C" bool niuhttpd_usrdef_get_password(const char* username, string& password);
+extern "C" bool heaphttpd_usrdef_get_password(const char* username, string& password);
 
 #endif /* _AUTH_H_ */

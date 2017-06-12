@@ -6,7 +6,7 @@
 #include "mongodemo.h"
 
 //API sample
-#define MONGO_SERVICE_OBJ_NAME  "root$mongodb$niuhttpd@"
+#define MONGO_SERVICE_OBJ_NAME  "root$mongodb$heaphttpd@"
 
 void ApiMongoDemo::Response()
 {
@@ -16,7 +16,7 @@ void ApiMongoDemo::Response()
     
 	if(stg_engine == NULL)
 	{
-		stg_engine = new StorageEngine("localhost", "", "", "test", "/var/run/mongod/mongod.sock", 0, "UTF-8", "/var/niuhttpd/private");
+		stg_engine = new StorageEngine("localhost", "", "", "test", "/var/run/mongod/mongod.sock", 0, "UTF-8", "/var/heaphttpd/private");
 		m_session->SetServiceObject(strObjName.c_str(), stg_engine);		
 	}
     
@@ -26,7 +26,7 @@ void ApiMongoDemo::Response()
     
     if(database_instance && database_instance->ShowDatabases(strDatabases) == 0)
     {
-        strDatabases = "<html><head><title>CGI sample</title></head><h1>niuhttpd web server/0.3</h1>Show databases: " + strDatabases;
+        strDatabases = "<html><head><title>CGI sample</title></head><h1>heaphttpd web server/0.3</h1>Show databases: " + strDatabases;
         strDatabases += "</body></html>";
         
         header.SetStatusCode(SC200);
