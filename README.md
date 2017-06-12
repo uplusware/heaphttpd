@@ -3,5 +3,3 @@
 * Supports extension, API, cgi/fast-cgi/scgi, php/php-fpm, web.py and WebSocket natively.
 * Support Service Object (For example, a persistent MariabDB or MongoDB connection)
 * [Project Wiki](https://github.com/uplusware/niuhttpd/wiki/)
-
-### niu means 钮(niǔ). It's a Chinese character which means button.

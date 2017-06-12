@@ -8,7 +8,8 @@
 typedef struct
 {
 	void* handle;
-	string action;
+    string name;
+	string description;
 }stExtension;
 
 #endif /* _EXTENSION_H_ */

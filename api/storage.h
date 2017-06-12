@@ -60,15 +60,15 @@ protected:
     string m_encoding;
     string m_private_path;
     
-    pthread_mutex_t m_thread_pool_mutex;
+    pthread_mutex_t m_thread_query_lock;
     
 private:
 #ifndef _MONGODB_
     int mysql_thread_real_query(MYSQL *mysql, const char *stmt_str, unsigned long length)
     {
-        pthread_mutex_lock(&m_thread_pool_mutex);
+        pthread_mutex_lock(&m_thread_query_lock);
         int ret = mysql_real_query(mysql, stmt_str, length);
-        pthread_mutex_unlock(&m_thread_pool_mutex);
+        pthread_mutex_unlock(&m_thread_query_lock);
         return ret;
     }
 #endif /* _MONGODB_*/

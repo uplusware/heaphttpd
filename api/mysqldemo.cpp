@@ -16,7 +16,7 @@ void ApiMySQLDemo::Response()
 	if(stg_engine == NULL)
 	{
 		stg_engine = new StorageEngine("localhost", "root", "123456", "", "/var/run/mysqld/mysqld.sock", 0, "UTF-8", "/var/niuhttpd/private");
-		m_session->SetServiceObject(MYSQL_SERVICE_OBJ_NAME, stg_engine);		
+		m_session->SetServiceObject(strObjName.c_str(), stg_engine);		
 	}
     
     

@@ -585,7 +585,8 @@ void CHttpBase::_load_ext_()
 				
 				if(ext.handle)
 				{
-					ext.action = pChildNode->ToElement()->Attribute("action");
+                    ext.name = pChildNode->ToElement()->Attribute("name") ? pChildNode->ToElement()->Attribute("name") : "";
+					ext.description = pChildNode->ToElement()->Attribute("description") ? pChildNode->ToElement()->Attribute("description") : "";
 					m_ext_list.push_back(ext);
 				}
 			}

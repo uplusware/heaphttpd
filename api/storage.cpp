@@ -52,10 +52,9 @@ int DatabaseStorage::Connect(const char * host, const char* username, const char
         m_port = port;
         m_username = username;
 		m_password = password;
-        m_unix_socket = unix_socket;
-        if(database != NULL)
-			m_database = database;
-			
+        m_unix_socket = unix_socket ? unix_socket : "";
+		m_database = database ? database : "";
+        
 #ifdef _MONGODB_
         char sz_port[64];
         string mongodb_uri = "mongodb://";
@@ -141,7 +140,6 @@ int DatabaseStorage::Ping()
         bson_init(&ping);
         bson_append_int32(&ping, "ping", 4, 1);
         
-        //printf("database: %s\n", m_database.c_str());
         ret_val = mongoc_client_command_simple (m_hMongoDB, m_database.c_str(), &ping, NULL, &reply, &error);
         if (ret_val)
         {

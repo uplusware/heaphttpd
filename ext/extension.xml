@@ -1,11 +1,12 @@
-<!--- action:                                                           -->
-<!---      default: keep the default action                             -->
-<!---         skip: skip the default response after recieve the request -->
-<!--- action:                                                           -->
-
+<!-- 
+	Copyright (c) openheap, uplusware. uplusware@gmail.com
+    niuhttpd extension:
+        Please make sure name is unique.
+-->
 <? xml version="1.0" encoding="UTF-8" ?>
 <niuhttpd>
-	<extension libso="/var/niuhttpd/ext/libextsample1.so" action="default" />
-	<extension libso="/var/niuhttpd/ext/libextsample2.so" action="default" />
-	<extension libso="/var/niuhttpd/ext/libextsample3.so" action="default" />
+	<extension libso="/var/niuhttpd/ext/libextsample1.so" name="example1" description="niuhttpd extension example 1" />
+	<extension libso="/var/niuhttpd/ext/libextsample2.so" name="example2" description="niuhttpd extension example 2" />
+	<extension libso="/var/niuhttpd/ext/libextsample3.so" name="example3" description="niuhttpd extension example 3" />
+    <extension libso="/var/niuhttpd/ext/libhttpbalancer.so" name="http_balancer" description="niuhttpd workload balancer" />
 </niuhttpd>

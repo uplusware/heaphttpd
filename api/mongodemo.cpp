@@ -17,7 +17,7 @@ void ApiMongoDemo::Response()
 	if(stg_engine == NULL)
 	{
 		stg_engine = new StorageEngine("localhost", "", "", "test", "/var/run/mongod/mongod.sock", 0, "UTF-8", "/var/niuhttpd/private");
-		m_session->SetServiceObject(MONGO_SERVICE_OBJ_NAME, stg_engine);		
+		m_session->SetServiceObject(strObjName.c_str(), stg_engine);		
 	}
     
     CHttpResponseHdr header;

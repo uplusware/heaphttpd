@@ -1,0 +1,5 @@
+<? xml version="1.0" encoding="UTF-8" ?>
+<httpbalancer>
+    <redirect host="https://192.168.56.101:5081" weight="8" />
+    <redirect host="https://192.168.56.103:5081" weight="8" />
+</httpbalancer>

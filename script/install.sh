@@ -32,6 +32,7 @@ echo "Copy the files to your system."
 
 test -x /tmp/niuhttpd || mkdir /tmp/niuhttpd
 test -x /etc/niuhttpd || mkdir /etc/niuhttpd
+test -x /etc/niuhttpd/extension || mkdir /etc/niuhttpd/extension
 test -x /var/niuhttpd || mkdir /var/niuhttpd
 test -x /var/niuhttpd/html || mkdir /var/niuhttpd/html
 test -x /var/niuhttpd/cookie || mkdir /var/niuhttpd/cookie

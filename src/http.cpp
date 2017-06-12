@@ -487,21 +487,21 @@ void CHttp::Response()
     }
 
     //1st extension hook
-    BOOL skipAction = FALSE;
+    BOOL skipSession = FALSE;
     for(int x = 0; x < m_ext_list->size(); x++)
     {
-        void* (*ext_request)(CHttp*, const char*);
-        ext_request = (void*(*)(CHttp*, const char*))dlsym((*m_ext_list)[x].handle, "ext_request");
+        void* (*ext_request)(CHttp*, const char*, const char*, BOOL*);
+        ext_request = (void*(*)(CHttp*, const char*, const char*, BOOL*))dlsym((*m_ext_list)[x].handle, "ext_request");
         const char* errmsg;
         if((errmsg = dlerror()) == NULL)
         {
-            ext_request(this, (*m_ext_list)[x].action.c_str());
-            if((*m_ext_list)[x].action == "skip")
-                skipAction = TRUE;
+            BOOL skipAction = FALSE;
+            ext_request(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), &skipAction);
+            skipSession = skipAction ? skipAction : skipSession;
         }
     }
 
-    if(!skipAction)
+    if(!skipSession)
     {
         Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_default_webpages, m_php_mode.c_str(), 
             m_fpm_socktype, m_fpm_sockfile.c_str(), 
@@ -511,12 +511,12 @@ void CHttp::Response()
         //2nd extension hook
         for(int x = 0; x < m_ext_list->size(); x++)
         {
-            void* (*ext_response)(CHttp*, const char*, Htdoc*);
-            ext_response = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_response");
+            void* (*ext_response)(CHttp*, const char*, const char*, Htdoc*);
+            ext_response = (void*(*)(CHttp*, const char*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_response");
             const char* errmsg;
             if((errmsg = dlerror()) == NULL)
             {
-                ext_response(this, (*m_ext_list)[x].action.c_str(), doc);
+                ext_response(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), doc);
             }
         }
         doc->Response();
@@ -530,12 +530,12 @@ void CHttp::Response()
         //3rd extension hook
         for(int x = 0; x < m_ext_list->size(); x++)
         {
-            void* (*ext_finish)(CHttp*, const char*, Htdoc*);
-            ext_finish = (void*(*)(CHttp*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_finish");
+            void* (*ext_finish)(CHttp*, const char*, const char*, Htdoc*);
+            ext_finish = (void*(*)(CHttp*, const char*, const char*, Htdoc* doc))dlsym((*m_ext_list)[x].handle, "ext_finish");
             const char* errmsg;
             if((errmsg = dlerror()) == NULL)
             {
-                ext_finish(this, (*m_ext_list)[x].action.c_str(), doc);
+                ext_finish(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), doc);
             }
         }
 

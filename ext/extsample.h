@@ -14,8 +14,15 @@
 #include "webdoc.h"
 #include "niuapi.h"
 
-extern "C" void* ext_request(CHttp* m_session, const char * action);
-extern "C" void* ext_response(CHttp* m_session, const char * action, Htdoc* doc);
-extern "C" void* ext_finish(CHttp* m_session, const char * action, Htdoc* doc);
+#ifdef __cplusplus
+extern "C"
+{
+#endif /* __cplusplus */
+    void* ext_request(CHttp* http_session, const char * name, const char * description, BOOL * skip);
+    void* ext_response(CHttp* http_session, const char * name, const char * description, Htdoc* doc);
+    void* ext_finish(CHttp* http_session, const char * name, const char * description, Htdoc* doc);
+#ifdef __cplusplus
+};
+#endif /* __cplusplus */
 
 #endif /* _EXTSAMPLE_H_ */
