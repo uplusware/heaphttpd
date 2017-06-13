@@ -48,6 +48,8 @@ DatabaseStorage* StorageEngine::Acquire()
                 return NULL;
             }
         }
+        else 
+            return m_storage;
     }
     else
         return NULL;
