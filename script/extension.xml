@@ -6,9 +6,9 @@
 <? xml version="1.0" encoding="UTF-8" ?>
 <heaphttpd>
 <!--
-	<extension libso="/var/heaphttpd/ext/libextsample1.so" name="example1" description="heaphttpd extension example 1" config="" />
-	<extension libso="/var/heaphttpd/ext/libextsample2.so" name="example2" description="heaphttpd extension example 2" config="" />
-	<extension libso="/var/heaphttpd/ext/libextsample3.so" name="example3" description="heaphttpd extension example 3" config=""  />
-    <extension libso="/var/heaphttpd/ext/libhttpbalancer.so" name="http_balancer" description="heaphttpd workload balancer" config=""  />
+    <extension libso="/var/heaphttpd/ext/libextsample1.so" name="example1" description="heaphttpd extension example 1" parameters="" />
+    <extension libso="/var/heaphttpd/ext/libextsample2.so" name="example2" description="heaphttpd extension example 2" parameters="" />
+    <extension libso="/var/heaphttpd/ext/libextsample3.so" name="example3" description="heaphttpd extension example 3" parameters=""  />
+    <extension libso="/var/heaphttpd/ext/libhttpbalancer.so" name="http_balancer" description="heaphttpd workload balancer" parameters=""  />
 -->
 </heaphttpd>
