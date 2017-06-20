@@ -5,3 +5,9 @@
 * [Project Wiki](https://github.com/uplusware/heaphttpd/wiki/)
 
 ![openheap](https://raw.githubusercontent.com/uplusware/heaphttpd/master/doc/heaphttpd.png)
+
+Architecture
+
+***
+
+![Load balance solution](https://raw.githubusercontent.com/uplusware/heaphttpd/master/doc/heaphttpd_loadbalance.png)[Big Picture](https://raw.githubusercontent.com/uplusware/heaphttpd/master/doc/heaphttpd_loadbalance.png)
