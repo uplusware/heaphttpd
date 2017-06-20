@@ -19,7 +19,7 @@ extern "C"
 {
 #endif /* __cplusplus */
 
-void* ext_request(CHttp* http_session, const char * name, const char * description, BOOL * skip);
+void* ext_request(CHttp* http_session, const char * name, const char * description, const char * parameters, BOOL * skip);
     
 #ifdef __cplusplus
 };

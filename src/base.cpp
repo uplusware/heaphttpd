@@ -21,7 +21,7 @@ string CHttpBase::m_encoding = "UTF-8";
 string CHttpBase::m_private_path = "/tmp/heaphttpd/private";
 string CHttpBase::m_work_path = "/var/heaphttpd/";
 string CHttpBase::m_ext_list_file = "/etc/heaphttpd/extension.xml";
-vector<stExtension> CHttpBase::m_ext_list;
+vector<http_extension_t> CHttpBase::m_ext_list;
 
 string CHttpBase::m_localhostname = "localhost";
 string CHttpBase::m_hostip = "";
@@ -579,7 +579,7 @@ void CHttpBase::_load_ext_()
 		{
 			if(pChildNode && pChildNode->ToElement())
 			{
-				stExtension ext;
+				http_extension_t ext;
 				
 				ext.handle = dlopen(pChildNode->ToElement()->Attribute("libso"), RTLD_NOW);
 				
@@ -587,6 +587,7 @@ void CHttpBase::_load_ext_()
 				{
                     ext.name = pChildNode->ToElement()->Attribute("name") ? pChildNode->ToElement()->Attribute("name") : "";
 					ext.description = pChildNode->ToElement()->Attribute("description") ? pChildNode->ToElement()->Attribute("description") : "";
+                    ext.parameters = pChildNode->ToElement()->Attribute("parameters") ? pChildNode->ToElement()->Attribute("parameters") : "";
 					m_ext_list.push_back(ext);
 				}
 			}

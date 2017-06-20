@@ -6,7 +6,7 @@
 http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, ServiceObjMap* srvobj, int sockfd,
         const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
-		const char* work_path, vector<string>* default_webpages, vector<stExtension>* ext_list, const char* php_mode, 
+		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list,

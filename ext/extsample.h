@@ -18,9 +18,9 @@
 extern "C"
 {
 #endif /* __cplusplus */
-    void* ext_request(CHttp* http_session, const char * name, const char * description, BOOL * skip);
-    void* ext_response(CHttp* http_session, const char * name, const char * description, Htdoc* doc);
-    void* ext_finish(CHttp* http_session, const char * name, const char * description, Htdoc* doc);
+    void* ext_request(CHttp* http_session, const char * name, const char * description, const char * parameters, BOOL * skip);
+    void* ext_response(CHttp* http_session, const char * name, const char * description, const char * parameters, Htdoc* doc);
+    void* ext_finish(CHttp* http_session, const char * name, const char * description, const char * parameters, Htdoc* doc);
 #ifdef __cplusplus
 };
 #endif /* __cplusplus */

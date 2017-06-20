@@ -10,6 +10,7 @@ typedef struct
 	void* handle;
     string name;
 	string description;
-}stExtension;
+    string parameters;
+}http_extension_t;
 
 #endif /* _EXTENSION_H_ */

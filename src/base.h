@@ -516,7 +516,7 @@ public:
 	static string 	m_work_path;
 	static string   m_ext_list_file;
 
-	static vector<stExtension> m_ext_list;
+	static vector<http_extension_t> m_ext_list;
 
 	static string	m_localhostname;
 	static string	m_encoding;
