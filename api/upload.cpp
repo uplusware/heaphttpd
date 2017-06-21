@@ -14,7 +14,7 @@ void ApiUpload::Response()
     header.SetField("Content-Type", "text/html");
     
     string strResp;
-    strResp = "<html></head><title>API Sample</title></head><body><h1>"VERSION_STRING"</h1>";
+    strResp = "<html></head><title>API Sample</title></head><body><h1>"VERSION_STRING"</h1><hr>";
     
     string filename;
     string filetype;

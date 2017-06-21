@@ -137,9 +137,6 @@ public:
 	WebCGI m_cgi;
 	
 	X509* GetClientX509Cert() { return m_client_cert; }
-	
-	void SetExtensionDate(void* extdata) { m_extdata = extdata; }
-	void* GetExtensionDate() { return m_extdata; }
     
     BOOL GetKeepAlive() { return m_keep_alive; }
     BOOL IsEnabledKeepAlive() { return m_enabled_keep_alive; }
@@ -212,8 +209,6 @@ protected:
     ServiceObjMap* m_srvobj;
     
     map<string, string> m_set_cookies;
-
-    void* m_extdata;
 };
 
 #endif /* _HTTP_H_ */
