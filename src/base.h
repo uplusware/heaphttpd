@@ -148,7 +148,7 @@ public:
 				memcpy(pbuf, dbuf, blen);
 				memmove(dbuf, dbuf + blen, dlen - blen);
 				dlen = dlen - blen;
-				return -2;
+				return blen;
 			}
 		}
 		else
@@ -164,7 +164,7 @@ public:
 				memcpy(pbuf, dbuf, blen);
 				memmove(dbuf, dbuf + blen, dlen - blen);
 				dlen = dlen - blen;
-				return -2;
+				return blen;
 			}
 		}
 
@@ -173,20 +173,18 @@ public:
 		while(1)
 		{
 			if(nRecv >= blen)
-				return -2;
+				break;
 			
 			timeout.tv_sec = 1; 
 			timeout.tv_usec = 0;
 					
 			FD_SET(sockfd, &mask);
 			res = select(sockfd + 1, &mask, NULL, NULL, &timeout);
-			//printf("%d %d\n", sockfd, res);
 			if( res == 1) 
 			{
 				taketime = 0;
 				len = recv(sockfd, pbuf + nRecv, blen - nRecv, 0);
-				//printf("len: %d\n", len);
-                if(len == 0)
+				if(len == 0)
                 {
                     close(sockfd);
                     return -1;
@@ -303,13 +301,13 @@ public:
 	{
 		int taketime = 0;
 		int res;
-		fd_set mask; 
-		struct timeval timeout; 
+		fd_set mask;
+		struct timeval timeout;
 		char* p = NULL;
 		int len;
 		unsigned int nRecv = 0;
 		int ret;
-		
+
 		int left;
 		int right;
 		p = dlen > 0 ? (char*)memchr(dbuf, '\n', dlen) : NULL;
@@ -317,7 +315,7 @@ public:
 		{
 			left = p - dbuf + 1;
 			right = dlen - left;
-		
+
 			if(blen >= left)
 			{
 				memcpy(pbuf, dbuf, left);
@@ -331,7 +329,7 @@ public:
 				memcpy(pbuf, dbuf, blen);
 				memmove(dbuf, dbuf + blen, dlen - blen);
 				dlen = dlen - blen;
-				return -2;
+				return blen;
 			}
 		}
 		else
@@ -347,130 +345,82 @@ public:
 				memcpy(pbuf, dbuf, blen);
 				memmove(dbuf, dbuf + blen, dlen - blen);
 				dlen = dlen - blen;
-				return -2;
+				return blen;
 			}
 		}
 
 		p = NULL;
-
-#if	1	
-        FD_ZERO(&mask);
+        
 		while(1)
 		{
-			if(nRecv >= blen)
-				return -2;
-			
-			timeout.tv_sec = 1; 
-			timeout.tv_usec = 0;
-					
-			FD_SET(sockfd, &mask);
-			res = select(sockfd + 1, &mask, NULL, NULL, &timeout);
+			if(nRecv == blen)
+				break;
             
-			if( res == 1) 
-			{
-				taketime = 0;
-				len = SSL_read(sslhd, pbuf + nRecv, blen - nRecv);
-                if(len == 0)
-				{
-					ret = SSL_get_error(sslhd, len);
-					if(ret == SSL_ERROR_ZERO_RETURN)
-					{
-						printf("SSL_read: shutdown by the peer\n");
-					}
+            len = SSL_read(sslhd, pbuf + nRecv, blen - nRecv);
+            if(len == 0)
+            {
+                close(sockfd);
+                return -1;
+            }
+            else if(len < 0)
+            {
+                ret = SSL_get_error(sslhd, len);
+                if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+                {
+                    timeout.tv_sec = MAX_TRY_TIMEOUT;
+                    timeout.tv_usec = 0;
+
+                    FD_ZERO(&mask);
+                    FD_SET(sockfd, &mask);
+                    
+                    res = select(sockfd + 1, &mask, NULL, NULL, &timeout);
+
+                    if( res == 1)
+                    {
+                        continue;
+                    }
+                    else if(res == 0)
+                    {
+                        close(sockfd);
+                        return -1;
+                    }
+                    else
+                    {
+                        close(sockfd);
+                        return -1;
+                    }
+                }
+                else
+                {
+                    printf("SSL_get_error %d\n", ret);
                     close(sockfd);
                     return -1;
                 }
-				else if(len < 0)
-				{
-					ret = SSL_get_error(sslhd, len);
-					if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
-					{
-						continue;
-					}
-					else
-					{
-						close(sockfd);
-						return -1;
-					}
-				}
-				nRecv = nRecv + len;
-				p = (char*)memchr(pbuf, '\n', nRecv);
-				if(p != NULL)
-				{
-					left = p - pbuf + 1;
-					right = nRecv - left;
-				
-					if(right > dbufsize)
-					{
-						if(dbuf)
-							free(dbuf);
-						dbuf = (char*)malloc(right);
-						dbufsize = right;
-					}
-					memcpy(dbuf, p + 1, right);
-					dlen = right;
-					nRecv = left;
-					pbuf[nRecv] = '\0';
-					break;
-				}
-			}
-			else if(res == 0)
-			{
-				taketime = taketime + 1;
-                //printf("%p: %d %d\n", this, sockfd, taketime);
-				if(taketime > MAX_TRY_TIMEOUT)
-				{
-					close(sockfd);
-					return -1;
-				}
-				continue;
-			}
-			else
-			{
-                //printf("%p: closed\n", this);
-				return -1;
-			}
-			
+            }
+            else
+            {
+                nRecv = nRecv + len;
+                p = (char*)memchr(pbuf, '\n', nRecv);
+                if(p != NULL)
+                {
+                    left = p - pbuf + 1;
+                    right = nRecv - left;
+
+                    if(right > dbufsize)
+                    {
+                        if(dbuf)
+                            free(dbuf);
+                        dbuf = (char*)malloc(right);
+                        dbufsize = right;
+                    }
+                    memcpy(dbuf, p + 1, right);
+                    dlen = right;
+                    nRecv = left;
+                    pbuf[nRecv] = '\0';
+                    break;
+                }
+            }
 		}
-#else
-		while(1)
-		{
-			if(nRecv >= blen)
-				return -2;
-			
-			len = SSL_read(sslhd, pbuf + nRecv, blen - nRecv);
-			if(len <= 0)
-			{
-				ret = SSL_get_error(sslhd, len);
-				if(ret == SSL_ERROR_ZERO_RETURN)
-				{
-					printf("SSL_read: shutdown by the peer\n");
-				}
-				close(sockfd);
-				return -1;
-			}
-			nRecv = nRecv + len;
-			p = (char*)memchr(pbuf, '\n', nRecv);
-			if(p != NULL)
-			{
-				left = p - pbuf + 1;
-				right = nRecv - left;
-			
-				if(right > dbufsize)
-				{
-					if(dbuf)
-						free(dbuf);
-					dbuf = (char*)malloc(right);
-					dbufsize = right;
-				}
-				memcpy(dbuf, p + 1, right);
-				dlen = right;
-				nRecv = left;
-				pbuf[nRecv] = '\0';
-				break;
-			}
-		}
-#endif
 		return nRecv;
 	}
 
