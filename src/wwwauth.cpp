@@ -157,7 +157,7 @@ bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, string
 				where = 'K';
 				
 			}
-			else if(authinfo[x] == '=')
+			else if(where == 'K' && authinfo[x] == '=')
 			{
 				where = 'V';
 			}
