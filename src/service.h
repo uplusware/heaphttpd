@@ -158,6 +158,40 @@ static bool check_pid_file(const char* pflag)
 	return true;   
 } 
 
+typedef struct
+{
+    
+	int sockfd;
+	string client_ip;
+	BOOL https;
+	BOOL http2;
+    string ca_crt_root;
+    string ca_crt_server;
+    string ca_password;
+    string ca_key_server;
+    BOOL client_cer_check;
+	memory_cache* cache;
+	ServiceObjMap* srvobjmap;
+} SESSION_PARAM;
+
+enum CLIENT_PARAM_CTRL{
+	SessionParamData = 0,
+	SessionParamExt,
+	SessionParamQuit
+};
+
+typedef struct {
+	CLIENT_PARAM_CTRL ctrl;
+	char client_ip[128];
+    BOOL https;
+	BOOL http2;
+    char ca_crt_root[256];
+    char ca_crt_server[256];
+    char ca_password[256];
+    char ca_key_server[256];
+    BOOL client_cer_check;
+} CLIENT_PARAM;
+
 class Worker
 {
 public:
@@ -173,6 +207,18 @@ private:
 	int m_thread_num;
 	int m_process_seq;
 	string m_service_name;
+//static methods
+    static void SESSION_HANDLING(SESSION_PARAM* session_param);
+    static void INIT_THREAD_POOL_HANDLER();
+    static void* START_THREAD_POOL_HANDLER(void* arg);
+    static void LEAVE_THREAD_POOL_HANDLER();
+    
+    //static variables
+    static std::queue<SESSION_PARAM*> m_STATIC_THREAD_POOL_ARG_QUEUE;
+    static volatile BOOL m_STATIC_THREAD_POOL_EXIT;
+    static pthread_mutex_t m_STATIC_THREAD_POOL_MUTEX;
+    static sem_t m_STATIC_THREAD_POOL_SEM;
+    static volatile unsigned int m_STATIC_THREAD_POOL_SIZE;
 };
 
 typedef struct {

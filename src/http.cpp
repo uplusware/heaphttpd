@@ -118,9 +118,6 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 
 CHttp::~CHttp()
 {
-    int flags = fcntl(m_sockfd, F_GETFL, 0); 
-	fcntl(m_sockfd, F_SETFL, flags & ~O_NONBLOCK);
-
 	if(m_keep_alive != TRUE || m_enabled_keep_alive != TRUE) //close the socket when non-keep-alive or non-websocket
 	{
 		if(m_sockfd > 0)

@@ -21,40 +21,6 @@
 #include "pool.h"
 #include "util/trace.h"
 
-typedef struct
-{
-    
-	int sockfd;
-	string client_ip;
-	BOOL https;
-	BOOL http2;
-    string ca_crt_root;
-    string ca_crt_server;
-    string ca_password;
-    string ca_key_server;
-    BOOL client_cer_check;
-	memory_cache* cache;
-	ServiceObjMap* srvobjmap;
-} SESSION_PARAM;
-
-enum CLIENT_PARAM_CTRL{
-	SessionParamData = 0,
-	SessionParamExt,
-	SessionParamQuit
-};
-
-typedef struct {
-	CLIENT_PARAM_CTRL ctrl;
-	char client_ip[128];
-    BOOL https;
-	BOOL http2;
-    char ca_crt_root[256];
-    char ca_crt_server[256];
-    char ca_password[256];
-    char ca_key_server[256];
-    BOOL client_cer_check;
-} CLIENT_PARAM;
-
 int SEND_FD(int sfd, int fd_file, CLIENT_PARAM* param) 
 {
 	struct msghdr msg;  
@@ -134,13 +100,6 @@ int RECV_FD(int sfd, int* fd_file, CLIENT_PARAM* param)
     return *fd_file;  
 }
 
-static std::queue<SESSION_PARAM*> STATIC_THREAD_POOL_ARG_QUEUE;
-
-static volatile BOOL STATIC_THREAD_POOL_EXIT = TRUE;
-static pthread_mutex_t STATIC_THREAD_POOL_MUTEX;
-static sem_t STATIC_THREAD_POOL_SEM;
-static volatile unsigned int STATIC_THREAD_POOL_SIZE = 0;
-
 /*
 OpenSSL example:
 	unsigned char vector[] = {
@@ -204,7 +163,13 @@ static int alpn_cb(SSL *ssl,
 	return ret;
 }
 
-static void SESSION_HANDLING(SESSION_PARAM* session_param)
+std::queue<SESSION_PARAM*> Worker::m_STATIC_THREAD_POOL_ARG_QUEUE;
+volatile BOOL Worker::m_STATIC_THREAD_POOL_EXIT = TRUE;
+pthread_mutex_t Worker::m_STATIC_THREAD_POOL_MUTEX;
+sem_t Worker::m_STATIC_THREAD_POOL_SEM;
+volatile unsigned int Worker::m_STATIC_THREAD_POOL_SIZE = 0;
+
+void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 {    
 	BOOL isHttp2 = FALSE;
 	Session* pSession = NULL;
@@ -213,6 +178,10 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
     BOOL bSSLAccepted;
 	SSL_CTX* ssl_ctx = NULL;
 	X509* client_cert = NULL;
+    
+    int flags = fcntl(session_param->sockfd, F_GETFL, 0); 
+	fcntl(session_param->sockfd, F_SETFL, flags | O_NONBLOCK);
+        
     if(session_param->https == TRUE)
 	{
 		SSL_METHOD* meth;
@@ -224,8 +193,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		ssl_ctx = SSL_CTX_new(meth);
 		if(!ssl_ctx)
 		{
-			CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-            uTrace.Write(Trace_Error, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
 		
@@ -237,23 +205,20 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		SSL_CTX_load_verify_locations(ssl_ctx, session_param->ca_crt_root.c_str(), NULL);
 		if(SSL_CTX_use_certificate_file(ssl_ctx, session_param->ca_crt_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
-			CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-            uTrace.Write(Trace_Error, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
         
 		SSL_CTX_set_default_passwd_cb_userdata(ssl_ctx, (char*)session_param->ca_password.c_str());
 		if(SSL_CTX_use_PrivateKey_file(ssl_ctx, session_param->ca_key_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
-			CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-            uTrace.Write(Trace_Error, "SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 
 		}
 		if(!SSL_CTX_check_private_key(ssl_ctx))
 		{
-			CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-            uTrace.Write(Trace_Error, "SSL_CTX_check_private_key: %s", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_CTX_check_private_key: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl3;
 		}
 		if(session_param->http2)
@@ -262,8 +227,7 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, CHttpBase::m_https_cipher.c_str());
         if(ssl_rc == 0)
         {
-            CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-            uTrace.Write(Trace_Error, "SSL_CTX_set_cipher_list: %s", ERR_error_string(ERR_get_error(),NULL));
+            fprintf(stderr, "SSL_CTX_set_cipher_list: %s", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl3;
         }
 		SSL_CTX_set_mode(ssl_ctx, SSL_MODE_AUTO_RETRY);
@@ -275,15 +239,13 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
 		ssl = SSL_new(ssl_ctx);
 		if(!ssl)
 		{
-			CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-            uTrace.Write(Trace_Error, "SSL_new: %s", ERR_error_string(ERR_get_error(),NULL));
+			fprintf(stderr, "SSL_new: %s", ERR_error_string(ERR_get_error(),NULL));
 			goto clean_ssl2;
 		}
 		ssl_rc = SSL_set_fd(ssl, session_param->sockfd);
         if(ssl_rc == 0)
         {
-            CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-            uTrace.Write(Trace_Error, "SSL_set_fd: %s", ERR_error_string(ERR_get_error(),NULL));
+            fprintf(stderr, "SSL_set_fd: %s", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl2;
         }
         if(session_param->http2)
@@ -292,45 +254,60 @@ static void SESSION_HANDLING(SESSION_PARAM* session_param)
             ssl_rc = SSL_set_cipher_list(ssl, CHttpBase::m_https_cipher.c_str());
         if(ssl_rc == 0)
         {
-            CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-            uTrace.Write(Trace_Error, "SSL_set_cipher_list: %s", ERR_error_string(ERR_get_error(),NULL));
+            fprintf(stderr, "SSL_set_cipher_list: %s", ERR_error_string(ERR_get_error(),NULL));
             goto clean_ssl2;
         }
-re_ssl_accept:        
-        ssl_rc = SSL_accept(ssl);
-		if(ssl_rc < 0)
-		{
-            int ret = SSL_get_error(ssl, ssl_rc);
-            if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+
+        do {
+            ssl_rc = SSL_accept(ssl);
+            if(ssl_rc < 0)
             {
-                goto re_ssl_accept;
-            }
-            else if(ret == SSL_ERROR_SYSCALL)
-            {
-                if(ERR_get_error() == 0)
+                int ret = SSL_get_error(ssl, ssl_rc);
+                    
+                if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
                 {
-                    CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-                    uTrace.Write(Trace_Error, "SSL_accept(%d): shutdown by peer", ssl_rc);
+                    fd_set mask;
+                    struct timeval timeout;
+            
+                    timeout.tv_sec = MAX_SOCKET_TIMEOUT;
+                    timeout.tv_usec = 0;
+
+                    FD_ZERO(&mask);
+                    FD_SET(session_param->sockfd, &mask);
+                    
+                    int res = select(session_param->sockfd + 1, ret == SSL_ERROR_WANT_READ ? &mask : NULL, ret == SSL_ERROR_WANT_WRITE ? &mask : NULL, NULL, &timeout);
+
+                    if( res == 1)
+                    {
+                        continue;
+                    }
+                    else /* timeout or error */
+                    {
+                        
+                        fprintf(stderr, "SSL_accept: %s %s", ERR_error_string(ERR_get_error(),NULL), strerror(errno));
+                        goto clean_ssl2;
+                    }
                 }
                 else
                 {
-                    CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-                    uTrace.Write(Trace_Error, "SSL_accept(%d): SSL_ERROR_SYSCALL %s", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
+                    
+                    fprintf(stderr, "SSL_accept: %s", ERR_error_string(ERR_get_error(),NULL));
+                    goto clean_ssl2;
                 }
+
             }
-            else
+            else if(ssl_rc == 0)
             {
-                CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-                uTrace.Write(Trace_Error, "SSL_accept(%d): %s, SSL_get_error: %d", ssl_rc, ERR_error_string(ERR_get_error(),NULL), ret);
+                
+                fprintf(stderr, "SSL_accept: %s", ERR_error_string(ERR_get_error(),NULL));
+                    
+                goto clean_ssl1;
             }
-			goto clean_ssl2;
-		}
-        else if(ssl_rc = 0)
-		{
-		    CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-            uTrace.Write(Trace_Error, "SSL_accept(%d): %s", ssl_rc, ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl1;
-		}
+            else if(ssl_rc == 1)
+            {
+                break;
+            }
+        } while(1);
         
         bSSLAccepted = TRUE;
         if(session_param->client_cer_check)
@@ -338,8 +315,8 @@ re_ssl_accept:
             ssl_rc = SSL_get_verify_result(ssl);
             if(ssl_rc != X509_V_OK)
             {
-                CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-                uTrace.Write(Trace_Error, "SSL_get_verify_result: %s", ERR_error_string(ERR_get_error(),NULL));
+                
+                fprintf(stderr, "SSL_get_verify_result: %s", ERR_error_string(ERR_get_error(),NULL));
                 goto clean_ssl1;
             }
         }
@@ -348,8 +325,8 @@ re_ssl_accept:
 			client_cert = SSL_get_peer_certificate(ssl);
 			if (client_cert == NULL)
 			{
-				CUplusTrace uTrace(HEAPHTTPD_SSLERR_LOGNAME, HEAPHTTPD_SSLERR_LCKNAME);
-                uTrace.Write(Trace_Error, "SSL_get_peer_certificate: %s", ERR_error_string(ERR_get_error(),NULL));
+				
+                fprintf(stderr, "SSL_get_peer_certificate: %s", ERR_error_string(ERR_get_error(),NULL));
 				goto clean_ssl1;
 			}
 		}
@@ -388,37 +365,37 @@ clean_ssl3:
 	close(session_param->sockfd);
 }
 
-static void INIT_THREAD_POOL_HANDLER()
+void Worker::INIT_THREAD_POOL_HANDLER()
 {
-	STATIC_THREAD_POOL_EXIT = TRUE;
-	STATIC_THREAD_POOL_SIZE = 0;
-	while(!STATIC_THREAD_POOL_ARG_QUEUE.empty())
+	m_STATIC_THREAD_POOL_EXIT = TRUE;
+	m_STATIC_THREAD_POOL_SIZE = 0;
+	while(!m_STATIC_THREAD_POOL_ARG_QUEUE.empty())
 	{
-		STATIC_THREAD_POOL_ARG_QUEUE.pop();
+		m_STATIC_THREAD_POOL_ARG_QUEUE.pop();
 	}
-	pthread_mutex_init(&STATIC_THREAD_POOL_MUTEX, NULL);
-	sem_init(&STATIC_THREAD_POOL_SEM, 0, 0);
+	pthread_mutex_init(&m_STATIC_THREAD_POOL_MUTEX, NULL);
+	sem_init(&m_STATIC_THREAD_POOL_SEM, 0, 0);
 }
 
-static void* START_THREAD_POOL_HANDLER(void* arg)
+void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 {
-	STATIC_THREAD_POOL_SIZE++;
+	m_STATIC_THREAD_POOL_SIZE++;
 	struct timespec ts;
-	while(STATIC_THREAD_POOL_EXIT)
+	while(m_STATIC_THREAD_POOL_EXIT)
 	{
 		clock_gettime(CLOCK_REALTIME, &ts);
 		ts.tv_sec += 1;
-		if(sem_timedwait(&STATIC_THREAD_POOL_SEM, &ts) == 0)
+		if(sem_timedwait(&m_STATIC_THREAD_POOL_SEM, &ts) == 0)
 		{
 			SESSION_PARAM* session_param = NULL;
 		
-			pthread_mutex_lock(&STATIC_THREAD_POOL_MUTEX);
-			if(!STATIC_THREAD_POOL_ARG_QUEUE.empty())
+			pthread_mutex_lock(&m_STATIC_THREAD_POOL_MUTEX);
+			if(!m_STATIC_THREAD_POOL_ARG_QUEUE.empty())
 			{
-				session_param = STATIC_THREAD_POOL_ARG_QUEUE.front();
-				STATIC_THREAD_POOL_ARG_QUEUE.pop();			
+				session_param = m_STATIC_THREAD_POOL_ARG_QUEUE.front();
+				m_STATIC_THREAD_POOL_ARG_QUEUE.pop();			
 			}
-			pthread_mutex_unlock(&STATIC_THREAD_POOL_MUTEX);
+			pthread_mutex_unlock(&m_STATIC_THREAD_POOL_MUTEX);
 			if(session_param)
 			{
 				SESSION_HANDLING(session_param);
@@ -426,20 +403,20 @@ static void* START_THREAD_POOL_HANDLER(void* arg)
 			}
 		}
 	}
-	STATIC_THREAD_POOL_SIZE--;
+	m_STATIC_THREAD_POOL_SIZE--;
 	if(arg != NULL)
 		delete arg;
 	
 	pthread_exit(0);
 }
 
-static void LEAVE_THREAD_POOL_HANDLER()
+void Worker::LEAVE_THREAD_POOL_HANDLER()
 {
 	printf("LEAVE_THREAD_POOL_HANDLER\n");
-	STATIC_THREAD_POOL_EXIT = FALSE;
+	m_STATIC_THREAD_POOL_EXIT = FALSE;
 
-	pthread_mutex_destroy(&STATIC_THREAD_POOL_MUTEX);
-	sem_close(&STATIC_THREAD_POOL_SEM);
+	pthread_mutex_destroy(&m_STATIC_THREAD_POOL_MUTEX);
+	sem_close(&m_STATIC_THREAD_POOL_SEM);
 
     char local_sockfile[256];
     sprintf(local_sockfile, "/tmp/heaphttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
@@ -447,14 +424,14 @@ static void LEAVE_THREAD_POOL_HANDLER()
     unlink(local_sockfile);
 
 	unsigned long timeout = 200;
-	while(STATIC_THREAD_POOL_SIZE > 0 && timeout > 0)
+	while(m_STATIC_THREAD_POOL_SIZE > 0 && timeout > 0)
 	{
 		usleep(1000*10);
 		timeout--;
 	}	
 }
 
-static void CLEAR_QUEUE(mqd_t qid)
+void CLEAR_QUEUE(mqd_t qid)
 {
 	mq_attr attr;
 	struct timespec ts;
@@ -512,7 +489,7 @@ void Worker::Working(CUplusTrace& uTrace)
 		}
 		if(clt_sockfd < 0)
 		{
-			uTrace.Write(Trace_Error, "RECV_FD error, clt_sockfd = %d %s %d", clt_sockfd, __FILE__, __LINE__);
+			fprintf(stderr, "RECV_FD error, clt_sockfd = %d %s %d", clt_sockfd, __FILE__, __LINE__);
 			bQuit = true;
 		}
 
@@ -541,11 +518,11 @@ void Worker::Working(CUplusTrace& uTrace)
 		    session_param->ca_key_server = client_param.ca_key_server;
 		    session_param->client_cer_check = client_param.client_cer_check;
 
-			pthread_mutex_lock(&STATIC_THREAD_POOL_MUTEX);
-			STATIC_THREAD_POOL_ARG_QUEUE.push(session_param);
-			pthread_mutex_unlock(&STATIC_THREAD_POOL_MUTEX);
+			pthread_mutex_lock(&m_STATIC_THREAD_POOL_MUTEX);
+			m_STATIC_THREAD_POOL_ARG_QUEUE.push(session_param);
+			pthread_mutex_unlock(&m_STATIC_THREAD_POOL_MUTEX);
 
-			sem_post(&STATIC_THREAD_POOL_SEM);
+			sem_post(&m_STATIC_THREAD_POOL_SEM);
 		}
 	}
 }
@@ -804,7 +781,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
         {
             WORK_PROCESS_INFO  wpinfo;
             if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
-                uTrace.Write(Trace_Error, "socketpair error, %s %d\n", __FILE__, __LINE__);
+                fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
             
             int work_pid = fork();
             if(work_pid == 0)
@@ -936,7 +913,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
         if(CHttpBase::m_instance_prestart == TRUE)
         {
             if (socketpair(AF_UNIX, SOCK_DGRAM, 0, wpinfo.sockfds) < 0)
-                uTrace.Write(Trace_Error, "socketpair error, %s %d\n", __FILE__, __LINE__);
+                fprintf(stderr, "socketpair error, %s %d\n", __FILE__, __LINE__);
             int work_pid = fork();
             if(work_pid == 0)
             {
@@ -970,7 +947,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             }
             else
             {
-                uTrace.Write(Trace_Error, "fork error, work_pid = %d, %s %d\n", work_pid, __FILE__, __LINE__);
+                fprintf(stderr, "fork error, work_pid = %d, %s %d\n", work_pid, __FILE__, __LINE__);
             }
         }        
         m_work_processes.push_back(wpinfo);
@@ -999,7 +976,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort, &hints, &server_addr);
             if (s != 0)
             {
-               uTrace.Write(Trace_Error, "getaddrinfo: %s %s %d", gai_strerror(s), __FILE__, __LINE__);
+               fprintf(stderr, "getaddrinfo: %s %s %d", gai_strerror(s), __FILE__, __LINE__);
                break;
             }
             
@@ -1020,7 +997,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             
             if (rp == NULL)
             {               /* No address succeeded */
-                  uTrace.Write(Trace_Error, "Could not bind %s %d", __FILE__, __LINE__);
+                  fprintf(stderr, "Could not bind %s %d", __FILE__, __LINE__);
                   break;
             }
 
@@ -1031,7 +1008,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             
             if(listen(m_sockfd, 128) == -1)
             {
-                uTrace.Write(Trace_Error, "Service LISTEN error, %s:%u", hostip ? hostip : "", http_port);
+                fprintf(stderr, "Service LISTEN error, %s:%u", hostip ? hostip : "", http_port);
                 result = 1;
                 write(fd, &result, sizeof(unsigned int));
                 close(fd);
@@ -1060,7 +1037,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort2, &hints2, &server_addr2);
             if (s != 0)
             {
-               uTrace.Write(Trace_Error, "getaddrinfo: %s %s %d", gai_strerror(s), __FILE__, __LINE__);
+               fprintf(stderr, "getaddrinfo: %s %s %d", gai_strerror(s), __FILE__, __LINE__);
                break;
             }
             
@@ -1081,7 +1058,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             
             if (rp2 == NULL)
             {     /* No address succeeded */
-                  uTrace.Write(Trace_Error, "Could not bind %s %d", __FILE__, __LINE__);
+                  fprintf(stderr, "Could not bind %s %d", __FILE__, __LINE__);
                   break;
             }
 
@@ -1187,7 +1164,7 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 			{
 				if(errno != ETIMEDOUT && errno != EINTR && errno != EMSGSIZE)
 				{
-					uTrace.Write(Trace_Error, "mq_timedreceive error, errno = %d, %s, %s %d\n", errno, strerror(errno), __FILE__, __LINE__);
+					fprintf(stderr, "mq_timedreceive error, errno = %d, %s, %s %d\n", errno, strerror(errno), __FILE__, __LINE__);
 					svr_exit = TRUE;
 					break;
 				}
