@@ -194,7 +194,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 		if(!ssl_ctx)
 		{
 			fprintf(stderr, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl3;
+			goto FAIL_CLEAN_SSL_3;
 		}
 		
 		if(session_param->client_cer_check)
@@ -206,20 +206,20 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 		if(SSL_CTX_use_certificate_file(ssl_ctx, session_param->ca_crt_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
 			fprintf(stderr, "SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl3;
+			goto FAIL_CLEAN_SSL_3;
 		}
         
 		SSL_CTX_set_default_passwd_cb_userdata(ssl_ctx, (char*)session_param->ca_password.c_str());
 		if(SSL_CTX_use_PrivateKey_file(ssl_ctx, session_param->ca_key_server.c_str(), SSL_FILETYPE_PEM) <= 0)
 		{
 			fprintf(stderr, "SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl3;
+			goto FAIL_CLEAN_SSL_3;
 
 		}
 		if(!SSL_CTX_check_private_key(ssl_ctx))
 		{
 			fprintf(stderr, "SSL_CTX_check_private_key: %s", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl3;
+			goto FAIL_CLEAN_SSL_3;
 		}
 		if(session_param->http2)
             ssl_rc = SSL_CTX_set_cipher_list(ssl_ctx, CHttpBase::m_http2_tls_cipher.c_str());
@@ -228,7 +228,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
         if(ssl_rc == 0)
         {
             fprintf(stderr, "SSL_CTX_set_cipher_list: %s", ERR_error_string(ERR_get_error(),NULL));
-            goto clean_ssl3;
+            goto FAIL_CLEAN_SSL_3;
         }
 		SSL_CTX_set_mode(ssl_ctx, SSL_MODE_AUTO_RETRY);
 #if OPENSSL_VERSION_NUMBER >= 0x010002000L
@@ -240,13 +240,13 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 		if(!ssl)
 		{
 			fprintf(stderr, "SSL_new: %s", ERR_error_string(ERR_get_error(),NULL));
-			goto clean_ssl2;
+			goto FAIL_CLEAN_SSL_2;
 		}
 		ssl_rc = SSL_set_fd(ssl, session_param->sockfd);
         if(ssl_rc == 0)
         {
             fprintf(stderr, "SSL_set_fd: %s", ERR_error_string(ERR_get_error(),NULL));
-            goto clean_ssl2;
+            goto FAIL_CLEAN_SSL_2;
         }
         if(session_param->http2)
             ssl_rc = SSL_set_cipher_list(ssl, CHttpBase::m_http2_tls_cipher.c_str());
@@ -255,7 +255,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
         if(ssl_rc == 0)
         {
             fprintf(stderr, "SSL_set_cipher_list: %s", ERR_error_string(ERR_get_error(),NULL));
-            goto clean_ssl2;
+            goto FAIL_CLEAN_SSL_2;
         }
 
         do {
@@ -285,14 +285,14 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
                     {
                         
                         fprintf(stderr, "SSL_accept: %s %s", ERR_error_string(ERR_get_error(),NULL), strerror(errno));
-                        goto clean_ssl2;
+                        goto FAIL_CLEAN_SSL_2;
                     }
                 }
                 else
                 {
                     
                     fprintf(stderr, "SSL_accept: %s", ERR_error_string(ERR_get_error(),NULL));
-                    goto clean_ssl2;
+                    goto FAIL_CLEAN_SSL_2;
                 }
 
             }
@@ -301,7 +301,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
                 
                 fprintf(stderr, "SSL_accept: %s", ERR_error_string(ERR_get_error(),NULL));
                     
-                goto clean_ssl1;
+                goto FAIL_CLEAN_SSL_1;
             }
             else if(ssl_rc == 1)
             {
@@ -317,7 +317,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
             {
                 
                 fprintf(stderr, "SSL_get_verify_result: %s", ERR_error_string(ERR_get_error(),NULL));
-                goto clean_ssl1;
+                goto FAIL_CLEAN_SSL_1;
             }
         }
 		if(session_param->client_cer_check)
@@ -327,7 +327,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 			{
 				
                 fprintf(stderr, "SSL_get_peer_certificate: %s", ERR_error_string(ERR_get_error(),NULL));
-				goto clean_ssl1;
+				goto FAIL_CLEAN_SSL_1;
 			}
 		}
 	}
@@ -341,7 +341,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
         pSession = NULL;
 	}
 
-clean_ssl1:
+FAIL_CLEAN_SSL_1:
     if(client_cert)
         X509_free (client_cert);
     client_cert = NULL;
@@ -350,13 +350,13 @@ clean_ssl1:
 		SSL_shutdown(ssl);
         bSSLAccepted = FALSE;
     }
-clean_ssl2:
+FAIL_CLEAN_SSL_2:
 	if(ssl)
     {
 		SSL_free(ssl);
         ssl = NULL;
     }
-clean_ssl3:
+FAIL_CLEAN_SSL_3:
 	if(ssl_ctx)
     {
 		SSL_CTX_free(ssl_ctx);
@@ -735,7 +735,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
         access_result = FALSE;
         for(int x = 0; x < CHttpBase::m_permit_list.size(); x++)
         {
-            if(strlike(CHttpBase::m_permit_list[x].c_str(), client_ip.c_str()) == TRUE)
+            if(strmatch(CHttpBase::m_permit_list[x].c_str(), client_ip.c_str()) == TRUE)
             {
                 access_result = TRUE;
                 break;
@@ -744,7 +744,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
         
         for(int x = 0; x < CHttpBase::m_reject_list.size(); x++)
         {
-            if( (strlike(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE)
+            if( (strmatch(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE)
                 && (time(NULL) < CHttpBase::m_reject_list[x].expire) )
             {
                 access_result = FALSE;
@@ -757,7 +757,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
         access_result = TRUE;
         for(int x = 0; x < CHttpBase::m_reject_list.size(); x++)
         {
-            if( (strlike(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE)
+            if( (strmatch(CHttpBase::m_reject_list[x].ip.c_str(), (char*)client_ip.c_str()) == TRUE)
                 && (time(NULL) < CHttpBase::m_reject_list[x].expire) )
             {
                 access_result = FALSE;

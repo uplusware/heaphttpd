@@ -282,12 +282,12 @@ BOOL CHttpBase::LoadConfig()
                     }
                 }
             }
-			else if(strncasecmp(strline.c_str(), "CheckClientCA", sizeof("CheckClientCA") - 1) == 0)
+			else if(strncasecmp(strline.c_str(), "CACheckClient", sizeof("CACheckClient") - 1) == 0)
 			{
-				string CheckClientCA;
-				strcut(strline.c_str(), "=", NULL, CheckClientCA );
-				strtrim(CheckClientCA);
-				m_client_cer_check = (strcasecmp(CheckClientCA.c_str(), "yes")) == 0 ? TRUE : FALSE;
+				string CACheckClient;
+				strcut(strline.c_str(), "=", NULL, CACheckClient );
+				strtrim(CACheckClient);
+				m_client_cer_check = (strcasecmp(CACheckClient.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
 			else if(strncasecmp(strline.c_str(), "CARootCrt", sizeof("CARootCrt") - 1) == 0)
 			{

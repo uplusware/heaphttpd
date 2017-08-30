@@ -91,6 +91,8 @@ public:
 	const char* GetResource() { return m_resource.c_str(); }
 	const char* GetUserName() { return m_username.c_str(); }
 	const char* GetPassword() { return m_password.c_str(); }
+    
+    BOOL GetClientCertCommonName(vector<string>& common_names);
 	
 	formdata* GetFormData() { return m_formdata; }
 

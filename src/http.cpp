@@ -889,3 +889,47 @@ BOOL CHttp::IsHttp2()
 {
     return m_http2 ? TRUE : FALSE;
 }
+
+BOOL CHttp::GetClientCertCommonName(vector<string>& common_names)
+{
+    if(m_ssl)
+    {
+        X509* client_cert;
+        client_cert = SSL_get_peer_certificate(m_ssl);
+        if (client_cert != NULL)
+        {
+            X509_NAME * owner = X509_get_subject_name(client_cert);
+            const char * owner_buf = X509_NAME_oneline(owner, 0, 0);
+            
+            const char* commonName;
+            
+            int lastpos = -1;
+            X509_NAME_ENTRY *e;
+            for (;;)
+            {
+                lastpos = X509_NAME_get_index_by_NID(owner, NID_commonName, lastpos);
+                if (lastpos == -1)
+                    break;
+                e = X509_NAME_get_entry(owner, lastpos);
+                if(!e)
+                    break;
+                ASN1_STRING *d = X509_NAME_ENTRY_get_data(e);
+                char *commonName = (char*)ASN1_STRING_data(d);
+                if(commonName)
+                    common_names.push_back(commonName);
+            }
+
+            X509_free (client_cert);
+            
+            return TRUE;
+        }
+        else
+        {
+            return FALSE;
+        }
+    }
+    else
+    {
+        return FALSE;
+    }
+}

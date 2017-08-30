@@ -781,7 +781,7 @@ void __inline__ strtoupper(char* str)
 		str[x] = toupper(str[x]);
 }
 
-BOOL __inline__ strlike(const char* aPattern, const char* aSource)
+BOOL __inline__ strmatch(const char* aPattern, const char* aSource)
 {
 	char* StringPtr, *PatternPtr;
 	char* StringRes, *PatternRes;
