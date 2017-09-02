@@ -357,20 +357,6 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
 		len = SSL_read(ssl, buf + nRecv, buf_len - nRecv);
 		if(len == 0)
         {
-            ret = SSL_get_error(ssl, len);
-            if(ret == SSL_ERROR_ZERO_RETURN)
-            {
-                printf("SSL_read: shutdown by the peer\n");
-            }
-            else if(ret == SSL_ERROR_SYSCALL)
-            {
-                if(ERR_get_error() == 0)
-                {
-                    printf("SSL_read: shutdown by the peer\n");
-                }
-                else
-                    printf("SSL_read: %s\n", ERR_error_string(ERR_get_error(),NULL));
-            }
             close(sockfd);
             return -1;
         }
@@ -383,19 +369,6 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
             }
             else
             {
-                if(ret == SSL_ERROR_ZERO_RETURN)
-                {
-                    printf("SSL_read: shutdown by the peer\n");
-                }
-                else if(ret == SSL_ERROR_SYSCALL)
-                {
-                    if(ERR_get_error() == 0)
-                    {
-                        printf("SSL_read: shutdown by the peer\n");
-                    }
-                    else
-                        printf("SSL_read: %s\n", ERR_error_string(ERR_get_error(),NULL));
-                }
                 close(sockfd);
                 return -1;
             }
@@ -422,22 +395,6 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
         len = SSL_read(ssl, buf + nRecv, buf_len - nRecv);
         if(len == 0)
         {
-            ret = SSL_get_error(ssl, len);
-            if(ret == SSL_ERROR_ZERO_RETURN)
-            {
-                printf("SSL_read: shutdown by the peer %d\n", ret);
-            }
-            else if(ret == SSL_ERROR_SYSCALL)
-            {
-                if(ERR_get_error() == 0)
-                {
-                    printf("SSL_read: shutdown by the peer %d\n", ret);
-                }
-                else
-                {
-                    printf("SSL_read: SSL_ERROR_SYSCALL, %d, %s\n", ret, ERR_error_string(ERR_get_error(), NULL));
-                }
-            }
             close(sockfd);
             return -1;
         }
@@ -505,20 +462,6 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
 		len = SSL_write(ssl, buf + nSend, buf_len - nSend);
 		if(len == 0)
         {
-            ret = SSL_get_error(ssl, len);
-            if(ret == SSL_ERROR_ZERO_RETURN)
-            {
-                printf("SSL_write: shutdown by the peer\n");
-            }
-            else if(ret == SSL_ERROR_SYSCALL)
-            {
-                if(ERR_get_error() == 0)
-                {
-                    printf("SSL_write: shutdown by the peer\n");
-                }
-                else
-                    printf("SSL_write: %s\n", ERR_error_string(ERR_get_error(),NULL));
-            }
             close(sockfd);
             return -1;
         }
@@ -531,19 +474,6 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
             }
             else
             {
-                if(ret == SSL_ERROR_ZERO_RETURN)
-                {
-                    printf("SSL_write: shutdown by the peer\n");
-                }
-                else if(ret == SSL_ERROR_SYSCALL)
-                {
-                    if(ERR_get_error() == 0)
-                    {
-                        printf("SSL_write: shutdown by the peer\n");
-                    }
-                    else
-                        printf("SSL_write: %s\n", ERR_error_string(ERR_get_error(),NULL));
-                }
                 close(sockfd);
                 return -1;
             }
@@ -570,20 +500,6 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
         int len = SSL_write(ssl, buf + nSend, buf_len - nSend);
         if(len == 0)
         {
-            ret = SSL_get_error(ssl, len);
-            if(ret == SSL_ERROR_ZERO_RETURN)
-            {
-                printf("SSL_write: shutdown by the peer\n");
-            }
-            else if(ret == SSL_ERROR_SYSCALL)
-            {
-                if(ERR_get_error() == 0)
-                {
-                    printf("SSL_write: shutdown by the peer\n");
-                }
-                else
-                    printf("SSL_write: %s\n", ERR_error_string(ERR_get_error(),NULL));
-            }
             close(sockfd);
             return -1;
         }

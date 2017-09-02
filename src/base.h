@@ -349,20 +349,6 @@ public:
             len = SSL_read(sslhd, pbuf + nRecv, blen - nRecv);
             if(len == 0)
             {
-                ret = SSL_get_error(sslhd, len);
-                if(ret == SSL_ERROR_ZERO_RETURN)
-                {
-                    printf("SSL_read: shutdown by the peer\n");
-                }
-                else if(ret == SSL_ERROR_SYSCALL)
-                {
-                    if(ERR_get_error() == 0)
-                    {
-                        printf("SSL_read: shutdown by the peer\n");
-                    }
-                    else
-                        printf("SSL_read: %s\n", ERR_error_string(ERR_get_error(),NULL));
-                }
                 close(sockfd);
                 return -1;
             }
@@ -391,19 +377,6 @@ public:
                 }
                 else
                 {
-                    if(ret == SSL_ERROR_ZERO_RETURN)
-                    {
-                        printf("SSL_read: shutdown by the peer\n");
-                    }
-                    else if(ret == SSL_ERROR_SYSCALL)
-                    {
-                        if(ERR_get_error() == 0)
-                        {
-                            printf("SSL_read: shutdown by the peer\n");
-                        }
-                        else
-                            printf("SSL_read: %s\n", ERR_error_string(ERR_get_error(),NULL));
-                    }
                     close(sockfd);
                     return -1;
                 }
