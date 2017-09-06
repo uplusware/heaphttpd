@@ -29,7 +29,7 @@
 
 const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" };
 
-CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
 	const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, const char* php_mode, 
     cgi_socket_t fpm_socktype, const char* fpm_sockfile,
@@ -79,7 +79,9 @@ CHttp::CHttp(ServiceObjMap * srvobj, int sockfd, const char* servername, unsigne
 	m_postdata = "";
 	m_http_method = hmGet;
 
-
+    m_http_tunneling_connection = HTTP_Tunneling_None;
+    m_http_tunneling = tunneling;
+    
     m_work_path = work_path;
 	m_php_mode = php_mode;
     m_fpm_socktype = fpm_socktype;
@@ -317,30 +319,104 @@ int CHttp::SendContent(const char* buf, int len)
     else
         return HttpSend(buf, len);
 }
-void CHttp::ParseMethod(const string & strtext)
+void CHttp::ParseMethod(string & strtext)
 {
     int buf_len = strtext.length();
-    char* sz_resource = (char*)malloc(buf_len + 1);
-    char* sz_querystring = (char*)malloc(buf_len + 1);
-    memset(sz_resource, 0, buf_len + 1);
-    memset(sz_querystring, 0, buf_len + 1);
     
-    sscanf(strtext.c_str(), "%*[^/]%[^? \t\r\n]?%[^ \t\r\n]", sz_resource, sz_querystring);
+    char* sz_method = (char*)malloc(buf_len + 1);
+    memset(sz_method, 0, buf_len + 1);
     
-	m_resource = sz_resource;
-	m_querystring = sz_querystring;
-	free(sz_resource);
-	free(sz_querystring);
-	
-	m_uri = m_resource;
-	if(m_querystring != "")
-	{
-    	m_uri += "?";
-    	m_uri += m_querystring;
-	}
-	
-	m_cgi.SetMeta("REQUEST_URI", m_uri.c_str());
-	m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
+    sscanf(strtext.c_str(), "%[A-Z \t]", sz_method);
+    
+    if(strncasecmp(sz_method, "CONNECT ", 8) == 0)
+    {
+        m_http_tunneling_connection = HTTP_Tunneling_With_CONNECT;
+        
+        const char* p_temp = strtext.c_str() + strlen(sz_method);
+        
+        char* sz_host = (char*)malloc(buf_len + 1);
+        
+        memset(sz_host, 0, buf_len + 1);
+        sscanf(p_temp, "%[^ ]", sz_host);        
+        
+        m_http_tunneling_backend_port = 443;
+        
+        char* p = strstr(sz_host, ":");
+        if(p)
+        {
+            *p = '\0';
+            m_http_tunneling_backend_address = sz_host;
+            m_http_tunneling_backend_port = atoi(p + 1);
+        }
+        else
+        {
+            m_http_tunneling_backend_address = sz_host;
+        }
+        
+        free(sz_host);
+            
+    }
+    else
+    {
+        const char* p_temp = strtext.c_str() + strlen(sz_method);
+        if(strncasecmp(p_temp, "http://", 7) == 0)
+        {
+            m_http_tunneling_connection = HTTP_Tunneling_Without_CONNECT;
+            
+            char* sz_host = (char*)malloc(buf_len + 1);
+            char* sz_relatived = (char*)malloc(buf_len + 1);
+            memset(sz_host, 0, buf_len + 1);
+            memset(sz_relatived, 0, buf_len + 1);
+            
+            sscanf(p_temp + 7, "%[^/]", sz_host);
+            
+            strcpy(sz_relatived, p_temp + 7 + strlen(sz_host));
+            
+            m_http_tunneling_backend_port = 80;
+            
+            char* p = strstr(sz_host, ":");
+            if(p)
+            {
+                *p = '\0';
+                m_http_tunneling_backend_address = sz_host;
+                m_http_tunneling_backend_port = atoi(p + 1);
+            }
+            else
+            {
+                m_http_tunneling_backend_address = sz_host;
+            }
+            strtext = sz_method;
+            strtext += sz_relatived;
+            
+            free(sz_relatived);
+            free(sz_host);
+        }
+        else
+        {
+            char* sz_resource = (char*)malloc(buf_len + 1);
+            char* sz_querystring = (char*)malloc(buf_len + 1);
+            memset(sz_resource, 0, buf_len + 1);
+            memset(sz_querystring, 0, buf_len + 1);
+            
+            sscanf(strtext.c_str(), "%*[^/]%[^? \t\r\n]?%[^ \t\r\n]", sz_resource, sz_querystring);
+            
+            m_resource = sz_resource;
+            m_querystring = sz_querystring;
+            free(sz_resource);
+            free(sz_querystring);
+            
+            m_uri = m_resource;
+            if(m_querystring != "")
+            {
+                m_uri += "?";
+                m_uri += m_querystring;
+            }
+            
+            m_cgi.SetMeta("REQUEST_URI", m_uri.c_str());
+            m_cgi.SetMeta("QUERY_STRING", m_querystring.c_str());
+        }
+    }
+    free(sz_method);
 }
 
 void CHttp::PushPostData(const char* buf, int len)
@@ -441,6 +517,48 @@ void CHttp::RecvPostData()
             }
         }
     }	   
+}
+
+void CHttp::Tunneling()
+{
+    if(!m_http2) //only available in http/1.1
+    {
+        if(!m_http_tunneling)
+            m_http_tunneling = new http_tunneling(m_sockfd, m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_connection);
+        if(m_http_tunneling->connect_backend()) //connected
+        {
+            if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
+            {
+                const char* connect_resp = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: Heaphttpd Web Server/1.0\r\n\r\n";
+                HttpSend(connect_resp, strlen(connect_resp));
+                
+                m_http_tunneling->relay_processing();
+            }
+            else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT)
+            {
+                const char* pRequestHeader = m_header_content.c_str();
+                int nRequestHeaderLen = m_header_content.length();
+                
+                const char* pRequestData = NULL;
+                int nRequestDataLen = 0;
+                if(m_content_type == multipart_form_data && m_postdata_ex)
+                {
+                    pRequestData = m_postdata_ex->c_buffer();
+                    nRequestDataLen = m_postdata_ex->length();
+                }
+                else
+                {
+                    pRequestData = m_postdata.c_str();
+                    nRequestDataLen = m_postdata.length();
+                }
+                
+                if(m_http_tunneling->send_request(pRequestHeader, nRequestHeaderLen, pRequestData, nRequestDataLen))
+                {
+                    m_http_tunneling->recv_relay_reply();
+                }
+            }
+        }
+    }
 }
 
 void CHttp::Response()
@@ -551,7 +669,7 @@ Http_Connection CHttp::LineParse(const char* text)
         m_line_text = m_line_text.substr(new_line + 1);
 
         strtrim(strtext);
-        // printf("<<<< %s\r\n", strtext.c_str());
+        //printf("<<<< %s\r\n", strtext.c_str());
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)
         {
@@ -572,6 +690,9 @@ Http_Connection CHttp::LineParse(const char* text)
             m_http_method = hmGet;
             m_request_hdr.SetMethod(m_http_method);
             ParseMethod(strtext);
+            //store the header content
+            m_header_content += strtext;
+            m_header_content += "\r\n";
         }
         else if(strncasecmp(strtext.c_str(), "POST ", 5) == 0)
         {
@@ -581,6 +702,9 @@ Http_Connection CHttp::LineParse(const char* text)
             m_request_hdr.SetMethod(m_http_method);
 
             ParseMethod(strtext);
+            //store the header content
+            m_header_content += strtext;
+            m_header_content += "\r\n";
         }
         else if(strncasecmp(strtext.c_str(), "PUT ", 4) == 0)
         {
@@ -590,6 +714,9 @@ Http_Connection CHttp::LineParse(const char* text)
             m_request_hdr.SetMethod(m_http_method);
 
             ParseMethod(strtext);
+            //store the header content
+            m_header_content += strtext;
+            m_header_content += "\r\n";
         }
         else if(strncasecmp(strtext.c_str(), "HEAD ", 5) == 0)
         {
@@ -599,6 +726,9 @@ Http_Connection CHttp::LineParse(const char* text)
             m_request_hdr.SetMethod(m_http_method);
 
             ParseMethod(strtext);
+            //store the header content
+            m_header_content += strtext;
+            m_header_content += "\r\n";
         }
         else if(strncasecmp(strtext.c_str(), "DELETE ", 7) == 0)
         {
@@ -608,6 +738,9 @@ Http_Connection CHttp::LineParse(const char* text)
             m_request_hdr.SetMethod(m_http_method);
 
             ParseMethod(strtext);
+            //store the header content
+            m_header_content += strtext;
+            m_header_content += "\r\n";
         }
         else if(strncasecmp(strtext.c_str(), "OPTIONS ", 8) == 0)
         {
@@ -617,6 +750,9 @@ Http_Connection CHttp::LineParse(const char* text)
             m_request_hdr.SetMethod(m_http_method);
 
             ParseMethod(strtext);
+            //store the header content
+            m_header_content += strtext;
+            m_header_content += "\r\n";
         }
         else if(strncasecmp(strtext.c_str(), "TRACE ", 6) == 0)
         {
@@ -626,6 +762,9 @@ Http_Connection CHttp::LineParse(const char* text)
             m_request_hdr.SetMethod(m_http_method);
 
             ParseMethod(strtext);
+            //store the header content
+            m_header_content += strtext;
+            m_header_content += "\r\n";
         }
         else if(strncasecmp(strtext.c_str(), "CONNECT ", 8) == 0)
         {
@@ -635,20 +774,72 @@ Http_Connection CHttp::LineParse(const char* text)
             m_request_hdr.SetMethod(m_http_method);
 
             ParseMethod(strtext);
+            //store the header content
+            m_header_content += strtext;
+            m_header_content += "\r\n";
         }
         else if(strcasecmp(strtext.c_str(), "") == 0) /* if true, then http request header finished. */
         {
+            //store the header content
+            m_header_content += "\r\n";
             if(m_http_method == hmPost)
             {
                 RecvPostData();
             }
             
-            Response();
+            if(m_http_tunneling_connection == HTTP_Tunneling_None)
+            {
+                if(m_http_method == hmPut || m_http_method == hmDelete)
+                {
+                    CHttpResponseHdr header;
+                    header.SetStatusCode(SC405);
+
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    SendHeader(header.Text(), header.Length());
+                    SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                }
+                else
+                {
+                    Response();
+                }
+            }
+            else
+            {
+                if(!CHttpBase::m_enable_http_tunneling && m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT)
+                {
+                    CHttpResponseHdr header;
+                    header.SetStatusCode(SC404);
+
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    SendHeader(header.Text(), header.Length());
+                    SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                }
+                else if(!CHttpBase::m_enable_http_tunneling && m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
+                {
+                    CHttpResponseHdr header;
+                    header.SetStatusCode(SC405);
+
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    SendHeader(header.Text(), header.Length());
+                    SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                }
+                else
+                {
+                    Tunneling();
+                }
+            }
             
             return (m_keep_alive && m_enabled_keep_alive) ? httpKeepAlive : httpClose;
         }
         else
         {
+            //store the header content
+            m_header_content += strtext;
+            m_header_content += "\r\n";
+            
             /* Protocol-Specific Meta-Variables for CGI */
             string strSpecVarName, strSpecVarValue;
             strcut(strtext.c_str(), NULL, ":", strSpecVarName);

@@ -16,6 +16,7 @@
 #include "cache.h"
 #include "serviceobjmap.h"
 #include "util/trace.h"
+#include "tunneling.h"
 
 typedef enum
 {
@@ -32,6 +33,7 @@ protected:
 	BOOL m_http2;
     ServiceObjMap * m_srvobj;
     X509* m_client_cert;
+    http_tunneling* m_http_tunneling;
 public:
 	Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, BOOL https, BOOL http2, memory_cache* ch);
 	virtual ~Session();

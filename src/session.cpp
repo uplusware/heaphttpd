@@ -16,11 +16,14 @@ Session::Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* client
 	m_http2 = http2;
 	m_client_cert = client_cert;
 	m_cache = ch;
+    m_http_tunneling = NULL;
 }
 
 Session::~Session()
 {
-
+    if(m_http_tunneling)
+        delete m_http_tunneling;
+    m_http_tunneling = NULL;
 }
 
 void Session::Process()
@@ -45,7 +48,7 @@ void Session::Process()
         {
             if(!m_https)
             {
-                pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
+                pProtocol = new CHttp(m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
                     m_clientip.c_str(), m_client_cert, m_cache,
 					CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(),
                     CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
@@ -67,7 +70,7 @@ void Session::Process()
                 }
                 else
                 {
-                    pProtocol = new CHttp(m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
+                    pProtocol = new CHttp(m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
                         m_clientip.c_str(), m_client_cert, m_cache,
                         CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, CHttpBase::m_php_mode.c_str(), 
                         CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
@@ -96,6 +99,7 @@ void Session::Process()
         }
         else
         {
+            m_http_tunneling  = pProtocol->GetHttpTunneling();
             httpConn = pProtocol->Processing();
         }
         delete pProtocol;

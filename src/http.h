@@ -13,6 +13,7 @@
 #include "wwwauth.h"
 #include "serviceobjmap.h"
 #include "extension.h"
+#include "tunneling.h"
 
 enum WebSocket_HandShake
 {
@@ -39,6 +40,7 @@ public:
     virtual Http_Connection Processing() = 0;
     virtual int HttpSend(const char* buf, int len) = 0;
     virtual int HttpRecv(char* buf, int len) = 0;
+    virtual http_tunneling* GetHttpTunneling() = 0;
 };
 
 #include "http2.h"
@@ -47,7 +49,7 @@ class CHttp : public IHttp
 {
 public:
     friend class CHttp2;
-	CHttp(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	CHttp(http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -68,6 +70,7 @@ public:
     void PushPostData(const char* buf, int len);
     void RecvPostData();
     void Response();
+    void Tunneling();
     
     void SetCookie(const char* szName, const char* szValue,
         int nMaxAge = -1, const char* szExpires = NULL,
@@ -100,7 +103,9 @@ public:
 	{ 
 		m_resource = resource;
 	}
-
+    
+    virtual http_tunneling* GetHttpTunneling() { return m_http_tunneling; }
+    
 	memory_cache* m_cache;
 
 	string m_servername;
@@ -150,7 +155,7 @@ public:
     void Http2PushPromise(const char * path);
     BOOL IsHttp2();
 private:
-    void ParseMethod(const string & strtext);
+    void ParseMethod(string & strtext);
 protected:
 	SSL* m_ssl;
 	CHttp2 * m_http2;
@@ -211,6 +216,15 @@ protected:
     ServiceObjMap* m_srvobj;
     
     map<string, string> m_set_cookies;
+    
+    string m_header_content;
+    
+    HTTPTunneling m_http_tunneling_connection;
+    
+    string m_http_tunneling_backend_address;
+    unsigned short m_http_tunneling_backend_port;
+    
+    http_tunneling* m_http_tunneling;
 };
 
 #endif /* _HTTP_H_ */

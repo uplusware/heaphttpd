@@ -26,10 +26,12 @@ vector<http_extension_t> CHttpBase::m_ext_list;
 string CHttpBase::m_localhostname = "localhost";
 string CHttpBase::m_hostip = "";
 
-BOOL	CHttpBase::m_enablehttp = TRUE;
+BOOL   CHttpBase::m_enable_http_tunneling = FALSE;
+
+BOOL   CHttpBase::m_enablehttp = TRUE;
 unsigned short	CHttpBase::m_httpport = 5080;
 
-BOOL	CHttpBase::m_enablehttps = TRUE;
+BOOL   CHttpBase::m_enablehttps = TRUE;
 unsigned short	CHttpBase::m_httpsport = 5081;
 
 string   CHttpBase::m_https_cipher = "ALL";
@@ -214,7 +216,14 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, m_instance_balance_scheme );
 				strtrim(m_instance_balance_scheme);
 			}
-			else if(strncasecmp(strline.c_str(), "HTTPEnable", sizeof("HTTPEnable") - 1) == 0)
+			else if(strncasecmp(strline.c_str(), "HTTPTunnelingEnable", sizeof("HTTPTunnelingEnable") - 1) == 0)
+			{
+				string HTTPTunnelingEnable;
+				strcut(strline.c_str(), "=", NULL, HTTPTunnelingEnable );
+				strtrim(HTTPTunnelingEnable);
+				m_enable_http_tunneling = (strcasecmp(HTTPTunnelingEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
+			}
+            else if(strncasecmp(strline.c_str(), "HTTPEnable", sizeof("HTTPEnable") - 1) == 0)
 			{
 				string HTTPEnable;
 				strcut(strline.c_str(), "=", NULL, HTTPEnable );

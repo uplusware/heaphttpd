@@ -43,7 +43,7 @@ http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_3
     
     m_http2 = phttp2;
     
-    m_http1 = new CHttp(m_srvobj,
+    m_http1 = new CHttp(NULL, m_srvobj,
                             m_sockfd,
                             m_servername.c_str(),
                             m_serverport,

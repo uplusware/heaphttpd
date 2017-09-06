@@ -118,6 +118,8 @@ public:
     virtual int HttpSend(const char* buf, int len);
     virtual int HttpRecv(char* buf, int len);
     
+    virtual http_tunneling* GetHttpTunneling() { return NULL; }
+    
     void PushPromise(uint_32 stream_ind, const char * path);
     
     void TransHttp2ParseHttp1Header(uint_32 stream_ind, hpack* hdr);
