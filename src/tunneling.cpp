@@ -111,7 +111,7 @@ bool http_tunneling::connect_backend()
         fd_set mask_r, mask_w; 
         struct timeval timeout; 
     
-        timeout.tv_sec = 10; 
+        timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
 	    timeout.tv_usec = 0;
         
         int s = connect(m_backend_sockfd, rp->ai_addr, rp->ai_addrlen);
@@ -168,72 +168,44 @@ bool http_tunneling::recv_relay_reply()
 {
     if(m_type == HTTP_Tunneling_Without_CONNECT)
     {
-        int header_length = -1;
-        int content_length = -1;
+        int http_header_length = -1;
+        int http_content_length = -1;
             
-        http_client the_client;
+        http_client the_client(m_client_sockfd);
         string str_header;
-        int recv_len = 0;
-        char recv_buf[4096];
-        int res;
-        fd_set mask; 
+        int received_len = 0;
+        char response_buf[4096];
+        int next_recv_len = 4095;
+        fd_set mask_r; 
         struct timeval timeout; 
-        FD_ZERO(&mask);
+        FD_ZERO(&mask_r);
         while(1)
         {
             timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
             timeout.tv_usec = 0;
 
-            FD_SET(m_backend_sockfd, &mask);
-            res = select(m_backend_sockfd + 1, &mask, NULL, NULL, &timeout);
-            if( res <= 0)
+            FD_SET(m_backend_sockfd, &mask_r);
+            int ros = select(m_backend_sockfd + 1, &mask_r, NULL, NULL, &timeout);
+            if( ros <= 0)
+            {
                 break; // quit from the loop since error or timeout
+            }
             
-            int len = recv(m_backend_sockfd, recv_buf, 4095, 0);
-            
+            int len = recv(m_backend_sockfd, response_buf, 4095 /*next_recv_len > 4095 ? 4095 : next_recv_len*/, 0);
             if(len == 0)
             {
-                close(m_backend_sockfd);
                 return false; 
             }
             else if(len < 0)
             {
                 if( errno == EAGAIN)
                     continue;
-                close(m_backend_sockfd);
                 return false;
             }
-            recv_buf[len] = '\0';
-            if(_Send_(m_client_sockfd, recv_buf, len) < 0)
-            {
-                break;
-            }
+            response_buf[len] = '\0';
             
-            recv_len += len;
-            if(header_length == -1)
-            {
-                recv_buf[len] = '\0';
-                str_header += recv_buf;
-                
-                if(str_header.length() >= 1024*64)
-                {
-                    close(m_backend_sockfd);
-                    break;
-                }
-                
-                char* p = strstr((char*)str_header.c_str(), "\r\n\r\n");
-                if(p != NULL)
-                {
-                    the_client.parse(str_header.c_str());
-                    
-                    header_length = p - str_header.c_str() + 4;
-                    content_length = the_client.get_content_length();
-                }
-            }
-            if(header_length != -1 && content_length != -1 && recv_len >= header_length + content_length)
-            {
+            if(!the_client.processing(response_buf, len, next_recv_len))
                 break;
-            }
         }
     }
     return true;
@@ -242,26 +214,24 @@ bool http_tunneling::recv_relay_reply()
 void http_tunneling::relay_processing()
 {
     char recv_buf[4096];
-    int len;
-    int res;
-    fd_set mask; 
+    fd_set mask_r; 
     struct timeval timeout; 
-    FD_ZERO(&mask);
+    FD_ZERO(&mask_r);
     while(m_type == HTTP_Tunneling_With_CONNECT)
     {
         timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
         timeout.tv_usec = 0;
 
-        FD_SET(m_backend_sockfd, &mask);
-        FD_SET(m_client_sockfd, &mask);
-        res = select(m_backend_sockfd > m_client_sockfd ? m_backend_sockfd + 1 : m_backend_sockfd + 1,
-            &mask, NULL, NULL, &timeout);
-        if(res > 0)
+        FD_SET(m_backend_sockfd, &mask_r);
+        FD_SET(m_client_sockfd, &mask_r);
+        int ros = select(m_backend_sockfd > m_client_sockfd ? m_backend_sockfd + 1 : m_backend_sockfd + 1,
+            &mask_r, NULL, NULL, &timeout);
+        if(ros > 0)
         {
-            if(FD_ISSET(m_client_sockfd, &mask))
+            if(FD_ISSET(m_client_sockfd, &mask_r))
             {
                 //recv from the client
-                len = recv(m_client_sockfd, recv_buf, 4095, 0);//SSL_read(m_client_ssl, recv_buf, 4095);
+                int len = recv(m_client_sockfd, recv_buf, 4095, 0);//SSL_read(m_client_ssl, recv_buf, 4095);
                 if(len == 0)
                 {
                     break;
@@ -280,10 +250,10 @@ void http_tunneling::relay_processing()
                         break;
                 }
             }
-            if(FD_ISSET(m_backend_sockfd,&mask))
+            if(FD_ISSET(m_backend_sockfd,&mask_r))
             {
                 //recv from the backend
-                len = recv(m_backend_sockfd, recv_buf, 4095, 0);//SSL_read(m_backend_ssl, recv_buf, 4095);
+                int len = recv(m_backend_sockfd, recv_buf, 4095, 0);//SSL_read(m_backend_ssl, recv_buf, 4095);
                 if(len == 0)
                 {
                     break;
@@ -303,7 +273,7 @@ void http_tunneling::relay_processing()
                 }
             }
         }
-        else if(res < 0)
+        else if(ros < 0)
         {
             break;
         }
