@@ -25,7 +25,7 @@ http_chunk::~http_chunk()
         free(m_buf);
 }
 
-void http_chunk::parse(const char* text)
+bool http_chunk::parse(const char* text)
 {
     string strtext;
     m_line_text += text;
@@ -37,7 +37,12 @@ void http_chunk::parse(const char* text)
 
         strtrim(strtext);
         m_chunk_len = atoi(strtext.c_str());
+		if(m_chunk_len < 0)
+			return false;
+		m_chunk_len += 2; /* \r\n */
     }
+	
+	return true;
 }
 
 bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
@@ -72,8 +77,9 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
                     if(m_buf_used_len > 64)
                         return false;
                     
-                    parse(m_buf);
-                    
+                    if(!parse(m_buf))
+						return false;
+					
                     if(_Send_(m_sockfd, m_buf, x + 2) < 0)
                         return false;
                     
@@ -82,13 +88,11 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
                     
                     m_state = HTTP_Client_Parse_State_Chunk_Content;
                     
-                    if(m_buf_used_len > 0)
+                    if(m_buf_used_len > 0) /* begin to send chunk data */
                     {
-                        
                         if(_Send_(m_sockfd, m_buf, m_buf_used_len) < 0)
                             return false;
                         m_sent_chunk += m_buf_used_len;
-                        
                         m_buf_used_len = 0;
                         
                         if(m_sent_chunk == m_chunk_len)
@@ -102,7 +106,7 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
                     {
                         return false;
                     }
-                    next_recv_len = m_chunk_len;
+                    next_recv_len = m_chunk_len - m_sent_chunk;
                     found_endle = true;
                     break;
                 }
@@ -201,7 +205,7 @@ http_client::~http_client()
         delete m_chunk;
 }
 
-void http_client::parse(const char* text)
+bool http_client::parse(const char* text)
 {
     string strtext;
     m_line_text += text;
@@ -238,6 +242,8 @@ void http_client::parse(const char* text)
             m_content_length = atoi(strLen.c_str());
             if(m_content_length >= 0)
                 m_has_content_length = true;
+			else
+				return false;
         }
         else if(strncasecmp(strtext.c_str(), "Transfer-Encoding", 17) == 0)
         {
@@ -250,6 +256,8 @@ void http_client::parse(const char* text)
             }
         }
     }
+	
+	return true;
 }
 
 bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
@@ -284,7 +292,8 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                     if(m_buf_used_len > 64*1024)
                         return false;
                     
-                    parse(m_buf);
+                    if(!parse(m_buf))
+						return false;
                     
                     if(_Send_(m_sockfd, m_buf, x + 4) < 0)
                         return false;
@@ -319,15 +328,13 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                             {
                                 return false;
                             }
-                            
                         }
-            
             
                         if(has_content_length() && 0 == m_content_length)
                         {
                             return false;
                         }
-                        next_recv_len = m_content_length;
+                        next_recv_len = m_content_length - m_sent_content;
                         
                     }
                     found_endle = true;

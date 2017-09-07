@@ -34,7 +34,7 @@ class http_chunk
 public:
     http_chunk(int sockfd);
     virtual ~http_chunk();
-    void parse(const char* text);
+    bool parse(const char* text);
     bool processing(const char* buf, int buf_len, int& next_recv_len);
 
 protected:
@@ -57,7 +57,7 @@ public:
     http_client(int sockfd);
     virtual ~http_client();
     
-    void parse(const char* text);
+    bool parse(const char* text);
     
     bool processing(const char* buf, int buf_len, int& next_recv_len);
     

@@ -46,6 +46,7 @@ static void daemon_init()
 	setsid();
 	chdir("/");
 	umask(0);
+	
 	close(STDIN_FILENO);
 	close(STDOUT_FILENO);
     if(CHttpBase::m_close_stderr)

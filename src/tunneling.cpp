@@ -194,12 +194,14 @@ bool http_tunneling::recv_relay_reply()
             int len = recv(m_backend_sockfd, response_buf, 4095 /*next_recv_len > 4095 ? 4095 : next_recv_len*/, 0);
             if(len == 0)
             {
+				close(m_client_sockfd);
                 return false; 
             }
             else if(len < 0)
             {
                 if( errno == EAGAIN)
                     continue;
+				close(m_client_sockfd);
                 return false;
             }
             response_buf[len] = '\0';
@@ -224,6 +226,7 @@ void http_tunneling::relay_processing()
 
         FD_SET(m_backend_sockfd, &mask_r);
         FD_SET(m_client_sockfd, &mask_r);
+		
         int ros = select(m_backend_sockfd > m_client_sockfd ? m_backend_sockfd + 1 : m_backend_sockfd + 1,
             &mask_r, NULL, NULL, &timeout);
         if(ros > 0)
@@ -234,12 +237,14 @@ void http_tunneling::relay_processing()
                 int len = recv(m_client_sockfd, recv_buf, 4095, 0);//SSL_read(m_client_ssl, recv_buf, 4095);
                 if(len == 0)
                 {
+					close(m_backend_sockfd);
                     break;
                 }
                 else if(len < 0)
                 {
                     if( errno != EAGAIN)
                     {
+						close(m_backend_sockfd);
                         break;
                     }
                 }
@@ -256,12 +261,14 @@ void http_tunneling::relay_processing()
                 int len = recv(m_backend_sockfd, recv_buf, 4095, 0);//SSL_read(m_backend_ssl, recv_buf, 4095);
                 if(len == 0)
                 {
+					close(m_client_sockfd);
                     break;
                 }
                 else if(len < 0)
                 {
                     if( errno != EAGAIN)
                     {
+						close(m_client_sockfd);
                         break;
                     }
                 }
@@ -275,6 +282,8 @@ void http_tunneling::relay_processing()
         }
         else if(ros < 0)
         {
+			close(m_client_sockfd);
+			close(m_client_sockfd);
             break;
         }
     }
