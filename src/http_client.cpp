@@ -6,9 +6,10 @@
 #include "http_client.h"
 
 //http_chunk
-http_chunk::http_chunk(int sockfd)
+http_chunk::http_chunk(int client_sockfd, int backend_sockfd)
 {
-    m_sockfd = sockfd;
+    m_client_sockfd = client_sockfd;
+    m_backend_sockfd = backend_sockfd;
     m_chunk_len = 0;
     m_sent_chunk = 0;
     m_state = HTTP_Client_Parse_State_Chunk_Header;
@@ -80,7 +81,7 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
                     if(!parse(m_buf))
 						return false;
 					
-                    if(_Send_(m_sockfd, m_buf, x + 2) < 0)
+                    if(_Send_(m_client_sockfd, m_buf, x + 2) < 0)
                         return false;
                     
                     memmove(m_buf, m_buf + x + 2, m_buf_used_len - x - 2);
@@ -90,7 +91,7 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
                     
                     if(m_buf_used_len > 0) /* begin to send chunk data */
                     {
-                        if(_Send_(m_sockfd, m_buf, m_buf_used_len) < 0)
+                        if(_Send_(m_client_sockfd, m_buf, m_buf_used_len) < 0)
                             return false;
                         m_sent_chunk += m_buf_used_len;
                         m_buf_used_len = 0;
@@ -118,7 +119,7 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
         //Send the left data from the last send.
         if(m_buf_used_len > 0)
         {
-            if(_Send_(m_sockfd, m_buf, m_buf_used_len) < 0)
+            if(_Send_(m_client_sockfd, m_buf, m_buf_used_len) < 0)
                 return false;
             m_sent_chunk += m_buf_used_len;
             m_buf_used_len = 0;
@@ -137,7 +138,7 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
             
             int should_send_len = buf_len < expected_send_len ? buf_len : expected_send_len;
             
-            if(_Send_(m_sockfd, buf, should_send_len) < 0)
+            if(_Send_(m_client_sockfd, buf, should_send_len) < 0)
                     return false;
             
             m_sent_chunk += should_send_len;
@@ -177,8 +178,11 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
 
 
 // http_client
-http_client::http_client(int sockfd)
+http_client::http_client(int client_sockfd, int backend_sockfd)
 {
+    m_client_sockfd = client_sockfd;
+    m_backend_sockfd = backend_sockfd;
+    
     m_state = HTTP_Client_Parse_State_Header;
     
     m_content_length = -1;
@@ -192,7 +196,6 @@ http_client::http_client(int sockfd)
     
     m_sent_content = 0;
     
-    m_sockfd = sockfd;
     m_chunk = NULL;
 }
 
@@ -295,8 +298,12 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                     if(!parse(m_buf))
 						return false;
                     
-                    if(_Send_(m_sockfd, m_buf, x + 4) < 0)
+                    if(_Send_(m_client_sockfd, m_buf, x + 4) < 0)
+                    {
+                        close(m_client_sockfd);
+                        close(m_backend_sockfd);
                         return false;
+                    }
                     
                     memmove(m_buf, m_buf + x + 4, m_buf_used_len - x - 4);
                     m_buf_used_len = m_buf_used_len - x - 4;
@@ -309,7 +316,7 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                     if(is_chunked())
                     {
                         if(!m_chunk)
-                            m_chunk = new http_chunk(m_sockfd);
+                            m_chunk = new http_chunk(m_client_sockfd, m_backend_sockfd);
                         if(!m_chunk->processing(m_buf, m_buf_used_len, next_recv_len))
                             return false;
                     }
@@ -318,8 +325,12 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                         if(m_buf_used_len > 0)
                         {
                             
-                            if(_Send_(m_sockfd, m_buf, m_buf_used_len) < 0)
+                            if(_Send_(m_client_sockfd, m_buf, m_buf_used_len) < 0)
+                            {
+                                close(m_client_sockfd);
+                                close(m_backend_sockfd);
                                 return false;
+                            }
                             m_sent_content += m_buf_used_len;
                             
                             m_buf_used_len = 0;
@@ -349,7 +360,7 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
         if(is_chunked())
         {
             if(!m_chunk)
-                m_chunk = new http_chunk(m_sockfd);
+                m_chunk = new http_chunk(m_client_sockfd, m_backend_sockfd);
             m_chunk->processing(buf, buf_len, next_recv_len);
         }
         else
@@ -358,8 +369,12 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
             if(m_buf_used_len > 0)
             {
                 
-                if(_Send_(m_sockfd, m_buf, m_buf_used_len) < 0)
+                if(_Send_(m_client_sockfd, m_buf, m_buf_used_len) < 0)
+                {
+                    close(m_client_sockfd);
+                    close(m_backend_sockfd);
                     return false;
+                }
                 m_sent_content += m_buf_used_len;
                 
                 m_buf_used_len = 0;
@@ -376,8 +391,12 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                 
                 int should_send_len = buf_len < expected_send_len ? buf_len : expected_send_len;
                 
-                if(_Send_(m_sockfd, buf, should_send_len) < 0)
+                if(_Send_(m_client_sockfd, buf, should_send_len) < 0)
+                {
+                    close(m_client_sockfd);
+                    close(m_backend_sockfd);
                     return false;
+                }
                 
                 m_sent_content += should_send_len;
                 

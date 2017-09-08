@@ -26,6 +26,16 @@ enum HTTPTunneling
     HTTP_Tunneling_With_CONNECT
 };
 
+#define BUFFER_DESCR_BUF_LEN (4096*3)
+
+typedef struct
+{
+    char* buf;
+    int buf_len;
+    int r_pos;
+    int w_pos;
+} Buffer_Descr;
+
 class http_tunneling
 {
 public:

@@ -37,9 +37,24 @@ bool http_tunneling::connect_backend()
     hints.ai_family = AF_UNSPEC;
     hints.ai_flags = AI_CANONNAME; 
     
-    if (getaddrinfo(m_address.c_str(), NULL, &hints, &servinfo) != 0)
+    for(;;)
     {
-        return false;
+        int rval = getaddrinfo(m_address.c_str(), NULL, &hints, &servinfo);
+        if (rval != 0)
+        {
+            if(rval == EAI_AGAIN)
+                continue;
+            
+            string strError = m_address;
+            strError += " ";
+            strError += strerror(errno);
+            
+            fprintf(stderr, "%s(line:%d): %s\n", __FILE__, __LINE__, strError.c_str());
+            
+            return false;
+        }
+        else
+            break;
     }
     
     bool found = false;
@@ -85,17 +100,25 @@ bool http_tunneling::connect_backend()
     
     char szPort[32];
     sprintf(szPort, "%u", backhost_port);
-    if (getaddrinfo((backhost_ip && backhost_ip[0] != '\0') ? backhost_ip : NULL, szPort, &hints, &server_addr) != 0)
+    for(;;)
     {
-       
-        string strError = backhost_ip;
-        strError += ":";
-        strError += szPort;
-        strError += " ";
-        strError += strerror(errno);
-        
-        fprintf(stderr, "%s\n", strError.c_str());
-        return false;
+        int rval = getaddrinfo((backhost_ip && backhost_ip[0] != '\0') ? backhost_ip : NULL, szPort, &hints, &server_addr);
+        if (rval != 0)
+        {
+           
+           if(rval == EAI_AGAIN)
+               continue;
+            string strError = backhost_ip;
+            strError += ":";
+            strError += szPort;
+            strError += " ";
+            strError += strerror(errno);
+            
+            fprintf(stderr, "%s(line:%s): %s\n", __FILE__, __LINE__, strError.c_str());
+            return false;
+        }
+        else
+            break;
     }
     
     bool connected = false;
@@ -115,7 +138,7 @@ bool http_tunneling::connect_backend()
 	    timeout.tv_usec = 0;
         
         int s = connect(m_backend_sockfd, rp->ai_addr, rp->ai_addrlen);
-        if(s == 0 || (s == -1 && errno == EINPROGRESS))
+        if(s == 0 || (s < 0 && errno == EINPROGRESS))
         {
             FD_ZERO(&mask_r);
             FD_ZERO(&mask_w);
@@ -146,7 +169,7 @@ bool http_tunneling::connect_backend()
         strError += " ";
         strError += strerror(errno);
         
-        fprintf(stderr, "%s\n", strError.c_str());
+        fprintf(stderr, "%s(line:%d): %s\n", __FILE__, __LINE__, strError.c_str());
         return false;
     }
     return true;
@@ -171,7 +194,7 @@ bool http_tunneling::recv_relay_reply()
         int http_header_length = -1;
         int http_content_length = -1;
             
-        http_client the_client(m_client_sockfd);
+        http_client the_client(m_client_sockfd, m_backend_sockfd);
         string str_header;
         int received_len = 0;
         char response_buf[4096];
@@ -185,8 +208,8 @@ bool http_tunneling::recv_relay_reply()
             timeout.tv_usec = 0;
 
             FD_SET(m_backend_sockfd, &mask_r);
-            int ros = select(m_backend_sockfd + 1, &mask_r, NULL, NULL, &timeout);
-            if( ros <= 0)
+            int ret_val = select(m_backend_sockfd + 1, &mask_r, NULL, NULL, &timeout);
+            if( ret_val <= 0)
             {
                 break; // quit from the loop since error or timeout
             }
@@ -195,6 +218,8 @@ bool http_tunneling::recv_relay_reply()
             if(len == 0)
             {
 				close(m_client_sockfd);
+                close(m_backend_sockfd);
+                m_backend_sockfd = -1;
                 return false; 
             }
             else if(len < 0)
@@ -202,6 +227,8 @@ bool http_tunneling::recv_relay_reply()
                 if( errno == EAGAIN)
                     continue;
 				close(m_client_sockfd);
+                close(m_backend_sockfd);
+                m_backend_sockfd = -1;
                 return false;
             }
             response_buf[len] = '\0';
@@ -215,10 +242,24 @@ bool http_tunneling::recv_relay_reply()
 
 void http_tunneling::relay_processing()
 {
+    Buffer_Descr buf_descr_frm_client, buf_descr_frm_backend;
+    
+    buf_descr_frm_client.buf = (char*)malloc(BUFFER_DESCR_BUF_LEN*2 + 1); //dup for implement ring buffer
+    buf_descr_frm_client.buf_len = BUFFER_DESCR_BUF_LEN;
+    buf_descr_frm_client.r_pos = 0;
+    buf_descr_frm_client.w_pos = 0;
+    
+    buf_descr_frm_backend.buf = (char*)malloc(BUFFER_DESCR_BUF_LEN*2 + 1); //dup for implement ring buffer
+    buf_descr_frm_backend.buf_len = BUFFER_DESCR_BUF_LEN;
+    buf_descr_frm_backend.r_pos = 0;
+    buf_descr_frm_backend.w_pos = 0;
+    
     char recv_buf[4096];
-    fd_set mask_r; 
+    fd_set mask_r, mask_w, mask_e; 
     struct timeval timeout; 
     FD_ZERO(&mask_r);
+    FD_ZERO(&mask_w);
+    FD_ZERO(&mask_e);
     while(m_type == HTTP_Tunneling_With_CONNECT)
     {
         timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
@@ -227,64 +268,188 @@ void http_tunneling::relay_processing()
         FD_SET(m_backend_sockfd, &mask_r);
         FD_SET(m_client_sockfd, &mask_r);
 		
-        int ros = select(m_backend_sockfd > m_client_sockfd ? m_backend_sockfd + 1 : m_backend_sockfd + 1,
-            &mask_r, NULL, NULL, &timeout);
-        if(ros > 0)
+        FD_SET(m_backend_sockfd, &mask_e);
+        FD_SET(m_client_sockfd, &mask_e);
+        
+        int ret_val = select(m_backend_sockfd > m_client_sockfd ? m_backend_sockfd + 1 : m_backend_sockfd + 1,
+            &mask_r, &mask_w, &mask_e, &timeout);
+        if(ret_val > 0)
         {
             if(FD_ISSET(m_client_sockfd, &mask_r))
             {
                 //recv from the client
-                int len = recv(m_client_sockfd, recv_buf, 4095, 0);//SSL_read(m_client_ssl, recv_buf, 4095);
-                if(len == 0)
+                int wanna_recv_len = buf_descr_frm_client.buf_len - (buf_descr_frm_client.w_pos - buf_descr_frm_client.r_pos);
+                
+                if(wanna_recv_len > 0 && wanna_recv_len <= buf_descr_frm_client.buf_len)
                 {
-					close(m_backend_sockfd);
-                    break;
-                }
-                else if(len < 0)
-                {
-                    if( errno != EAGAIN)
+                    int len = recv(m_client_sockfd, buf_descr_frm_client.buf + buf_descr_frm_client.w_pos%buf_descr_frm_client.buf_len, wanna_recv_len, 0);
+                    
+                    if(len > buf_descr_frm_client.buf_len - buf_descr_frm_client.w_pos%buf_descr_frm_client.buf_len) //dup the data
                     {
-						close(m_backend_sockfd);
+                        memcpy(buf_descr_frm_client.buf, buf_descr_frm_client.buf + buf_descr_frm_client.buf_len,
+                            len - (buf_descr_frm_client.buf_len - buf_descr_frm_client.w_pos%buf_descr_frm_client.buf_len));
+                    }
+                    
+                    if(len == 0)
+                    {
+                        close(m_client_sockfd);
+                        close(m_backend_sockfd);
+                        m_backend_sockfd = -1;
                         break;
                     }
-                }
-                else if(len > 0)
-                {
-                    recv_buf[len] = '\0';
-                    if(_Send_(m_backend_sockfd, recv_buf, len) < 0)
-                        break;
+                    else if(len < 0)
+                    {
+                        if( errno != EAGAIN)
+                        {
+                            close(m_client_sockfd);
+                            close(m_backend_sockfd);
+                            m_backend_sockfd = -1;
+                            break;
+                        }
+                    }
+                    else if(len > 0)
+                    {
+                        buf_descr_frm_client.w_pos += len;
+                        FD_SET(m_backend_sockfd, &mask_w);
+                    }
                 }
             }
+            
+            //send
+            if(FD_ISSET(m_backend_sockfd, &mask_w))
+            {
+                int wanna_send_len = buf_descr_frm_client.w_pos - buf_descr_frm_client.r_pos;
+                
+                if(wanna_send_len > 0 && wanna_send_len <= buf_descr_frm_client.buf_len)
+                {
+                    int len = send(m_backend_sockfd, buf_descr_frm_client.buf + buf_descr_frm_client.r_pos%buf_descr_frm_client.buf_len, wanna_send_len, 0);
+                    
+                    if(len == 0)
+                    {
+                        close(m_client_sockfd);
+                        close(m_backend_sockfd);
+                        m_backend_sockfd = -1;
+                        break;
+                    }
+                    else if(len < 0)
+                    {
+                        if( errno != EAGAIN)
+                        {
+                            close(m_client_sockfd);
+                            close(m_backend_sockfd);
+                            m_backend_sockfd = -1;
+                            break;
+                        }
+                    }
+                    else if(len > 0)
+                    {
+                        buf_descr_frm_client.r_pos += len;
+                        if(buf_descr_frm_client.r_pos == buf_descr_frm_client.w_pos)
+                            FD_CLR(m_backend_sockfd, &mask_w);
+                    }
+                }
+            }
+            
             if(FD_ISSET(m_backend_sockfd,&mask_r))
             {
                 //recv from the backend
-                int len = recv(m_backend_sockfd, recv_buf, 4095, 0);//SSL_read(m_backend_ssl, recv_buf, 4095);
-                if(len == 0)
+                int wanna_recv_len = buf_descr_frm_backend.buf_len - (buf_descr_frm_backend.w_pos - buf_descr_frm_backend.r_pos);
+                
+                if(wanna_recv_len > 0 && wanna_recv_len <= buf_descr_frm_backend.buf_len)
                 {
-					close(m_client_sockfd);
-                    break;
-                }
-                else if(len < 0)
-                {
-                    if( errno != EAGAIN)
+                    int len = recv(m_backend_sockfd, buf_descr_frm_backend.buf + buf_descr_frm_backend.w_pos%buf_descr_frm_backend.buf_len, wanna_recv_len, 0);
+                    
+                    if(len > buf_descr_frm_backend.buf_len - buf_descr_frm_backend.w_pos%buf_descr_frm_backend.buf_len) //dup the data
                     {
-						close(m_client_sockfd);
+                        memcpy(buf_descr_frm_backend.buf, buf_descr_frm_backend.buf + buf_descr_frm_backend.buf_len,
+                            len - (buf_descr_frm_backend.buf_len - buf_descr_frm_backend.w_pos%buf_descr_frm_backend.buf_len));
+                    }
+                    
+                    if(len == 0)
+                    {
+                        close(m_client_sockfd);
+                        close(m_backend_sockfd);
+                        m_backend_sockfd = -1;
                         break;
                     }
-                }
-                else if(len > 0)
-                {
-                    recv_buf[len] = '\0';
-                    if(_Send_(m_client_sockfd, recv_buf, len) < 0)
-                        break;
+                    else if(len < 0)
+                    {
+                        if( errno != EAGAIN)
+                        {
+                            close(m_client_sockfd);
+                            close(m_backend_sockfd);
+                            m_backend_sockfd = -1;
+                            break;
+                        }
+                    }
+                    else if(len > 0)
+                    {
+                        buf_descr_frm_backend.w_pos += len;
+                        FD_SET(m_client_sockfd, &mask_w);
+                    }
                 }
             }
+            
+            //send
+            if(FD_ISSET(m_client_sockfd, &mask_w))
+            {
+                int wanna_send_len = buf_descr_frm_backend.w_pos - buf_descr_frm_backend.r_pos;
+                
+                if(wanna_send_len > 0 && wanna_send_len <= buf_descr_frm_backend.buf_len)
+                {
+                    int len = send(m_client_sockfd, buf_descr_frm_backend.buf + buf_descr_frm_backend.r_pos%buf_descr_frm_backend.buf_len, wanna_send_len, 0);
+                    
+                    if(len == 0)
+                    {
+                        close(m_client_sockfd);
+                        close(m_backend_sockfd);
+                        m_backend_sockfd = -1;
+                        break;
+                    }
+                    else if(len < 0)
+                    {
+                        if( errno != EAGAIN)
+                        {
+                            close(m_client_sockfd);
+                            close(m_backend_sockfd);
+                            m_backend_sockfd = -1;
+                            break;
+                        }
+                    }
+                    else if(len > 0)
+                    {
+                        buf_descr_frm_backend.r_pos += len;
+                        if(buf_descr_frm_backend.r_pos == buf_descr_frm_backend.w_pos)
+                            FD_CLR(m_client_sockfd, &mask_w);
+                    }
+                }
+            }
+            
+            if(FD_ISSET(m_client_sockfd, &mask_e))
+            {
+                close(m_client_sockfd);
+                close(m_backend_sockfd);
+                m_backend_sockfd = -1;
+                break;
+            }
+            
+            if(FD_ISSET(m_backend_sockfd, &mask_e))
+            {
+                close(m_client_sockfd);
+                close(m_backend_sockfd);
+                m_backend_sockfd = -1;
+                break;
+            }
         }
-        else if(ros < 0)
+        else if(ret_val < 0)
         {
 			close(m_client_sockfd);
-			close(m_client_sockfd);
+			close(m_backend_sockfd);
+            m_backend_sockfd = -1;
             break;
         }
     }
+    
+    free(buf_descr_frm_client.buf);
+    free(buf_descr_frm_backend.buf);
 }
