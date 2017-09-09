@@ -348,6 +348,10 @@ void http_tunneling::relay_processing()
                             FD_CLR(m_backend_sockfd, &mask_w);
                     }
                 }
+                else if(wanna_send_len == 0)
+                {
+                    FD_CLR(m_backend_sockfd, &mask_w);
+                }
             }
             
             if(FD_ISSET(m_backend_sockfd,&mask_r))
@@ -422,6 +426,10 @@ void http_tunneling::relay_processing()
                         if(buf_descr_frm_backend.r_pos == buf_descr_frm_backend.w_pos)
                             FD_CLR(m_client_sockfd, &mask_w);
                     }
+                }
+                else if(wanna_send_len == 0)
+                {
+                    FD_CLR(m_client_sockfd, &mask_w);
                 }
             }
             
