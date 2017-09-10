@@ -140,13 +140,14 @@ bool http_tunneling::connect_backend()
         int s = connect(m_backend_sockfd, rp->ai_addr, rp->ai_addrlen);
         if(s == 0 || (s < 0 && errno == EINPROGRESS))
         {
+
             FD_ZERO(&mask_r);
             FD_ZERO(&mask_w);
         
             FD_SET(m_backend_sockfd, &mask_r);
             FD_SET(m_backend_sockfd, &mask_w);
-            
-            if(select(m_backend_sockfd + 1, &mask_r, &mask_w, NULL, &timeout) == 1)
+            int ret_val = select(m_backend_sockfd + 1, &mask_r, &mask_w, NULL, &timeout);
+            if(ret_val > 0)
             {
                 connected = true;
                 break;  /* Success */
@@ -169,7 +170,7 @@ bool http_tunneling::connect_backend()
         strError += " ";
         strError += strerror(errno);
         
-        fprintf(stderr, "%s(line:%d): %s\n", __FILE__, __LINE__, strError.c_str());
+        fprintf(stderr, "HTTP Tunneling: %s\n", strError.c_str());
         return false;
     }
     return true;
@@ -309,6 +310,7 @@ void http_tunneling::relay_processing()
                     }
                     else if(len > 0)
                     {
+                        //printf("RECV(CLT): %d\n", len);
                         buf_descr_frm_client.w_pos += len;
                         FD_SET(m_backend_sockfd, &mask_w);
                     }
@@ -343,6 +345,7 @@ void http_tunneling::relay_processing()
                     }
                     else if(len > 0)
                     {
+                        //printf("SEND(SRV): %d\n", len);
                         buf_descr_frm_client.r_pos += len;
                         if(buf_descr_frm_client.r_pos == buf_descr_frm_client.w_pos)
                             FD_CLR(m_backend_sockfd, &mask_w);
@@ -388,6 +391,7 @@ void http_tunneling::relay_processing()
                     }
                     else if(len > 0)
                     {
+                        //printf("RECV(SRV): %d\n", len);
                         buf_descr_frm_backend.w_pos += len;
                         FD_SET(m_client_sockfd, &mask_w);
                     }
@@ -422,6 +426,7 @@ void http_tunneling::relay_processing()
                     }
                     else if(len > 0)
                     {
+                        //printf("SEND(CLT): %d\n", len);
                         buf_descr_frm_backend.r_pos += len;
                         if(buf_descr_frm_backend.r_pos == buf_descr_frm_backend.w_pos)
                             FD_CLR(m_client_sockfd, &mask_w);
