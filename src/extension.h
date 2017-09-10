@@ -13,4 +13,10 @@ typedef struct
     string parameters;
 }http_extension_t;
 
+enum http_ext_tunneling_continuing
+{
+    http_ext_tunneling_continuing_yes = 0,
+    http_ext_tunneling_continuing_no
+};
+
 #endif /* _EXTENSION_H_ */

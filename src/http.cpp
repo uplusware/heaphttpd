@@ -523,6 +523,38 @@ void CHttp::Tunneling()
 {
     if(!m_http2) //only available in http/1.1
     {
+        //4rd extension hook
+        bool session_is_continuing = true;
+        for(int x = 0; x < m_ext_list->size(); x++)
+        {
+            void* (*ext_tunneling)(CHttp*, const char*, const char*, const char*, const char*, unsigned short, http_ext_tunneling_continuing*);
+            ext_tunneling = (void*(*)(CHttp*, const char*, const char*, const char*, const char*, unsigned short, http_ext_tunneling_continuing*))dlsym((*m_ext_list)[x].handle, "ext_tunneling");
+            const char* errmsg;
+            if((errmsg = dlerror()) == NULL)
+            {
+                http_ext_tunneling_continuing ext_is_continuing = http_ext_tunneling_continuing_yes;
+                ext_tunneling(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(),
+                    m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, &ext_is_continuing);
+                
+                if(ext_is_continuing == http_ext_tunneling_continuing_no)
+                {
+                    session_is_continuing = false;
+                }
+            }
+        }
+        if(!session_is_continuing)
+        {
+            CHttpResponseHdr header;
+            header.SetStatusCode(SC405);
+
+            header.SetField("Content-Type", "text/html");
+            header.SetField("Content-Length", header.GetDefaultHTMLLength());
+            SendHeader(header.Text(), header.Length());
+            SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            
+            return;
+        }
+        
         if(!m_http_tunneling)
             m_http_tunneling = new http_tunneling(m_sockfd, m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_connection);
         if(m_http_tunneling->connect_backend()) //connected
