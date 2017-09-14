@@ -27,6 +27,7 @@ string CHttpBase::m_localhostname = "localhost";
 string CHttpBase::m_hostip = "";
 
 BOOL   CHttpBase::m_enable_http_tunneling = FALSE;
+BOOL   CHttpBase::m_enable_http_tunneling_cache = FALSE;
 
 BOOL   CHttpBase::m_enablehttp = TRUE;
 unsigned short	CHttpBase::m_httpport = 5080;
@@ -222,6 +223,13 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, HTTPTunnelingEnable );
 				strtrim(HTTPTunnelingEnable);
 				m_enable_http_tunneling = (strcasecmp(HTTPTunnelingEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
+			}
+            else if(strncasecmp(strline.c_str(), "HTTPTunnelingCacheEnable", sizeof("HTTPTunnelingCacheEnable") - 1) == 0)
+			{
+				string HTTPTunnelingCacheEnable;
+				strcut(strline.c_str(), "=", NULL, HTTPTunnelingCacheEnable );
+				strtrim(HTTPTunnelingCacheEnable);
+				m_enable_http_tunneling_cache = (strcasecmp(HTTPTunnelingCacheEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
             else if(strncasecmp(strline.c_str(), "HTTPEnable", sizeof("HTTPEnable") - 1) == 0)
 			{

@@ -457,6 +457,7 @@ public:
 	static string	m_hostip;
     
     static BOOL     m_enable_http_tunneling;
+    static BOOL     m_enable_http_tunneling_cache;
     
 	static BOOL		m_enablehttp;
 	static unsigned short	m_httpport;

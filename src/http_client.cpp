@@ -245,8 +245,8 @@ bool http_client::parse(const char* text)
             m_content_length = atoi(strLen.c_str());
             if(m_content_length >= 0)
                 m_has_content_length = true;
-			else
-				return false;
+			/*else
+				return false;*/
         }
         else if(strncasecmp(strtext.c_str(), "Transfer-Encoding", 17) == 0)
         {
@@ -387,7 +387,7 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
             }
             else
             {
-                int expected_send_len = m_content_length - m_sent_content;
+                int expected_send_len = has_content_length() ? (m_content_length - m_sent_content) : buf_len;
                 
                 int should_send_len = buf_len < expected_send_len ? buf_len : expected_send_len;
                 

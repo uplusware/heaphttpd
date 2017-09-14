@@ -361,13 +361,18 @@ void CHttp::ParseMethod(string & strtext)
         const char* p_temp = strtext.c_str() + strlen(sz_method);
         if(strncasecmp(p_temp, "http://", 7) == 0)
         {
+            bool isCached = FALSE;
             m_http_tunneling_connection = HTTP_Tunneling_Without_CONNECT;
             
+            char* sz_url = (char*)malloc(buf_len + 1);
             char* sz_host = (char*)malloc(buf_len + 1);
             char* sz_relatived = (char*)malloc(buf_len + 1);
             memset(sz_host, 0, buf_len + 1);
             memset(sz_relatived, 0, buf_len + 1);
+            memset(sz_url, 0, buf_len + 1);
             
+            sscanf(p_temp, "%[^ ]", sz_url);
+  
             sscanf(p_temp + 7, "%[^/]", sz_host);
             
             strcpy(sz_relatived, p_temp + 7 + strlen(sz_host));
@@ -390,6 +395,7 @@ void CHttp::ParseMethod(string & strtext)
             
             free(sz_relatived);
             free(sz_host);
+            free(sz_url);
         }
         else
         {
