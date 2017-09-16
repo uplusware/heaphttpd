@@ -41,12 +41,24 @@ typedef struct {
     volatile time_t t_modify;
     volatile time_t t_access;
     volatile time_t t_create;
-} CACHE_DATA;
+} FILE_CACHE_DATA;
+
+typedef struct {
+    char* buf;
+    volatile unsigned int len;
+    string type;
+    string cache;
+    string etag;
+    string expires;
+    string last_modified;
+    string server;
+    volatile time_t t_access;
+} TUNNELING_CACHE_DATA;
 
 class file_cache
 {
 private:
-    CACHE_DATA m_cache_data;
+    FILE_CACHE_DATA m_cache_data;
     pthread_rwlock_t m_cache_lock;  
     
 public:   
@@ -76,14 +88,14 @@ public:
         pthread_rwlock_destroy(&m_cache_lock);
     }
     
-    CACHE_DATA* file_rdlock()
+    FILE_CACHE_DATA* file_rdlock()
     {
         pthread_rwlock_rdlock(&m_cache_lock);
         m_cache_data.t_access = time(NULL);     
         return &m_cache_data;
     }
     
-    CACHE_DATA* file_wrlock()
+    FILE_CACHE_DATA* file_wrlock()
     {
         pthread_rwlock_wrlock(&m_cache_lock);
         m_cache_data.t_access = time(NULL);     
@@ -94,6 +106,69 @@ public:
     {
         pthread_rwlock_unlock(&m_cache_lock);
     }  
+};
+
+class tunneling_cache
+{
+private:
+    TUNNELING_CACHE_DATA m_cache_data;
+    pthread_rwlock_t m_tunneling_lock;
+    time_t m_cache_max_time;
+    
+public:   
+    tunneling_cache(char* buf, unsigned int len, const char* type, const char* cache, const char* etag, const char* last_modified, const char* expires, const char* server, unsigned int max_age)
+    {
+        pthread_rwlock_init(&m_tunneling_lock, NULL);
+        
+        m_cache_data.buf = new char[len];
+        memcpy(m_cache_data.buf, buf, len);
+        
+        m_cache_data.len = len;
+        m_cache_data.type = type;
+        m_cache_data.cache = cache;
+        m_cache_data.etag = etag;
+        m_cache_data.last_modified = last_modified;
+        m_cache_data.expires = expires;
+        m_cache_data.server = server;
+        
+        m_cache_max_time = time(NULL) + max_age;
+    }
+    
+    virtual ~tunneling_cache()
+    {
+        pthread_rwlock_wrlock(&m_tunneling_lock);
+        
+        if(m_cache_data.buf)
+            delete[] m_cache_data.buf;
+        m_cache_data.buf = NULL;
+        pthread_rwlock_unlock(&m_tunneling_lock);   
+             
+        pthread_rwlock_destroy(&m_tunneling_lock);
+    }
+    
+    TUNNELING_CACHE_DATA* tunneling_rdlock()
+    {
+        pthread_rwlock_rdlock(&m_tunneling_lock);
+        m_cache_data.t_access = time(NULL);     
+        return &m_cache_data;
+    }
+    
+    TUNNELING_CACHE_DATA* tunneling_wrlock()
+    {
+        pthread_rwlock_wrlock(&m_tunneling_lock);
+        m_cache_data.t_access = time(NULL);     
+        return &m_cache_data;
+    }
+    
+    void tunneling_unlock()
+    {
+        pthread_rwlock_unlock(&m_tunneling_lock);
+    }
+    
+    bool tunneling_fresh()
+    {
+        return time(NULL) > m_cache_max_time ? false : true;
+    }
 };
 
 typedef struct
@@ -113,10 +188,12 @@ public:
 	virtual ~memory_cache();
 
 	map<string, file_cache*> m_file_cache;
+    map<string, tunneling_cache*> m_tunneling_cache;
     vector<http2_push_file_t> m_http2_push_list;
     
 	volatile unsigned long long m_file_cache_size;
-	
+	volatile unsigned long long m_tunneling_cache_size;
+    
 	map<string, string> m_type_table;
 	
 	void load();
@@ -150,23 +227,24 @@ public:
 	int  get_server_var(const char* name, string& value);
 	void clear_server_vars();
 	
-	file_cache* lock_file(const char * name, CACHE_DATA ** cache_data);
+    //file
+	file_cache* lock_file(const char * name, FILE_CACHE_DATA ** cache_data);
     void unlock_file(file_cache* fc);
     void clear_files();
     
 	bool _push_file_(const char * name, char* buf, unsigned int len,
-	    time_t t_modify, unsigned char* etag, file_cache** fout);
+	    time_t t_modify, unsigned char* etag, file_cache** f_out);
 	    
-	bool _find_file_(const char * name, file_cache** fc);
+	bool _find_file_(const char * name, file_cache** f_out);
 	
-	void wrlock_cache()
+    void wrlock_cache()
 	{
 	    pthread_rwlock_wrlock(&m_file_rwlock);
 	}
 	
 	void rdlock_cache()
 	{
-	    pthread_rwlock_wrlock(&m_file_rwlock);
+	    pthread_rwlock_rdlock(&m_file_rwlock);
 	}
 	
 	void unlock_cache()
@@ -174,6 +252,31 @@ public:
 	    pthread_rwlock_unlock(&m_file_rwlock);
 	}
     
+    //tunneling
+    bool _find_tunneling_(const char * name, tunneling_cache** t_out);
+    bool _push_tunneling_(const char* name, 
+        char* buf, unsigned int len, const char* type, const char* cache, const char* last_modify, const char* etag, const char* expires, const char* server, unsigned int max_age,
+        tunneling_cache** t_out);
+    tunneling_cache* lock_tunneling(const char * name, TUNNELING_CACHE_DATA ** cache_data);
+    void unlock_tunneling(tunneling_cache* fc);
+    void clear_tunnelings();
+    
+    void wrlock_tunneling_cache()
+	{
+	    pthread_rwlock_wrlock(&m_tunneling_rwlock);
+	}
+	
+	void rdlock_tunneling_cache()
+	{
+	    pthread_rwlock_rdlock(&m_tunneling_rwlock);
+	}
+	
+	void unlock_tunneling_cache()
+	{
+	    pthread_rwlock_unlock(&m_tunneling_rwlock);
+	}
+    
+    //http2    
     void load_http2_push_list(const char* dir_path);
     
 private:
@@ -181,6 +284,7 @@ private:
     string m_service_name;
     string m_dirpath;
     map<string, file_cache *>::iterator _find_oldest_file_();
+    map<string, tunneling_cache *>::iterator _find_oldest_tunneling_();
     map<string, Cookie*> m_cookies;
 	map<session_var_key, session_var*> m_session_vars;
 	map<string, server_var*> m_server_vars;
@@ -189,6 +293,7 @@ private:
     pthread_rwlock_t m_session_var_rwlock;
     pthread_rwlock_t m_server_var_rwlock;
     pthread_rwlock_t m_file_rwlock;
+    pthread_rwlock_t m_tunneling_rwlock;
     map<string, unsigned long> m_server_vars_file_versions;
     map<string, unsigned long> m_session_vars_file_versions;
     string m_localhostname;
@@ -203,7 +308,7 @@ class cache_instance
 {
 private:
     memory_cache* m_cache;
-    CACHE_DATA * m_cache_data;
+    FILE_CACHE_DATA * m_cache_data;
     file_cache* m_file_cache;  
 public:
     cache_instance(memory_cache* cache, const char * name)
@@ -218,7 +323,7 @@ public:
             m_cache->unlock_file(m_file_cache);
     }
     
-    CACHE_DATA * get_cache_data() { return m_cache_data; }
+    FILE_CACHE_DATA * get_cache_data() { return m_cache_data; }
 };
 #endif /* _CACHE_H_ */
 

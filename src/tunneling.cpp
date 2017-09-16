@@ -5,14 +5,18 @@
 
 #include "tunneling.h"
 #include "http_client.h"
+#include "httpcomm.h"
 
-http_tunneling::http_tunneling(int client_socked, const char* szAddr, unsigned short nPort, HTTPTunneling type)
+http_tunneling::http_tunneling(int client_socked, const char* szAddr, unsigned short nPort, HTTPTunneling type, memory_cache* cache, const char* http_url)
 {
     m_address = szAddr;
     m_port = nPort;
     m_client_sockfd = client_socked;
     m_backend_sockfd = -1;
     m_type = type;
+    m_cache = cache;
+    m_http_tunneling_url = http_url;
+    m_tunneling_cache_instance = NULL;
 }
 
 http_tunneling::~http_tunneling()
@@ -24,6 +28,18 @@ http_tunneling::~http_tunneling()
 
 bool http_tunneling::connect_backend()
 {
+    if(CHttpBase::m_enable_http_tunneling_cache)
+    {
+        m_cache->rdlock_tunneling_cache();
+        m_cache->_find_tunneling_(m_http_tunneling_url.c_str(), &m_tunneling_cache_instance);
+        m_cache->unlock_tunneling_cache();
+        
+        if(m_tunneling_cache_instance)
+        {
+            return true;
+        }
+    }
+    
     unsigned short backhost_port = m_port;
     
     /* Get the IP from the name */
@@ -178,8 +194,15 @@ bool http_tunneling::connect_backend()
 
 bool http_tunneling::send_request(const char* hbuf, int hlen, const char* dbuf, int dlen)
 {
+    
     if(m_type == HTTP_Tunneling_Without_CONNECT)
     {
+        if(m_tunneling_cache_instance)
+        {
+            return true;
+        }
+        //skip since there's cache
+    
         if(hbuf && hlen > 0 && _Send_(m_backend_sockfd, hbuf, hlen) < 0)
             return false;
         if(dbuf && dlen > 0 && _Send_(m_backend_sockfd, dbuf, dlen) < 0)
@@ -192,10 +215,44 @@ bool http_tunneling::recv_relay_reply()
 {
     if(m_type == HTTP_Tunneling_Without_CONNECT)
     {
+        if(m_tunneling_cache_instance)
+        {
+            TUNNELING_CACHE_DATA* tunneling_cache_data = m_tunneling_cache_instance->tunneling_rdlock();
+            if(tunneling_cache_data)
+            {
+                CHttpResponseHdr header;
+                header.SetStatusCode(SC200);
+                header.SetField("Content-Type", tunneling_cache_data->type.c_str());
+                header.SetField("Cache-Control", tunneling_cache_data->cache.c_str());
+                header.SetField("ETag", tunneling_cache_data->etag.c_str());
+                header.SetField("Content-Length", tunneling_cache_data->len);
+                header.SetField("Expires", tunneling_cache_data->expires.c_str());
+                header.SetField("Last-Modified", tunneling_cache_data->last_modified.c_str());
+
+                //printf("%s",  header.Text());
+                if(_Send_(m_client_sockfd, header.Text(), header.Length()) < 0 || _Send_(m_client_sockfd, "\r\n", 2) < 0)
+                {
+                    m_tunneling_cache_instance->tunneling_unlock();
+                    return false;
+                }                
+                if(tunneling_cache_data->buf && tunneling_cache_data->len > 0)
+                {
+                    if(_Send_(m_client_sockfd, tunneling_cache_data->buf, tunneling_cache_data->len) < 0)
+                    {
+                        m_tunneling_cache_instance->tunneling_unlock();
+                        return false;
+                    }
+                }
+            }
+            m_tunneling_cache_instance->tunneling_unlock();
+            return true;
+        }
+        //skip since there's cache
+        
         int http_header_length = -1;
         int http_content_length = -1;
             
-        http_client the_client(m_client_sockfd, m_backend_sockfd);
+        http_client the_client(m_client_sockfd, m_backend_sockfd, m_cache, m_http_tunneling_url.c_str());
         string str_header;
         int received_len = 0;
         char response_buf[4096];

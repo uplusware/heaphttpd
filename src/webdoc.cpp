@@ -100,7 +100,7 @@ void doc::Response()
     strResourceFullPath += "/html/";
     strResourceFullPath += m_session->GetResource();
     
-    CACHE_DATA* file_cache_data = NULL;
+    FILE_CACHE_DATA* file_cache_data = NULL;
     file_cache* file_cache_instance = NULL;
     
     bool file_cache_available = false;

@@ -30,13 +30,16 @@
     pthread_rwlock_init(&m_session_var_rwlock, NULL);
     pthread_rwlock_init(&m_server_var_rwlock, NULL);
     pthread_rwlock_init(&m_file_rwlock, NULL);
+    pthread_rwlock_init(&m_tunneling_rwlock, NULL);
 
 	m_file_cache.clear();
+    m_tunneling_cache.clear();
 	m_cookies.clear();
 	m_session_vars.clear();
 	m_server_vars.clear();
 	m_type_table.clear();
 	m_file_cache_size = 0;
+    m_tunneling_cache_size = 0;
     
 #ifdef _WITH_MEMCACHED_
         m_memcached_servers = NULL;
@@ -56,6 +59,7 @@ memory_cache::~memory_cache()
 {
 	unload();
 	
+    pthread_rwlock_destroy(&m_tunneling_rwlock);
 	pthread_rwlock_destroy(&m_file_rwlock);
 	pthread_rwlock_destroy(&m_cookie_rwlock);
 	pthread_rwlock_destroy(&m_session_var_rwlock);
@@ -492,7 +496,7 @@ void memory_cache::push_server_var(const char* name, const char* value)
         if(m_memcached_map.find(pthread_self()) == m_memcached_map.end())
             m_memcached_map[pthread_self()] = memcached_clone(NULL, m_memcached);     
         memcached_return memc_rc = memcached_set(m_memcached_map[pthread_self()], szMD5dst, 40, value, strlen(value) + 1, (time_t)0, (uint32_t)0);
-        printf("memcached_set: %s %s: %s\n", memc_rc == MEMCACHED_SUCCESS ? "OK" : "Error", szMD5dst, value);
+        //printf("memcached_set: %s %s: %s\n", memc_rc == MEMCACHED_SUCCESS ? "OK" : "Error", szMD5dst, value);
     }
 #endif /* _WITH_MEMCACHED_ */
 }
@@ -559,7 +563,7 @@ int  memory_cache::get_server_var(const char * name, string& value)
                 
                 ret = 0;
             }
-            printf("memcached_get: %s %s: %s\n", memc_rc == MEMCACHED_SUCCESS ? "OK" : "Error", szMD5dst, value.c_str());
+            //printf("memcached_get: %s %s: %s\n", memc_rc == MEMCACHED_SUCCESS ? "OK" : "Error", szMD5dst, value.c_str());
         }
 #endif /* _WITH_MEMCACHED_ */
     }
@@ -759,7 +763,7 @@ map<string, file_cache *>::iterator memory_cache::_find_oldest_file_()
         {
             if(o_it != c_it) //avoid re-entrying the lock
             {
-                CACHE_DATA* curr_data, * oldest_data;
+                FILE_CACHE_DATA* curr_data, * oldest_data;
                 curr_data = c_it->second->file_rdlock();
                 oldest_data = o_it->second->file_rdlock();
                 
@@ -777,14 +781,14 @@ map<string, file_cache *>::iterator memory_cache::_find_oldest_file_()
     return o_it;
 }
 
-bool memory_cache::_find_file_(const char * name, file_cache** fc)
+bool memory_cache::_find_file_(const char * name, file_cache** f_out)
 {
     bool ret = false;
-    *fc = NULL;
+    *f_out = NULL;
     map<string, file_cache *>::iterator iter = m_file_cache.find(name);
     if(iter != m_file_cache.end())
     {
-        *fc = iter->second;
+        *f_out = iter->second;
         ret = true;
     }
     
@@ -793,7 +797,7 @@ bool memory_cache::_find_file_(const char * name, file_cache** fc)
 
 bool memory_cache::_push_file_(const char* name, 
     char* buf, unsigned int len, time_t t_modify, unsigned char* etag,
-    file_cache** fout)
+    file_cache** f_out)
 {
     bool ret = false;
     
@@ -802,7 +806,7 @@ bool memory_cache::_push_file_(const char* name,
     {
         if(iter->second)
         {
-            CACHE_DATA * cache_data = iter->second->file_rdlock();
+            FILE_CACHE_DATA * cache_data = iter->second->file_rdlock();
             m_file_cache_size -= cache_data->len;
             iter->second->file_unlock();
             delete iter->second;
@@ -810,7 +814,7 @@ bool memory_cache::_push_file_(const char* name,
         iter->second = new file_cache(buf, len, t_modify, etag);
         m_file_cache_size += len;
         
-        *fout = iter->second;
+        *f_out = iter->second;
         ret = true;
     }
     else
@@ -822,17 +826,18 @@ bool memory_cache::_push_file_(const char* name,
             map<string, file_cache *>::iterator iter = m_file_cache.find(name);
             if(iter != m_file_cache.end())
             {
-                CACHE_DATA * cache_data = iter->second->file_rdlock();
+                FILE_CACHE_DATA * cache_data = iter->second->file_rdlock();
                 m_file_cache_size -= cache_data->len;
                 iter->second->file_unlock();
                 
                 delete iter->second;
+                m_file_cache.erase(iter);
             }
         }
         else
         {
             map<string, file_cache *>::iterator oldest_file = _find_oldest_file_();
-            CACHE_DATA * oldest_data = oldest_file->second->file_rdlock();
+            FILE_CACHE_DATA * oldest_data = oldest_file->second->file_rdlock();
             m_file_cache_size -= oldest_data->len;
             oldest_file->second->file_unlock();
             delete oldest_file->second;
@@ -844,7 +849,7 @@ bool memory_cache::_push_file_(const char* name,
         inspos = m_file_cache.insert(map<string, file_cache*>::value_type(name, fc));
         if(inspos.second == true)
         {
-            *fout = inspos.first->second;
+            *f_out = inspos.first->second;
             m_file_cache_size += len;
             ret = true;
         }
@@ -853,7 +858,7 @@ bool memory_cache::_push_file_(const char* name,
     return ret;
 }
 
-file_cache* memory_cache::lock_file(const char * name, CACHE_DATA ** cache_data)
+file_cache* memory_cache::lock_file(const char * name, FILE_CACHE_DATA ** cache_data)
 {
     file_cache* ret = NULL;
     pthread_rwlock_rdlock(&m_file_rwlock);
@@ -886,6 +891,171 @@ void memory_cache::clear_files()
 	}
 	m_file_cache.clear();
 	pthread_rwlock_unlock(&m_file_rwlock);
+}
+
+//Tunneling
+map<string, tunneling_cache *>::iterator memory_cache::_find_oldest_tunneling_()
+{
+    map<string, tunneling_cache *>::iterator o_it = m_tunneling_cache.end();
+    map<string, tunneling_cache *>::iterator c_it = m_tunneling_cache.begin();
+    for(c_it = m_tunneling_cache.begin(); c_it != m_tunneling_cache.end(); ++c_it)
+    {
+        if(o_it == m_tunneling_cache.end())
+        {
+            o_it = c_it;
+        }
+        else
+        {
+            if(o_it != c_it) //avoid re-entrying the lock
+            {
+                TUNNELING_CACHE_DATA* curr_data, * oldest_data;
+                curr_data = c_it->second->tunneling_rdlock();
+                oldest_data = o_it->second->tunneling_rdlock();
+                
+                if(curr_data->t_access < oldest_data->t_access)
+                    o_it = c_it;
+                else if(curr_data->t_access = oldest_data->t_access 
+                    && curr_data->len < oldest_data->len)
+                    o_it = c_it;
+                    
+                c_it->second->tunneling_unlock();
+                o_it->second->tunneling_unlock();
+            }
+        }
+    }
+    return o_it;
+}
+
+bool memory_cache::_find_tunneling_(const char * name, tunneling_cache** t_out)
+{
+    bool ret = false;
+    *t_out = NULL;
+    map<string, tunneling_cache *>::iterator iter = m_tunneling_cache.find(name);
+    if(iter != m_tunneling_cache.end())
+    {
+        if(!iter->second->tunneling_fresh())
+        {
+            TUNNELING_CACHE_DATA * cache_data = iter->second->tunneling_rdlock();
+            m_tunneling_cache_size -= cache_data->len;
+            iter->second->tunneling_unlock();
+            
+            delete iter->second;
+			
+			m_tunneling_cache.erase(iter);
+            
+            ret = false;
+        }
+        else
+        {
+            *t_out = iter->second;
+            
+            ret = true;
+        }
+    }
+    
+    return ret;
+}
+
+bool memory_cache::_push_tunneling_(const char* name, 
+        char* buf, unsigned int len, const char* type, const char* cache, const char* last_modify, const char* etag, const char* expires, const char* server, unsigned int max_age,
+        tunneling_cache** t_out)
+{
+    bool ret = false;
+    
+    map<string, tunneling_cache *>::iterator iter = m_tunneling_cache.find(name);
+    if(iter != m_tunneling_cache.end())
+    {
+        if(iter->second)
+        {
+            TUNNELING_CACHE_DATA * cache_data = iter->second->tunneling_rdlock();
+            m_tunneling_cache_size -= cache_data->len;
+            iter->second->tunneling_unlock();
+            delete iter->second;
+        }   
+        iter->second = new tunneling_cache(buf, len, type, cache, etag, last_modify, expires, server, max_age);
+        m_tunneling_cache_size += len;
+        
+        *t_out = iter->second;
+        ret = true;
+    }
+    else
+    {
+        tunneling_cache * t_cache = new tunneling_cache(buf, len, type, cache, etag, last_modify, expires, server, max_age);
+       
+        if(m_tunneling_cache_size < MAX_CACHE_SIZE)
+        {
+            map<string, tunneling_cache *>::iterator iter = m_tunneling_cache.find(name);
+            if(iter != m_tunneling_cache.end())
+            {
+                if(iter->second)
+                {
+                    TUNNELING_CACHE_DATA * cache_data = iter->second->tunneling_rdlock();
+                    m_tunneling_cache_size -= cache_data->len;
+                    iter->second->tunneling_unlock();
+                    
+                    delete iter->second;
+                    m_tunneling_cache.erase(iter);
+                }
+            }
+        }
+        else
+        {
+            map<string, tunneling_cache *>::iterator oldest_file = _find_oldest_tunneling_();
+            TUNNELING_CACHE_DATA * oldest_data = oldest_file->second->tunneling_rdlock();
+            m_tunneling_cache_size -= oldest_data->len;
+            oldest_file->second->tunneling_unlock();
+            delete oldest_file->second;
+            m_tunneling_cache.erase(oldest_file);
+        }
+        
+        pair<map<string, tunneling_cache *>::iterator, bool> ins_pos;
+        
+        ins_pos = m_tunneling_cache.insert(map<string, tunneling_cache*>::value_type(name, t_cache));
+        if(ins_pos.second == true)
+        {
+            *t_out = ins_pos.first->second;
+            m_tunneling_cache_size += len;
+            ret = true;
+        }
+    }
+    
+    return ret;
+}
+
+tunneling_cache* memory_cache::lock_tunneling(const char * name, TUNNELING_CACHE_DATA ** cache_data)
+{
+    tunneling_cache* ret = NULL;
+    pthread_rwlock_rdlock(&m_tunneling_rwlock);
+      
+    map<string, tunneling_cache*>::iterator iter = m_tunneling_cache.find(name);
+    if(iter != m_tunneling_cache.end())
+    {
+        ret = iter->second;
+        if(iter->second)
+            *cache_data = iter->second->tunneling_rdlock();
+    }
+    
+    pthread_rwlock_unlock(&m_tunneling_rwlock);
+    return ret;
+}
+
+void memory_cache::unlock_tunneling(tunneling_cache* fc)
+{
+    if(fc)
+        fc->tunneling_unlock();
+}
+
+void memory_cache::clear_tunnelings()
+{
+    pthread_rwlock_wrlock(&m_tunneling_rwlock);
+	map<string, tunneling_cache *>::iterator iter_file;
+	for(iter_file = m_tunneling_cache.begin(); iter_file != m_tunneling_cache.end(); iter_file++)
+	{
+	    if(iter_file->second)
+    		delete iter_file->second;
+	}
+	m_tunneling_cache.clear();
+	pthread_rwlock_unlock(&m_tunneling_rwlock);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1076,6 +1246,8 @@ void memory_cache::unload()
     clear_server_vars();
 
     clear_files();
+    
+    clear_tunnelings();
 }
 
 void memory_cache::load()

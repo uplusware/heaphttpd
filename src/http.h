@@ -223,6 +223,7 @@ protected:
     
     string m_http_tunneling_backend_address;
     unsigned short m_http_tunneling_backend_port;
+    string m_http_tunneling_url;   
     
     http_tunneling* m_http_tunneling;
 };

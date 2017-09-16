@@ -178,14 +178,17 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
 
 
 // http_client
-http_client::http_client(int client_sockfd, int backend_sockfd)
+http_client::http_client(int client_sockfd, int backend_sockfd, memory_cache* cache, const char* http_url)
 {
     m_client_sockfd = client_sockfd;
     m_backend_sockfd = backend_sockfd;
     
+    m_http_tunneling_url = http_url;
+    
     m_state = HTTP_Client_Parse_State_Header;
     
     m_content_length = -1;
+    m_cache_max_age = 300;
     m_has_content_length = false;
     m_is_chunked = false;
     
@@ -195,12 +198,32 @@ http_client::http_client(int client_sockfd, int backend_sockfd)
     m_buf_used_len = 0;
     
     m_sent_content = 0;
-    
+
     m_chunk = NULL;
+    
+    m_cache = cache;
+    
+    m_use_cache = false; //default is true
+    m_cache_buf = NULL;
+    m_cache_data_len = 0;
+    
+    m_is_200_ok = false;
 }
 
 http_client::~http_client()
 {
+    if(CHttpBase::m_enable_http_tunneling_cache && m_use_cache && m_cache_buf && m_cache_data_len > 0)
+    {
+        tunneling_cache* c_out;
+        m_cache->wrlock_tunneling_cache();
+        m_cache->_push_tunneling_(m_http_tunneling_url.c_str(), m_cache_buf, m_cache_data_len, m_content_type.c_str(), m_cache_control.c_str(),
+            m_last_modified.c_str(), m_etag.c_str(), m_expires.c_str(), m_server.c_str(), m_cache_max_age, &c_out);
+        m_cache->unlock_tunneling_cache();
+    }
+
+    if(m_cache_buf)
+        free(m_cache_buf);
+    
     if(m_buf)
         free(m_buf);
     
@@ -219,7 +242,7 @@ bool http_client::parse(const char* text)
         m_line_text = m_line_text.substr(new_line + 1);
 
         strtrim(strtext);
-        //printf(">>>>> %s\r\n", strtext.c_str());
+        // printf(">>>>> %s\r\n", strtext.c_str());
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)
         {
@@ -235,28 +258,109 @@ bool http_client::parse(const char* text)
         }
         if(strcmp(strtext.c_str(),"") == 0)
         {
+            if(CHttpBase::m_enable_http_tunneling_cache && m_use_cache && has_content_length() && m_content_length <= FILE_MAX_SIZE && m_content_length > 0) //only cache the little size data
+            {
+                m_cache_buf = (char*)malloc(m_content_length + 1);
+                m_cache_data_len = 0;
+            }
             break;
         }
-        else if(strncasecmp(strtext.c_str(), "Content-Length", 14) == 0)
+        else if(strncasecmp(strtext.c_str(), "HTTP/1.0 ", 9) == 0
+            || strncasecmp(strtext.c_str(), "HTTP/1.1 ", 9) == 0)
+        {
+            if(strstr(strtext.c_str() + 9, "200 OK") != NULL)
+            {
+                m_is_200_ok = true;
+                m_use_cache = true;
+            }
+        }
+        else if(strncasecmp(strtext.c_str(), "Content-Length:", 15) == 0)
         {
             string strLen;
             strcut(strtext.c_str(), "Content-Length:", NULL, strLen);
             strtrim(strLen);	
             m_content_length = atoi(strLen.c_str());
             if(m_content_length >= 0)
+            {
                 m_has_content_length = true;
-			/*else
-				return false;*/
+            }
         }
-        else if(strncasecmp(strtext.c_str(), "Transfer-Encoding", 17) == 0)
+        else if(strncasecmp(strtext.c_str(), "Transfer-Encoding:", 18) == 0)
         {
             string strEncoding;
-            strcut(strtext.c_str(), "Content-Length:", NULL, strEncoding);
+            strcut(strtext.c_str(), "Transfer-Encoding:", NULL, strEncoding);
             strtrim(strEncoding);
             if(strEncoding == "chunked")
             {
                 m_is_chunked = true;
             }
+        }
+        else if(strncasecmp(strtext.c_str(), "Cache-Control:", 14) == 0)
+        {
+            strcut(strtext.c_str(), "Cache-Control:", NULL, m_cache_control);
+            strtrim(m_cache_control);
+            
+            if(strncasecmp(m_cache_control.c_str(), "max-age=", 8) == 0)
+            {
+                string strMaxAge;
+                strcut(m_cache_control.c_str(), "max-age=", NULL, strMaxAge);
+                strtrim(strMaxAge);	
+                m_cache_max_age = atoi(strMaxAge.c_str());
+                
+                if(m_cache_max_age > 0)
+                {
+                    m_use_cache = true;
+                }
+            }
+            else if(strcasecmp(m_cache_control.c_str(), "no-cache") == 0)
+            {
+                m_use_cache = false;
+            }
+            else if(strcasecmp(m_cache_control.c_str(), "no-store") == 0)
+            {
+                 m_use_cache = false;
+            }
+            else if(strcasecmp(m_cache_control.c_str(), "proxy-revalidate") == 0)
+            {
+                 m_use_cache = false;
+            }
+            else if(strcasecmp(m_cache_control.c_str(), "must-revalidate") == 0)
+            {
+                 m_use_cache = false;
+            }
+            else if(strcasecmp(m_cache_control.c_str(), "private") == 0)
+            {
+                 m_use_cache = false;
+            }
+            else if(strcasecmp(m_cache_control.c_str(), "public") == 0)
+            {
+                 m_use_cache = true;
+            }
+        }
+        else if(strncasecmp(strtext.c_str(), "ETag:", 5) == 0)
+        {
+            strcut(strtext.c_str(), "ETag:", NULL, m_etag);
+            strtrim(m_etag, "\" ");
+        }
+        else if(strncasecmp(strtext.c_str(), "Server:", 7) == 0)
+        {
+            strcut(strtext.c_str(), "Server:", NULL, m_server);
+            strtrim(m_server);
+        }
+        else if(strncasecmp(strtext.c_str(), "Last-Modified:", 14) == 0)
+        {
+            strcut(strtext.c_str(), "Last-Modified:", NULL, m_last_modified);
+            strtrim(m_last_modified);
+        }
+        else if(strncasecmp(strtext.c_str(), "Expires:", 8) == 0)
+        {
+            strcut(strtext.c_str(), "Expires:", NULL, m_expires);
+            strtrim(m_expires);
+        }
+        else if(strncasecmp(strtext.c_str(), "Content-Type:", 13) == 0)
+        {
+            strcut(strtext.c_str(), "Content-Type:", NULL, m_content_type);
+            strtrim(m_content_type);
         }
     }
 	
@@ -324,7 +428,11 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                     {
                         if(m_buf_used_len > 0)
                         {
-                            
+                            if(m_use_cache && m_cache_buf)
+                            {
+                                memcpy(m_cache_buf + m_cache_data_len, m_buf, m_buf_used_len);
+                                m_cache_data_len += m_buf_used_len;
+                            }
                             if(_Send_(m_client_sockfd, m_buf, m_buf_used_len) < 0)
                             {
                                 close(m_client_sockfd);
@@ -369,6 +477,12 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
             if(m_buf_used_len > 0)
             {
                 
+                if(m_use_cache && m_cache_buf)
+                {
+                    memcpy(m_cache_buf + m_cache_data_len, m_buf, m_buf_used_len);
+                    m_cache_data_len += m_buf_used_len;
+                }
+                
                 if(_Send_(m_client_sockfd, m_buf, m_buf_used_len) < 0)
                 {
                     close(m_client_sockfd);
@@ -390,6 +504,12 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                 int expected_send_len = has_content_length() ? (m_content_length - m_sent_content) : buf_len;
                 
                 int should_send_len = buf_len < expected_send_len ? buf_len : expected_send_len;
+                
+                if(m_use_cache && m_cache_buf)
+                {
+                    memcpy(m_cache_buf + m_cache_data_len, buf, should_send_len);
+                    m_cache_data_len += should_send_len;
+                }
                 
                 if(_Send_(m_client_sockfd, buf, should_send_len) < 0)
                 {

@@ -11,7 +11,7 @@
 #include <sys/types.h>          /* See NOTES */
 #include <sys/socket.h>
 #include <netdb.h>
-
+#include "cache.h"
 #include "base.h"
 #include "util/general.h"
 
@@ -55,7 +55,7 @@ protected:
 class http_client
 {
 public:
-    http_client(int client_sockfd, int backend_sockfd);
+    http_client(int client_sockfd, int backend_sockfd, memory_cache* cache, const char* http_url);
     virtual ~http_client();
     
     bool parse(const char* text);
@@ -69,9 +69,20 @@ public:
     
 protected:
     string m_line_text;
-    int m_content_length;
-    bool m_is_chunked;
     bool m_has_content_length;
+    int m_content_length;
+    bool m_is_200_ok;
+    bool m_use_cache;
+    int m_cache_max_age;
+    string m_cache_control;
+    string m_content_type;
+    string m_etag;
+    string m_last_modified;
+    string m_expires;
+    string m_server;
+    
+    bool m_is_chunked;
+    
     int m_chunk_length;
     
     HTTP_Client_Parse_State m_state;
@@ -85,6 +96,12 @@ protected:
     
     int m_sent_content;
     
+
     http_chunk * m_chunk;
+    string m_http_tunneling_url;
+    memory_cache* m_cache;
+    
+    char* m_cache_buf;
+    unsigned int m_cache_data_len;
 };
 #endif /* _HTTP_CLIENT_H_ */

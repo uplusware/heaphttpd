@@ -11,7 +11,7 @@
 #include <sys/types.h>          /* See NOTES */
 #include <sys/socket.h>
 #include <netdb.h>
-
+#include "cache.h"
 #include "base.h"
 #include "util/general.h"
 
@@ -39,7 +39,7 @@ typedef struct
 class http_tunneling
 {
 public:
-    http_tunneling(int client_socked, const char* szAddr, unsigned short nPort, HTTPTunneling type);
+    http_tunneling(int client_socked, const char* szAddr, unsigned short nPort, HTTPTunneling type, memory_cache* cache, const char* http_url);
     virtual ~http_tunneling();
     
     bool connect_backend();
@@ -61,5 +61,8 @@ protected:
 	SSL_CTX* m_client_ssl_ctx;
     
     HTTPTunneling m_type;
+    memory_cache* m_cache;
+    string m_http_tunneling_url;
+    tunneling_cache* m_tunneling_cache_instance;
 };
 #endif /* _TUNNELING_H_ */
