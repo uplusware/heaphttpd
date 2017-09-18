@@ -9,9 +9,9 @@ void _gen_http_date_string_(unsigned int nTime, string & strTime)
 	char buf[128];
 	time_t clock = nTime;
 	struct tm *tm;
-	tm = localtime(&clock);
+	tm = gmtime(&clock);
 
-	strftime(buf, sizeof(buf), "%a, %d %h %Y %H:%M:%S %Z", tm);
+	strftime(buf, sizeof(buf), "%a, %d %h %Y %H:%M:%S GMT", tm);
 
 	strTime = buf;
 

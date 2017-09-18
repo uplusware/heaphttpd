@@ -788,8 +788,27 @@ bool memory_cache::_find_file_(const char * name, file_cache** f_out)
     map<string, file_cache *>::iterator iter = m_file_cache.find(name);
     if(iter != m_file_cache.end())
     {
-        *f_out = iter->second;
-        ret = true;
+        if(!iter->second->file_fresh())
+        {
+            FILE_CACHE_DATA * file_data = iter->second->file_rdlock();
+            m_file_cache_size -= file_data->len;
+            iter->second->file_unlock();
+            
+            unlock_file_cache(); //release read lock
+            wrlock_file_cache(); // switch to the write lock
+            delete iter->second;
+			
+			m_file_cache.erase(iter);
+            
+            /* NOTE: no need to unlock since the unlock will be called in out of this function */
+            
+            ret = false;
+        }
+        else
+        {
+            *f_out = iter->second;
+            ret = true;
+        }
     }
     
     return ret;
@@ -821,7 +840,7 @@ bool memory_cache::_push_file_(const char* name,
     {
         file_cache * fc = new file_cache(buf, len, t_modify, etag);
        
-        if(m_file_cache_size < MAX_CACHE_SIZE)
+        if(m_file_cache_size < CHttpBase::m_total_localfile_cache_size)
         {
             map<string, file_cache *>::iterator iter = m_file_cache.find(name);
             if(iter != m_file_cache.end())
@@ -939,9 +958,14 @@ bool memory_cache::_find_tunneling_(const char * name, tunneling_cache** t_out)
             m_tunneling_cache_size -= cache_data->len;
             iter->second->tunneling_unlock();
             
+            unlock_tunneling_cache(); //release the read lock
+            wrlock_tunneling_cache(); //switch to the write lock
+            
             delete iter->second;
 			
 			m_tunneling_cache.erase(iter);
+            
+            /* NOTE: no need to unlock since the unlock will be called in out of this function */
             
             ret = false;
         }
@@ -982,7 +1006,7 @@ bool memory_cache::_push_tunneling_(const char* name,
     {
         tunneling_cache * t_cache = new tunneling_cache(buf, len, type, cache, etag, last_modify, expires, server, max_age);
        
-        if(m_tunneling_cache_size < MAX_CACHE_SIZE)
+        if(m_tunneling_cache_size < CHttpBase::m_total_tunneling_cache_size)
         {
             map<string, tunneling_cache *>::iterator iter = m_tunneling_cache.find(name);
             if(iter != m_tunneling_cache.end())
@@ -1022,24 +1046,7 @@ bool memory_cache::_push_tunneling_(const char* name,
     return ret;
 }
 
-tunneling_cache* memory_cache::lock_tunneling(const char * name, TUNNELING_CACHE_DATA ** cache_data)
-{
-    tunneling_cache* ret = NULL;
-    pthread_rwlock_rdlock(&m_tunneling_rwlock);
-      
-    map<string, tunneling_cache*>::iterator iter = m_tunneling_cache.find(name);
-    if(iter != m_tunneling_cache.end())
-    {
-        ret = iter->second;
-        if(iter->second)
-            *cache_data = iter->second->tunneling_rdlock();
-    }
-    
-    pthread_rwlock_unlock(&m_tunneling_rwlock);
-    return ret;
-}
-
-void memory_cache::unlock_tunneling(tunneling_cache* fc)
+void memory_cache::unlock_tunneling_cache(tunneling_cache* fc)
 {
     if(fc)
         fc->tunneling_unlock();
@@ -1157,7 +1164,7 @@ void memory_cache::_save_cookies_()
 	        bSave = true;
 	        const char* szExpires = iter_c->second->getExpires();
 	        
-	        if(szExpires[0] != '\0' && time(NULL) > ParseCookieDateTimeString(szExpires))
+	        if(szExpires[0] != '\0' && time(NULL) > ParseGMTorUTCTimeString(szExpires))
 	        {
 	            bSave = false;
 	        }

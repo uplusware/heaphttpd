@@ -117,6 +117,12 @@ vector<string> CHttpBase::m_default_webpages;
     map<string, int> CHttpBase::m_memcached_list;
 #endif /* _WITH_MEMCACHED_ */
 
+unsigned int CHttpBase::m_total_localfile_cache_size = 64;
+unsigned int CHttpBase::m_total_tunneling_cache_size = 64;
+
+unsigned int CHttpBase::m_single_localfile_cache_size = 512;
+unsigned int CHttpBase::m_single_tunneling_cache_size = 512;
+    
 CHttpBase::CHttpBase()
 {
 
@@ -193,17 +199,45 @@ BOOL CHttpBase::LoadConfig()
 			}
 			else if(strncasecmp(strline.c_str(), "InstanceNum", sizeof("InstanceNum") - 1) == 0)
 			{
-				string maxconn;
-				strcut(strline.c_str(), "=", NULL, maxconn );
-				strtrim(maxconn);
-				m_max_instance_num = atoi(maxconn.c_str());
+				string inst_num;
+				strcut(strline.c_str(), "=", NULL, inst_num );
+				strtrim(inst_num);
+				m_max_instance_num = atoi(inst_num.c_str());
 			}
+            else if(strncasecmp(strline.c_str(), "TotalLocalFileCacheSize", sizeof("TotalLocalFileCacheSize") - 1) == 0)
+			{
+				string cache_size;
+				strcut(strline.c_str(), "=", NULL, cache_size );
+				strtrim(cache_size);
+				m_total_localfile_cache_size = atoi(cache_size.c_str()) * 1024 * 1024;
+			}
+            else if(strncasecmp(strline.c_str(), "TotalTunnelingCacheSize", sizeof("TotalTunnelingCacheSize") - 1) == 0)
+			{
+				string cache_size;
+				strcut(strline.c_str(), "=", NULL, cache_size );
+				strtrim(cache_size);
+				m_total_tunneling_cache_size = atoi(cache_size.c_str()) * 1024 * 1024;
+			}
+            else if(strncasecmp(strline.c_str(), "SingleLocalFileCacheSize", sizeof("SingleLocalFileCacheSize") - 1) == 0)
+			{
+				string cache_size;
+				strcut(strline.c_str(), "=", NULL, cache_size );
+				strtrim(cache_size);
+				m_single_localfile_cache_size = atoi(cache_size.c_str()) * 1024;
+			}
+            else if(strncasecmp(strline.c_str(), "SingleTunnelingCacheSize", sizeof("SingleTunnelingCacheSize") - 1) == 0)
+			{
+				string cache_size;
+				strcut(strline.c_str(), "=", NULL, cache_size );
+				strtrim(cache_size);
+				m_single_tunneling_cache_size = atoi(cache_size.c_str()) * 1024;
+			}            
 			else if(strncasecmp(strline.c_str(), "InstanceThreadNum", sizeof("InstanceThreadNum") - 1) == 0)
 			{
-				string maxconn;
-				strcut(strline.c_str(), "=", NULL, maxconn );
-				strtrim(maxconn);
-				m_max_instance_thread_num = atoi(maxconn.c_str());
+				string inst_thread_num;
+				strcut(strline.c_str(), "=", NULL, inst_thread_num);
+				strtrim(inst_thread_num);
+				m_max_instance_thread_num = atoi(inst_thread_num.c_str());
 			}
             else if(strncasecmp(strline.c_str(), "InstancePrestart", sizeof("InstancePrestart") - 1) == 0)
 			{

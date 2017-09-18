@@ -104,14 +104,14 @@ void doc::Response()
     file_cache* file_cache_instance = NULL;
     
     bool file_cache_available = false;
-    m_session->m_cache->rdlock_cache();
+    m_session->m_cache->rdlock_file_cache();
     if(m_session->m_cache->_find_file_(strResourceFullPath.c_str(), &file_cache_instance)
         && file_cache_instance)
     {
         file_cache_data = file_cache_instance->file_rdlock();
     }
     
-    m_session->m_cache->unlock_cache();
+    m_session->m_cache->unlock_file_cache();
     
     if(file_cache_instance && file_cache_data)
     {
@@ -174,7 +174,7 @@ void doc::Response()
         tLastModifyTime = file_cache_data->t_modify;
     }
 
-    OutHTTPDateString(tLastModifyTime, strDateTime);
+    OutHTTPGMTDateString(tLastModifyTime, strDateTime);
     
     if(strcmp(m_session->GetRequestField("Cache-Control"), "no-cache") != 0
         && strcmp(m_session->GetRequestField("Pragma"), "no-cache") != 0
@@ -199,7 +199,7 @@ void doc::Response()
         }
         else
         {
-            if(nResourceLength <= FILE_MAX_SIZE)
+            if(nResourceLength <= CHttpBase::m_single_localfile_cache_size)
                 file_buf = new char[nResourceLength];
                 
             if(get_file_etag(strResourceFullPath.c_str(), szETag, file_buf) == false)
@@ -219,11 +219,11 @@ void doc::Response()
             
             if(file_buf)
             {
-                m_session->m_cache->wrlock_cache();
+                m_session->m_cache->wrlock_file_cache();
                 bool push_rc = m_session->m_cache->_push_file_(strResourceFullPath.c_str(),
                     file_buf, nResourceLength, tLastModifyTime, szETag,
                     &file_cache_instance);
-                m_session->m_cache->unlock_cache();
+                m_session->m_cache->unlock_file_cache();
                 
                 if(push_rc)
                 {   
@@ -328,11 +328,28 @@ void doc::Response()
         else
             header.SetStatusCode(SC200);
         header.SetField("ETag", szQETagQ);
-        header.SetField("Content-Length", nRangeLength);
-        OutHTTPDateString(time(NULL) + 900, strDateTime);
+        header.SetField("Content-Length", nRangeLength);        
+        if(strcasecmp(strExtName.c_str(), "css") == 0 || strcasecmp(strExtName.c_str(), "js") == 0)
+        {
+            header.SetField("Cache-Control", "public, max-age=31536000"); //365 days
+            OutHTTPGMTDateString(time(NULL) + 31536000, strDateTime);
+        }
+        else if(strcasecmp(strExtName.c_str(), "jpg") == 0
+            || strcasecmp(strExtName.c_str(), "jpeg") == 0
+            || strcasecmp(strExtName.c_str(), "png") == 0
+            || strcasecmp(strExtName.c_str(), "gif") == 0
+            || strcasecmp(strExtName.c_str(), "bmp") == 0)
+        {
+            header.SetField("Cache-Control", "public, max-age=86400"); // 24 hours
+            OutHTTPGMTDateString(time(NULL) + 86400, strDateTime);
+        }
+        else
+        {
+            OutHTTPGMTDateString(time(NULL) + 28800, strDateTime);
+            header.SetField("Cache-Control", "public, max-age=28800"); // 8 hours
+        }
         header.SetField("Expires", strDateTime.c_str());
-        header.SetField("Cache-Control", "max-age=900");
-        OutHTTPDateString(tLastModifyTime, strDateTime);
+        OutHTTPGMTDateString(tLastModifyTime, strDateTime);
         header.SetField("Last-Modified", strDateTime.c_str());
         
         if(m_session->m_cache->m_type_table.find(strExtName) == m_session->m_cache->m_type_table.end())
@@ -396,10 +413,28 @@ void doc::Response()
                 header.SetStatusCode(SC200);
             header.SetField("ETag", szQETagQ);
             header.SetField("Content-Length", nRangeLength);
-            OutHTTPDateString(time(NULL) + 900, strDateTime);
+            
+            if(strcasecmp(strExtName.c_str(), "css") == 0 || strcasecmp(strExtName.c_str(), "js") == 0)
+            {
+                header.SetField("Cache-Control", "public, max-age=31536000"); //365 days
+                OutHTTPGMTDateString(time(NULL) + 31536000, strDateTime);
+            }
+            else if(strcasecmp(strExtName.c_str(), "jpg") == 0
+                || strcasecmp(strExtName.c_str(), "jpeg") == 0
+                || strcasecmp(strExtName.c_str(), "png") == 0
+                || strcasecmp(strExtName.c_str(), "gif") == 0
+                || strcasecmp(strExtName.c_str(), "bmp") == 0)
+            {
+                header.SetField("Cache-Control", "public, max-age=86400"); //24 hours
+                OutHTTPGMTDateString(time(NULL) + 86400, strDateTime);
+            }
+            else
+            {
+                OutHTTPGMTDateString(time(NULL) + 28800, strDateTime); // 8 hours
+                header.SetField("Cache-Control", "public, max-age=28800");
+            }
             header.SetField("Expires", strDateTime.c_str());
-            header.SetField("Cache-Control", "max-age=900");
-            OutHTTPDateString(tLastModifyTime, strDateTime);
+            OutHTTPGMTDateString(tLastModifyTime, strDateTime);
             header.SetField("Last-Modified", strDateTime.c_str());
             
             if(m_session->m_cache->m_type_table.find(strExtName) == m_session->m_cache->m_type_table.end())

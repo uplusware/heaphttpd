@@ -488,8 +488,6 @@ public:
     static string   m_fpm_sockfile;
     
 	static map<string, cgi_cfg_t> m_cgi_list;
-    
-	static unsigned int 	m_relaytasknum;
 	
 	static unsigned int	m_max_instance_num;
 	static unsigned int	m_max_instance_thread_num;
@@ -504,6 +502,12 @@ public:
 
 	static vector<stReject> m_reject_list;
 	static vector<string> m_permit_list;
+
+    static unsigned int m_total_localfile_cache_size;
+    static unsigned int m_total_tunneling_cache_size;
+
+    static unsigned int m_single_localfile_cache_size;
+    static unsigned int m_single_tunneling_cache_size;
 
 #ifdef _WITH_MEMCACHED_
     static map<string, int> m_memcached_list;

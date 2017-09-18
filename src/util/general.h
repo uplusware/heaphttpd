@@ -1070,14 +1070,27 @@ void __inline__ OutTimeString(unsigned int nTime, string & strTime)
 
 }
 
-void __inline__ OutHTTPDateString(unsigned int nTime, string & strTime)
+void __inline__ OutHTTPGMTDateString(unsigned int nTime, string & strTime)
 {
 	char buf[128];
 	time_t clock = nTime;
 	struct tm *tm;
-	tm = localtime(&clock);
+	tm = gmtime(&clock);
 
-	strftime(buf, sizeof(buf), "%a, %d %h %Y %H:%M:%S %Z", tm);
+	strftime(buf, sizeof(buf), "%a, %d %h %Y %H:%M:%S GMT", tm);
+
+	strTime = buf;
+
+}
+
+void __inline__ OutHTTPUTCDateString(unsigned int nTime, string & strTime)
+{
+	char buf[128];
+	time_t clock = nTime;
+	struct tm *tm;
+	tm = gmtime(&clock);
+
+	strftime(buf, sizeof(buf), "%a, %d %h %Y %H:%M:%S UTC", tm);
 
 	strTime = buf;
 
@@ -1611,7 +1624,7 @@ unsigned long long __inline__ atollu(const char* str)
 }
 
 /* Wed, 09 Jun 2021 10:18:14 GMT */
-time_t __inline__ ParseCookieDateTimeString(const char* szDateTime)
+time_t __inline__ ParseGMTorUTCTimeString(const char* szDateTime)
 {
     if(strlen(szDateTime) < 29)
         return 0;
@@ -1625,14 +1638,14 @@ time_t __inline__ ParseCookieDateTimeString(const char* szDateTime)
 	    return 0;
 	
 	tm1.tm_year = year - 1900;
-	tm1.tm_mon = getmonthnumber(sz_mon);
+	tm1.tm_mon = getmonthnumber(sz_mon) - 1;
 	tm1.tm_mday = day;
 	tm1.tm_hour = hour;
 	tm1.tm_min = min;
 	tm1.tm_sec = sec;
 	tm1.tm_isdst = -1;
 	
-	return mktime(&tm1);
+	return timegm(&tm1);
 }
 #endif /* _HEAPHTTPD_GENERAL_H_ */
 

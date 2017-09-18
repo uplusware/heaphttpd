@@ -258,7 +258,7 @@ bool http_client::parse(const char* text)
         }
         if(strcmp(strtext.c_str(),"") == 0)
         {
-            if(CHttpBase::m_enable_http_tunneling_cache && m_use_cache && has_content_length() && m_content_length <= FILE_MAX_SIZE && m_content_length > 0) //only cache the little size data
+            if(CHttpBase::m_enable_http_tunneling_cache && m_use_cache && has_content_length() && m_content_length <= CHttpBase::m_single_tunneling_cache_size && m_content_length > 0) //only cache the little size data
             {
                 m_cache_buf = (char*)malloc(m_content_length + 1);
                 m_cache_data_len = 0;
@@ -300,42 +300,37 @@ bool http_client::parse(const char* text)
             strcut(strtext.c_str(), "Cache-Control:", NULL, m_cache_control);
             strtrim(m_cache_control);
             
-            if(strncasecmp(m_cache_control.c_str(), "max-age=", 8) == 0)
-            {
-                string strMaxAge;
-                strcut(m_cache_control.c_str(), "max-age=", NULL, strMaxAge);
-                strtrim(strMaxAge);	
-                m_cache_max_age = atoi(strMaxAge.c_str());
-                
-                if(m_cache_max_age > 0)
-                {
-                    m_use_cache = true;
-                }
-            }
-            else if(strcasecmp(m_cache_control.c_str(), "no-cache") == 0)
+            if(strstr(m_cache_control.c_str() + 14, "no-cache") != NULL
+                || strstr(m_cache_control.c_str() + 14, "no-store") != NULL
+                || strstr(m_cache_control.c_str() + 14, "proxy-revalidate") != NULL
+                || strstr(m_cache_control.c_str() + 14, "must-revalidate") != NULL
+                || strstr(m_cache_control.c_str() + 14, "private") != NULL)
             {
                 m_use_cache = false;
             }
-            else if(strcasecmp(m_cache_control.c_str(), "no-store") == 0)
+            else
             {
-                 m_use_cache = false;
-            }
-            else if(strcasecmp(m_cache_control.c_str(), "proxy-revalidate") == 0)
-            {
-                 m_use_cache = false;
-            }
-            else if(strcasecmp(m_cache_control.c_str(), "must-revalidate") == 0)
-            {
-                 m_use_cache = false;
-            }
-            else if(strcasecmp(m_cache_control.c_str(), "private") == 0)
-            {
-                 m_use_cache = false;
-            }
-            else if(strcasecmp(m_cache_control.c_str(), "public") == 0)
-            {
-                 m_use_cache = true;
-            }
+                const char* p_max_age = strstr(m_cache_control.c_str() + 14, "max-age="); // eg.: Cache-Control:public, max-age=31536000
+                
+                if(p_max_age != NULL)
+                {
+                    string str_max_age;
+                    strcut(p_max_age, "max-age=", NULL, str_max_age);
+                    strtrim(str_max_age);	
+                    int n_max_age = atoi(str_max_age.c_str());
+                    
+                    m_cache_max_age = n_max_age < m_cache_max_age ? (n_max_age < 0 ? 0 : n_max_age) : m_cache_max_age;
+                
+                    if(m_cache_max_age > 0)
+                    {
+                        m_use_cache = true;
+                    }
+                    else
+                    {
+                        m_use_cache = false;
+                    }
+                }
+            }            
         }
         else if(strncasecmp(strtext.c_str(), "ETag:", 5) == 0)
         {
@@ -356,6 +351,20 @@ bool http_client::parse(const char* text)
         {
             strcut(strtext.c_str(), "Expires:", NULL, m_expires);
             strtrim(m_expires);
+            
+            int n_expire = ParseGMTorUTCTimeString(m_expires.c_str()) - time(NULL);
+            
+            m_cache_max_age = n_expire < m_cache_max_age ? (n_expire < 0 ? 0 : n_expire) : m_cache_max_age;
+            
+            
+            if(m_cache_max_age > 0)
+            {
+                m_use_cache = true;
+            }
+            else
+            {
+                m_use_cache = false;
+            }
         }
         else if(strncasecmp(strtext.c_str(), "Content-Type:", 13) == 0)
         {
