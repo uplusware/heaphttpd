@@ -271,7 +271,6 @@ bool http_client::parse(const char* text)
             if(strstr(strtext.c_str() + 9, "200 OK") != NULL)
             {
                 m_is_200_ok = true;
-                m_use_cache = true;
             }
         }
         else if(strncasecmp(strtext.c_str(), "Content-Length:", 15) == 0)
@@ -321,7 +320,7 @@ bool http_client::parse(const char* text)
                     
                     m_cache_max_age = n_max_age < m_cache_max_age ? (n_max_age < 0 ? 0 : n_max_age) : m_cache_max_age;
                 
-                    if(m_cache_max_age > 0)
+                    if(m_cache_max_age > 0 && m_is_200_ok)
                     {
                         m_use_cache = true;
                     }
@@ -355,9 +354,8 @@ bool http_client::parse(const char* text)
             int n_expire = ParseGMTorUTCTimeString(m_expires.c_str()) - time(NULL);
             
             m_cache_max_age = n_expire < m_cache_max_age ? (n_expire < 0 ? 0 : n_expire) : m_cache_max_age;
-            
-            
-            if(m_cache_max_age > 0)
+     
+            if(m_cache_max_age > 0 && m_is_200_ok)
             {
                 m_use_cache = true;
             }
