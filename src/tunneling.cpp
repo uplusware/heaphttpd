@@ -170,9 +170,18 @@ bool http_tunneling::connect_backend()
             }
             else
             {
-                close(m_backend_sockfd);
+                if(m_backend_sockfd > 0)
+                    close(m_backend_sockfd);
+                m_backend_sockfd = -1;
                 continue;
             }  
+        }
+        else
+        {
+            if(m_backend_sockfd > 0)
+                close(m_backend_sockfd);
+            m_backend_sockfd = -1;
+            continue;
         }
     }
 
@@ -187,6 +196,10 @@ bool http_tunneling::connect_backend()
         strError += strerror(errno);
         
         fprintf(stderr, "HTTP Tunneling: %s\n", strError.c_str());
+        if(m_backend_sockfd > 0)
+            close(m_backend_sockfd);
+        m_backend_sockfd = -1;
+                
         return false;
     }
     return true;

@@ -789,19 +789,7 @@ bool memory_cache::_find_file_(const char * name, file_cache** f_out)
     if(iter != m_file_cache.end())
     {
         if(!iter->second->file_fresh())
-        {
-            FILE_CACHE_DATA * file_data = iter->second->file_rdlock();
-            m_file_cache_size -= file_data->len;
-            iter->second->file_unlock();
-            
-            unlock_file_cache(); //release read lock
-            wrlock_file_cache(); // switch to the write lock
-            delete iter->second;
-			
-			m_file_cache.erase(iter);
-            
-            /* NOTE: no need to unlock since the unlock will be called in out of this function */
-            
+        {            
             ret = false;
         }
         else
@@ -954,19 +942,6 @@ bool memory_cache::_find_tunneling_(const char * name, tunneling_cache** t_out)
     {
         if(!iter->second->tunneling_fresh())
         {
-            TUNNELING_CACHE_DATA * cache_data = iter->second->tunneling_rdlock();
-            m_tunneling_cache_size -= cache_data->len;
-            iter->second->tunneling_unlock();
-            
-            unlock_tunneling_cache(); //release the read lock
-            wrlock_tunneling_cache(); //switch to the write lock
-            
-            delete iter->second;
-			
-			m_tunneling_cache.erase(iter);
-            
-            /* NOTE: no need to unlock since the unlock will be called in out of this function */
-            
             ret = false;
         }
         else

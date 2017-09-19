@@ -23,7 +23,7 @@ umask 0
 
 heaphttpd_start()
 {
-	/usr/bin/heaphttpd start
+	valgrind --track-fds=yes /usr/bin/heaphttpd start
 }
 
 heaphttpd_stop()

@@ -70,7 +70,6 @@ int RECV_FD(int sfd, int* fd_file, CLIENT_PARAM* param)
 
     if((nrecv = recvmsg(sfd, &msg, 0)) <= 0)  
     {  
-
         return nrecv;  
     }
 
@@ -92,9 +91,12 @@ int RECV_FD(int sfd, int* fd_file, CLIENT_PARAM* param)
     else  
     {  
         if(cmptr == NULL)
-			printf("null cmptr, fd not passed.\n");  
+			perror("null cmptr, fd not passed");  
         else
+        {
+            perror("recvmsg");
 			printf("message len[%d] if incorrect.\n", cmptr->cmsg_len);  
+        }
         *fd_file = -1; // descriptor was not passed  
     }   
     return *fd_file;  
