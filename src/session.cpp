@@ -92,15 +92,10 @@ void Session::Process()
             m_sockfd = -1;
             return;
         }
-        
-        if(m_http2)
+        httpConn = pProtocol->Processing();
+        if(!m_http2)
         {
-            httpConn = pProtocol->Processing();
-        }
-        else
-        {
-            m_http_tunneling  = pProtocol->GetHttpTunneling();
-            httpConn = pProtocol->Processing();
+			m_http_tunneling  = pProtocol->GetHttpTunneling();
         }
         delete pProtocol;
     }

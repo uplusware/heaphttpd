@@ -39,10 +39,10 @@ typedef struct
 class http_tunneling
 {
 public:
-    http_tunneling(int client_socked, const char* szAddr, unsigned short nPort, HTTPTunneling type, memory_cache* cache, const char* http_url);
+    http_tunneling(int client_socked, HTTPTunneling type, memory_cache* cache);
     virtual ~http_tunneling();
     
-    bool connect_backend();
+    bool connect_backend(const char* szAddr, unsigned short nPort, const char* http_url);
     
     bool send_request(const char* hbuf, int hlen, const char* dbuf, int dlen);
     bool recv_relay_reply();

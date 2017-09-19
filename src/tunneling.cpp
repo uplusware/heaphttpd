@@ -7,27 +7,32 @@
 #include "http_client.h"
 #include "httpcomm.h"
 
-http_tunneling::http_tunneling(int client_socked, const char* szAddr, unsigned short nPort, HTTPTunneling type, memory_cache* cache, const char* http_url)
+http_tunneling::http_tunneling(int client_socked, HTTPTunneling type, memory_cache* cache)
 {
-    m_address = szAddr;
-    m_port = nPort;
+    m_address = "";
+    m_port = 0;
     m_client_sockfd = client_socked;
     m_backend_sockfd = -1;
     m_type = type;
     m_cache = cache;
-    m_http_tunneling_url = http_url;
+    m_http_tunneling_url = "";
     m_tunneling_cache_instance = NULL;
 }
 
 http_tunneling::~http_tunneling()
 {
     if(m_backend_sockfd > 0)
+	{
         close(m_backend_sockfd);
+		
+	}
     m_backend_sockfd = -1;
 }
 
-bool http_tunneling::connect_backend()
+bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, const char* http_url)
 {
+	m_http_tunneling_url = http_url;
+	
     if(CHttpBase::m_enable_http_tunneling_cache)
     {
         m_cache->rdlock_tunneling_cache();
@@ -40,6 +45,13 @@ bool http_tunneling::connect_backend()
         }
     }
     
+	if(m_address == szAddr && m_port == nPort && m_backend_sockfd > 0)
+		return true;
+	
+	//connect to the new address:port
+	m_address = szAddr;
+    m_port = nPort;
+	
     unsigned short backhost_port = m_port;
     
     /* Get the IP from the name */

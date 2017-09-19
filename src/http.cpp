@@ -128,7 +128,7 @@ CHttp::~CHttp()
 			m_sockfd = -1;
 		}
 	}
-    
+	
     if(m_lssl)
         delete m_lssl;
     
@@ -566,8 +566,8 @@ void CHttp::Tunneling()
         }
         
         if(!m_http_tunneling)
-            m_http_tunneling = new http_tunneling(m_sockfd, m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_connection, m_cache, m_http_tunneling_url.c_str());
-        if(m_http_tunneling->connect_backend()) //connected
+            m_http_tunneling = new http_tunneling(m_sockfd, m_http_tunneling_connection, m_cache);
+        if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str())) //connected
         {
             if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
             {
