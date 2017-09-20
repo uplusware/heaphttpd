@@ -56,9 +56,9 @@ static bool lock_pid_file(const char* pflag)
 	/* try and set a write lock on the entire file   */   
 	if(write_lock(fd, 0, SEEK_SET, 0) < 0)
 	{   
-        perror("write_lock");
-		if((errno == EACCES) || (errno == EAGAIN))
+        if((errno == EACCES) || (errno == EAGAIN))
 		{   
+            close(fd);
 		    return false;   
 		}
 		else
@@ -116,7 +116,8 @@ static bool check_pid_file(const char* pflag)
 	if(write_lock(fd, 0, SEEK_SET, 0) < 0)
 	{   
 		if((errno == EACCES) || (errno == EAGAIN))
-		{   
+		{
+            close(fd);
 		    return false;   
 		}
 		else

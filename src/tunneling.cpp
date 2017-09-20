@@ -201,6 +201,7 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
     
     if(!connected)
     {
+        /*
         string strError = backhost_ip;
         strError += ":";
         strError += szPort;
@@ -208,6 +209,8 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         strError += strerror(errno);
         
         fprintf(stderr, "HTTP Tunneling: %s\n", strError.c_str());
+        */
+        
         if(m_backend_sockfd > 0)
             close(m_backend_sockfd);
         m_backend_sockfd = -1;
