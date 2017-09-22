@@ -35,7 +35,7 @@ CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, cons
     cgi_socket_t fpm_socktype, const char* fpm_sockfile,
     const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
     map<string, cgi_cfg_t>* cgi_list,
-	const char* private_path, AUTH_SCHEME wwwauth_scheme, 
+	const char* private_path, AUTH_SCHEME wwwauth_scheme, AUTH_SCHEME proxyauth_scheme, 
 	SSL* ssl, CHttp2* phttp2, uint_32 http2_stream_ind)
 {	
     m_srvobj = srvobj;
@@ -45,7 +45,9 @@ CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, cons
     m_keep_alive = TRUE; //HTTP/1.1 Keep-Alive is enabled as default
     m_enabled_keep_alive = TRUE; //default is true in a session
 	m_passed_wwwauth = FALSE;
+    m_passed_proxyauth = FALSE;
 	m_wwwauth_scheme = wwwauth_scheme;
+    m_proxyauth_scheme = proxyauth_scheme;
 	m_cache = ch;
 
     m_ext_list = ext_list;
@@ -829,6 +831,135 @@ Http_Connection CHttp::LineParse(const char* text)
                 RecvPostData();
             }
             
+            //Authentication
+            if(m_http_tunneling_connection == HTTP_Tunneling_None)
+            {
+                if((GetWWWAuthScheme() == asBasic || GetWWWAuthScheme() == asDigest)
+                    && !IsPassedWWWAuth())
+                {
+                    CHttpResponseHdr header;
+                    string strRealm = "User or Administrator";
+                    header.SetStatusCode(SC401);
+                    
+                    unsigned char md5key[17];
+                    sprintf((char*)md5key, "%016lx", pthread_self());
+                    
+                    unsigned char szMD5Realm[16];
+                    char szHexMD5Realm[33];
+                    HMAC_MD5((unsigned char*)strRealm.c_str(), strRealm.length(), md5key, 16, szMD5Realm);
+                    sprintf(szHexMD5Realm, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", 
+                        szMD5Realm[0], szMD5Realm[1], szMD5Realm[2], szMD5Realm[3],
+                        szMD5Realm[4], szMD5Realm[5], szMD5Realm[6], szMD5Realm[7],
+                        szMD5Realm[8], szMD5Realm[9], szMD5Realm[10], szMD5Realm[11],
+                        szMD5Realm[12], szMD5Realm[13], szMD5Realm[14], szMD5Realm[15]);
+                            
+                    string strVal;
+                    if(GetWWWAuthScheme() == asBasic)
+                    {
+                        strVal = "Basic realm=\"";
+                        strVal += strRealm;
+                        strVal += "\"";
+                    }
+                    else if(GetWWWAuthScheme() == asDigest)
+                    {
+                        
+                        struct timeval tval;
+                        struct timezone tzone;
+                        gettimeofday(&tval, &tzone);
+                        char szNonce[35];
+                        srandom(time(NULL));
+                        unsigned long long thisp64 = (unsigned long long)this;
+                        thisp64 <<= 32;
+                        thisp64 >>= 32;
+                        unsigned long thisp32 = (unsigned long)thisp64;
+                        
+                        sprintf(szNonce, "%08x%016lx%08x%02x", tval.tv_sec, tval.tv_usec + 0x01B21DD213814000ULL, thisp32, random()%255);
+                        
+                        strVal = "Digest realm=\"";
+                        strVal += strRealm;
+                        strVal += "\", qop=\"auth,auth-int\", nonce=\"";
+                        strVal += szNonce;
+                        strVal += "\", opaque=\"";
+                        strVal += szHexMD5Realm;
+                        strVal += "\"";
+                        
+                    }
+                    //printf("%s\n", strVal.c_str());
+                    header.SetField("WWW-Authenticate", strVal.c_str());
+                    
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    
+                    SendHeader(header.Text(), header.Length());
+                    SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    return httpContinue;
+                }
+            }
+            else
+            {
+                if((GetProxyAuthScheme() == asBasic || GetProxyAuthScheme() == asDigest)
+                    && !IsPassedProxyAuth())
+                {
+                    CHttpResponseHdr header;
+                    header.SetStatusCode(SC407);
+                    string strRealm = "Proxy User or Administrator";
+                    
+                    unsigned char md5key[17];
+                    sprintf((char*)md5key, "%016lx", pthread_self());
+                    
+                    unsigned char szMD5Realm[16];
+                    char szHexMD5Realm[33];
+                    HMAC_MD5((unsigned char*)strRealm.c_str(), strRealm.length(), md5key, 16, szMD5Realm);
+                    sprintf(szHexMD5Realm, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", 
+                        szMD5Realm[0], szMD5Realm[1], szMD5Realm[2], szMD5Realm[3],
+                        szMD5Realm[4], szMD5Realm[5], szMD5Realm[6], szMD5Realm[7],
+                        szMD5Realm[8], szMD5Realm[9], szMD5Realm[10], szMD5Realm[11],
+                        szMD5Realm[12], szMD5Realm[13], szMD5Realm[14], szMD5Realm[15]);
+                            
+                    string strVal;
+                    if(GetProxyAuthScheme() == asBasic)
+                    {
+                        strVal = "Basic realm=\"";
+                        strVal += strRealm;
+                        strVal += "\"";
+                    }
+                    else if(GetProxyAuthScheme() == asDigest)
+                    {
+                        
+                        struct timeval tval;
+                        struct timezone tzone;
+                        gettimeofday(&tval, &tzone);
+                        char szNonce[35];
+                        srandom(time(NULL));
+                        unsigned long long thisp64 = (unsigned long long)this;
+                        thisp64 <<= 32;
+                        thisp64 >>= 32;
+                        unsigned long thisp32 = (unsigned long)thisp64;
+                        
+                        sprintf(szNonce, "%08x%016lx%08x%02x", tval.tv_sec, tval.tv_usec + 0x01B21DD213814000ULL, thisp32, random()%255);
+                        
+                        strVal = "Digest realm=\"";
+                        strVal += strRealm;
+                        strVal += "\", qop=\"auth,auth-int\", nonce=\"";
+                        strVal += szNonce;
+                        strVal += "\", opaque=\"";
+                        strVal += szHexMD5Realm;
+                        strVal += "\"";
+                        
+                    }
+                    //printf("%s\n", strVal.c_str());
+                    header.SetField("Proxy-Authenticate", strVal.c_str());
+                    
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    
+                    SendHeader(header.Text(), header.Length());
+                    SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    return httpContinue;
+                }
+            }
+            
+            //go ahead after authentication
             if(m_http_tunneling_connection == HTTP_Tunneling_None)
             {
                 if(m_http_method == hmPut || m_http_method == hmDelete)
@@ -878,9 +1009,12 @@ Http_Connection CHttp::LineParse(const char* text)
         }
         else
         {
-            //store the header content
-            m_header_content += strtext;
-            m_header_content += "\r\n";
+            //store the header content except the proxy authentication
+            if(strncasecmp(strtext.c_str(), "Proxy-Authorization:", 20) != 0)
+            {
+                m_header_content += strtext;
+                m_header_content += "\r\n";
+            }
             
             /* Protocol-Specific Meta-Variables for CGI */
             string strSpecVarName, strSpecVarValue;
@@ -1017,6 +1151,31 @@ Http_Connection CHttp::LineParse(const char* text)
                 }
                 
                 m_cgi.SetMeta("PHP_AUTH_DIGEST", php_digest.c_str());
+            }
+            else if(strncasecmp(strtext.c_str(), "Proxy-Authorization: Basic", 26) == 0)
+            {
+                string strauth;
+                strcut(strtext.c_str(), "Proxy-Authorization: Basic ", NULL, strauth);
+
+                string php_auth_pwd;
+                
+                if(WWW_Auth(asBasic, strauth.c_str(), m_username, php_auth_pwd))
+                {
+                    m_passed_proxyauth = TRUE;
+                }
+            }
+            else if(strncasecmp(strtext.c_str(), "Proxy-Authorization: Digest", 27) == 0)
+            {
+                string strauth;
+                strcut(strtext.c_str(), "Proxy-Authorization: Digest ", NULL, strauth);
+                
+                string php_digest;
+                
+                if(WWW_Auth(asDigest, strauth.c_str(), m_username, php_digest, HTTP_METHOD_NAME[m_http_method]))
+                {
+                    m_passed_proxyauth = TRUE;
+                }
+                
             }
             else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Key", 17) == 0)
             {

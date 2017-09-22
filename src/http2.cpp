@@ -80,7 +80,7 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list,
-        const char* private_path, AUTH_SCHEME wwwauth_scheme,
+        const char* private_path, AUTH_SCHEME wwwauth_scheme, AUTH_SCHEME proxyauth_scheme,
 		SSL* ssl)
 {
     m_peer_window_size = 0;
@@ -119,6 +119,7 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
     m_cgi_list = cgi_list;
     m_private_path = private_path;
     m_wwwauth_scheme = wwwauth_scheme;
+    m_proxyauth_scheme = proxyauth_scheme;
     m_ssl = ssl;
     
     m_lsockfd = NULL;
@@ -407,6 +408,7 @@ http2_stream* CHttp2::create_stream_instance(uint_32 stream_ind)
                                                 m_cgi_list,
                                                 m_private_path.c_str(),
                                                 m_wwwauth_scheme,
+                                                m_proxyauth_scheme,
                                                 m_ssl);
     }
     else

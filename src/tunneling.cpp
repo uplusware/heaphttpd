@@ -72,13 +72,13 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         {
             if(rval == EAI_AGAIN)
                 continue;
-            
+/*            
             string strError = m_address;
             strError += " ";
             strError += strerror(errno);
             
             fprintf(stderr, "%s(line:%d): %s\n", __FILE__, __LINE__, strError.c_str());
-            
+*/            
             return false;
         }
         else
@@ -250,13 +250,33 @@ bool http_tunneling::recv_relay_reply()
             {
                 CHttpResponseHdr header;
                 header.SetStatusCode(SC200);
-                header.SetField("Content-Type", tunneling_cache_data->type.c_str());
-                header.SetField("Cache-Control", tunneling_cache_data->cache.c_str());
-                header.SetField("ETag", tunneling_cache_data->etag.c_str());
-                header.SetField("Content-Length", tunneling_cache_data->len);
-                header.SetField("Expires", tunneling_cache_data->expires.c_str());
-                header.SetField("Last-Modified", tunneling_cache_data->last_modified.c_str());
-
+                if(tunneling_cache_data->type != "")
+                    header.SetField("Content-Type", tunneling_cache_data->type.c_str());
+                if(tunneling_cache_data->cache != "")
+                    header.SetField("Cache-Control", tunneling_cache_data->cache.c_str());                
+                if(tunneling_cache_data->allow != "")
+                    header.SetField("Allow", tunneling_cache_data->allow.c_str());
+                if(tunneling_cache_data->encoding != "")
+                    header.SetField("Content-Encoding", tunneling_cache_data->encoding.c_str());
+                if(tunneling_cache_data->language != "")
+                    header.SetField("Content-Language", tunneling_cache_data->language.c_str());
+                if(tunneling_cache_data->etag != "")
+                    header.SetField("ETag", tunneling_cache_data->etag.c_str());
+                if(tunneling_cache_data->len >= 0)
+                    header.SetField("Content-Length", tunneling_cache_data->len);
+                if(tunneling_cache_data->expires != "")
+                    header.SetField("Expires", tunneling_cache_data->expires.c_str());
+                if(tunneling_cache_data->last_modified != "")
+                    header.SetField("Last-Modified", tunneling_cache_data->last_modified.c_str());
+                
+                header.SetField("Connection", "Keep-Alive");
+                
+                string strVia = "HTTP/1.1 ";
+                strVia += CHttpBase::m_localhostname.c_str();
+                strVia += "(Heaphttpd/1.0)";
+                
+                header.SetField("Via", strVia.c_str());
+                
                 //printf("%s",  header.Text());
                 if(_Send_(m_client_sockfd, header.Text(), header.Length()) < 0 || _Send_(m_client_sockfd, "\r\n", 2) < 0)
                 {

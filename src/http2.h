@@ -108,7 +108,7 @@ public:
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list,
-        const char* private_path, AUTH_SCHEME wwwauth_scheme = asNone,
+        const char* private_path, AUTH_SCHEME wwwauth_scheme = asNone, AUTH_SCHEME proxyauth_scheme = asNone,
 		SSL* ssl = NULL);
         
 	virtual ~CHttp2();
@@ -166,6 +166,7 @@ private:
     
     string m_private_path;
     AUTH_SCHEME m_wwwauth_scheme;
+    AUTH_SCHEME m_proxyauth_scheme;
     SSL* m_ssl;
 
     linesock* m_lsockfd;

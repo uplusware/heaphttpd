@@ -21,67 +21,6 @@
 
 void Htdoc::Response()
 {
-	if((m_session->GetWWWAuthScheme() == asBasic || m_session->GetWWWAuthScheme() == asDigest)
-        && !m_session->IsPassedWWWAuth())
-	{
-		CHttpResponseHdr header;
-		header.SetStatusCode(SC401);
-		string strRealm = "User or Administrator";
-		
-		unsigned char md5key[17];
-		sprintf((char*)md5key, "%016lx", pthread_self());
-		
-		unsigned char szMD5Realm[16];
-		char szHexMD5Realm[33];
-		HMAC_MD5((unsigned char*)strRealm.c_str(), strRealm.length(), md5key, 16, szMD5Realm);
-		sprintf(szHexMD5Realm, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", 
-			szMD5Realm[0], szMD5Realm[1], szMD5Realm[2], szMD5Realm[3],
-			szMD5Realm[4], szMD5Realm[5], szMD5Realm[6], szMD5Realm[7],
-			szMD5Realm[8], szMD5Realm[9], szMD5Realm[10], szMD5Realm[11],
-			szMD5Realm[12], szMD5Realm[13], szMD5Realm[14], szMD5Realm[15]);
-				
-		string strVal;
-		if(m_session->GetWWWAuthScheme() == asBasic)
-		{
-			strVal = "Basic realm=\"";
-			strVal += strRealm;
-			strVal += "\"";
-		}
-		else if(m_session->GetWWWAuthScheme() == asDigest)
-		{
-			
-			struct timeval tval;
-			struct timezone tzone;
-		    gettimeofday(&tval, &tzone);
-			char szNonce[35];
-			srandom(time(NULL));
-            unsigned long long thisp64 = (unsigned long long)this;
-            thisp64 <<= 32;
-            thisp64 >>= 32;
-            unsigned long thisp32 = (unsigned long)thisp64;
-            
-			sprintf(szNonce, "%08x%016lx%08x%02x", tval.tv_sec, tval.tv_usec + 0x01B21DD213814000ULL, thisp32, random()%255);
-			
-			strVal = "Digest realm=\"";
-			strVal += strRealm;
-			strVal += "\", qop=\"auth,auth-int\", nonce=\"";
-			strVal += szNonce;
-			strVal += "\", opaque=\"";
-			strVal += szHexMD5Realm;
-			strVal += "\"";
-			
-		}
-		//printf("%s\n", strVal.c_str());
-		header.SetField("WWW-Authenticate", strVal.c_str());
-		
-        header.SetField("Content-Type", "text/html");
-		header.SetField("Content-Length", header.GetDefaultHTMLLength());
-		
-		m_session->SendHeader(header.Text(), header.Length());
-		m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-		return;
-	}
-
     if(m_session->GetWebSocketHandShake())
     {
         if(m_session->GetWebSocketHandShake() == Websocket_Nak)

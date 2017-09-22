@@ -55,7 +55,7 @@ public:
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list,
-        const char* private_path, AUTH_SCHEME wwwauth_scheme = asNone,
+        const char* private_path, AUTH_SCHEME wwwauth_scheme = asNone, AUTH_SCHEME proxyauth_scheme = asNone,
 		SSL* ssl = NULL, CHttp2* phttp2 = NULL, uint_32 http2_stream_ind = 0);
         
 	virtual ~CHttp();
@@ -132,7 +132,9 @@ public:
     map<string, string> _COOKIE_VARS_; /* var in cookie */
     
 	BOOL IsPassedWWWAuth() { return m_passed_wwwauth; }
+    BOOL IsPassedProxyAuth() { return m_passed_proxyauth; }
 	AUTH_SCHEME GetWWWAuthScheme() { return m_wwwauth_scheme; };
+    AUTH_SCHEME GetProxyAuthScheme() { return m_proxyauth_scheme; };
     
     WebSocket_HandShake GetWebSocketHandShake() { return m_web_socket_handshake; }
 	void SetWebSocketHandShake(WebSocket_HandShake shake) { m_web_socket_handshake = shake;}
@@ -206,7 +208,9 @@ protected:
     CHttpRequestHdr m_request_hdr;
 	
 	BOOL m_passed_wwwauth;
+    BOOL m_passed_proxyauth;
 	AUTH_SCHEME m_wwwauth_scheme;
+    AUTH_SCHEME m_proxyauth_scheme;
     BOOL m_protocol_upgrade;
     string m_upgrade_protocol;
     

@@ -76,6 +76,9 @@ protected:
     int m_cache_max_age;
     string m_cache_control;
     string m_content_type;
+    string m_allow;
+    string m_encoding;
+    string m_language;
     string m_etag;
     string m_last_modified;
     string m_expires;

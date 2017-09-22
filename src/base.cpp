@@ -81,6 +81,7 @@ BOOL   CHttpBase::m_enablehttp2 = FALSE;
 string   CHttpBase::m_http2_tls_cipher = "ECDHE-RSA-AES128-GCM-SHA256:ALL";
 
 string CHttpBase::m_www_authenticate = "";
+string CHttpBase::m_proxy_authenticate = "";
 BOOL   CHttpBase::m_client_cer_check = FALSE;
 string CHttpBase::m_ca_crt_root   = "/var/heaphttpd/cert/ca.crt";
 string CHttpBase::m_ca_crt_server = "/var/heaphttpd/cert/server.crt";
@@ -314,6 +315,11 @@ BOOL CHttpBase::LoadConfig()
 			{
 				strcut(strline.c_str(), "=", NULL, m_www_authenticate );
 				strtrim(m_www_authenticate);
+			}
+            else if(strncasecmp(strline.c_str(), "ProxyAuthenticate", sizeof("ProxyAuthenticate") - 1) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_proxy_authenticate );
+				strtrim(m_proxy_authenticate);
 			}
             else if(strncasecmp(strline.c_str(), "DefaultWebPages", sizeof("DefaultWebPages") - 1) == 0)
             {

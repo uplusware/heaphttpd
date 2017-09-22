@@ -30,6 +30,7 @@ void Session::Process()
 {
 
 	AUTH_SCHEME wwwauth_scheme = asNone;
+    AUTH_SCHEME proxyauth_scheme = asNone;
 	if(strcasecmp(CHttpBase::m_www_authenticate.c_str(), "basic") == 0)
 	{
 		wwwauth_scheme = asBasic;
@@ -39,6 +40,15 @@ void Session::Process()
 		wwwauth_scheme = asDigest;
 	}
 	
+    if(strcasecmp(CHttpBase::m_proxy_authenticate.c_str(), "basic") == 0)
+	{
+		proxyauth_scheme = asBasic;
+	}
+	else if(strcasecmp(CHttpBase::m_proxy_authenticate.c_str(), "digest") == 0)
+	{
+		proxyauth_scheme = asDigest;
+	}
+    
     Http_Connection httpConn = httpKeepAlive;
     
     while(httpConn != httpClose)
@@ -54,7 +64,7 @@ void Session::Process()
                     CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
                     CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
                     &CHttpBase::m_cgi_list,
-                    CHttpBase::m_private_path.c_str(), wwwauth_scheme);
+                    CHttpBase::m_private_path.c_str(), wwwauth_scheme, proxyauth_scheme);
             }
             else if(m_https)
             {
@@ -66,7 +76,7 @@ void Session::Process()
                         CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
                         CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
                         &CHttpBase::m_cgi_list,
-                        CHttpBase::m_private_path.c_str(), wwwauth_scheme, m_ssl);
+                        CHttpBase::m_private_path.c_str(), wwwauth_scheme, proxyauth_scheme, m_ssl);
                 }
                 else
                 {
@@ -76,7 +86,7 @@ void Session::Process()
                         CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
                         CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
                         &CHttpBase::m_cgi_list,
-                        CHttpBase::m_private_path.c_str(), wwwauth_scheme, m_ssl);
+                        CHttpBase::m_private_path.c_str(), wwwauth_scheme, proxyauth_scheme, m_ssl);
                 }
             }
             else

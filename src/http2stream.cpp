@@ -10,7 +10,7 @@ http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_3
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list,
-        const char* private_path, AUTH_SCHEME wwwauth_scheme,
+        const char* private_path, AUTH_SCHEME wwwauth_scheme, AUTH_SCHEME proxyauth_scheme,
 		SSL* ssl)
 {
     m_path = "";
@@ -39,6 +39,7 @@ http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_3
     m_default_webpages = default_webpages;
     m_private_path = private_path;
     m_wwwauth_scheme = wwwauth_scheme;
+    m_proxyauth_scheme = proxyauth_scheme;
     m_ssl = ssl;
     
     m_http2 = phttp2;
@@ -62,6 +63,7 @@ http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_3
                             m_cgi_list,
                             m_private_path.c_str(),
                             m_wwwauth_scheme,
+                            m_proxyauth_scheme,
                             m_ssl, m_http2, m_stream_ind);
     m_hpack = NULL;
     

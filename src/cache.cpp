@@ -956,7 +956,11 @@ bool memory_cache::_find_tunneling_(const char * name, tunneling_cache** t_out)
 }
 
 bool memory_cache::_push_tunneling_(const char* name, 
-        char* buf, unsigned int len, const char* type, const char* cache, const char* last_modify, const char* etag, const char* expires, const char* server, unsigned int max_age,
+        char* buf, unsigned int len, const char* type, const char* cache,
+        const char* allow,
+        const char* encoding,
+        const char* language,
+        const char* last_modify, const char* etag, const char* expires, const char* server, unsigned int max_age,
         tunneling_cache** t_out)
 {
     bool ret = false;
@@ -971,7 +975,7 @@ bool memory_cache::_push_tunneling_(const char* name,
             iter->second->tunneling_unlock();
             delete iter->second;
         }   
-        iter->second = new tunneling_cache(buf, len, type, cache, etag, last_modify, expires, server, max_age);
+        iter->second = new tunneling_cache(buf, len, type, cache, allow, encoding, language, etag, last_modify, expires, server, max_age);
         m_tunneling_cache_size += len;
         
         *t_out = iter->second;
@@ -979,7 +983,7 @@ bool memory_cache::_push_tunneling_(const char* name,
     }
     else
     {
-        tunneling_cache * t_cache = new tunneling_cache(buf, len, type, cache, etag, last_modify, expires, server, max_age);
+        tunneling_cache * t_cache = new tunneling_cache(buf, len, type, cache, allow, encoding, language, etag, last_modify, expires, server, max_age);
        
         if(m_tunneling_cache_size < CHttpBase::m_total_tunneling_cache_size)
         {

@@ -217,6 +217,9 @@ http_client::~http_client()
         tunneling_cache* c_out;
         m_cache->wrlock_tunneling_cache();
         m_cache->_push_tunneling_(m_http_tunneling_url.c_str(), m_cache_buf, m_cache_data_len, m_content_type.c_str(), m_cache_control.c_str(),
+            m_allow.c_str(),
+            m_encoding.c_str(),
+            m_language.c_str(),
             m_last_modified.c_str(), m_etag.c_str(), m_expires.c_str(), m_server.c_str(), m_cache_max_age, &c_out);
         m_cache->unlock_tunneling_cache();
     }
@@ -233,6 +236,7 @@ http_client::~http_client()
 
 bool http_client::parse(const char* text)
 {
+    bool out_of_cache_header_scope = false;
     string strtext;
     m_line_text += text;
     std::size_t new_line;
@@ -242,7 +246,7 @@ bool http_client::parse(const char* text)
         m_line_text = m_line_text.substr(new_line + 1);
 
         strtrim(strtext);
-        // printf(">>>>> %s\r\n", strtext.c_str());
+        //printf(">>>>> %s\r\n", strtext.c_str());
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)
         {
@@ -341,6 +345,21 @@ bool http_client::parse(const char* text)
             strcut(strtext.c_str(), "Server:", NULL, m_server);
             strtrim(m_server);
         }
+        else if(strncasecmp(strtext.c_str(), "Allow:", 6) == 0)
+        {
+            strcut(strtext.c_str(), "Allow:", NULL, m_allow);
+            strtrim(m_allow);
+        }
+        else if(strncasecmp(strtext.c_str(), "Content-Encoding:", 17) == 0)
+        {
+            strcut(strtext.c_str(), "Content-Encoding:", NULL, m_encoding);
+            strtrim(m_encoding);
+        }
+        else if(strncasecmp(strtext.c_str(), "Content-Language:", 17) == 0)
+        {
+            strcut(strtext.c_str(), "Content-Language:", NULL, m_language);
+            strtrim(m_language);
+        }
         else if(strncasecmp(strtext.c_str(), "Last-Modified:", 14) == 0)
         {
             strcut(strtext.c_str(), "Last-Modified:", NULL, m_last_modified);
@@ -369,8 +388,24 @@ bool http_client::parse(const char* text)
             strcut(strtext.c_str(), "Content-Type:", NULL, m_content_type);
             strtrim(m_content_type);
         }
+        else if(strncasecmp(strtext.c_str(), "Connection:", 11) == 0 
+            || strncasecmp(strtext.c_str(), "Accept-Ranges:", 14) == 0
+            || strncasecmp(strtext.c_str(), "Date:", 5) == 0
+            || strncasecmp(strtext.c_str(), "Via:", 4) == 0)
+        {
+            //do nothing
+        }
+        else
+        {
+            //printf("Out of scope: %s\r\n", strtext.c_str());
+            out_of_cache_header_scope = true;
+        }
     }
 	
+    if(out_of_cache_header_scope)
+    {
+        m_use_cache = false;
+    }
 	return true;
 }
 
@@ -409,13 +444,24 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                     if(!parse(m_buf))
 						return false;
                     
-                    if(_Send_(m_client_sockfd, m_buf, x + 4) < 0)
+                    if(_Send_(m_client_sockfd, m_buf, x + 2) < 0) // not x + 4 since need to append Via header fragment.
                     {
                         close(m_client_sockfd);
                         close(m_backend_sockfd);
                         return false;
                     }
                     
+                    //Add the proxy tag
+                    string strVia = "Via: HTTP/1.1 ";
+                    strVia += CHttpBase::m_localhostname.c_str();
+                    strVia += "(Heaphttpd/1.0)\r\n\r\n"; //append additional \r\n for ending header
+                    if(_Send_(m_client_sockfd, strVia.c_str(), strVia.length()) < 0)
+                    {
+                        close(m_client_sockfd);
+                        close(m_backend_sockfd);
+                        return false;
+                    }
+                
                     memmove(m_buf, m_buf + x + 4, m_buf_used_len - x - 4);
                     m_buf_used_len = m_buf_used_len - x - 4;
                     
