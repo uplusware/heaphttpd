@@ -192,6 +192,9 @@ http_client::http_client(int client_sockfd, int backend_sockfd, memory_cache* ca
     m_has_content_length = false;
     m_is_chunked = false;
     
+    m_out_of_cache_header_scope = false;
+    m_has_via = false;
+    
     m_buf = (char*)malloc(HTTP_CLIENT_BUF_LEN + 1);
     m_buf[HTTP_CLIENT_BUF_LEN] = '\0';
     m_buf_len = HTTP_CLIENT_BUF_LEN;
@@ -236,7 +239,6 @@ http_client::~http_client()
 
 bool http_client::parse(const char* text)
 {
-    bool out_of_cache_header_scope = false;
     string strtext;
     m_line_text += text;
     std::size_t new_line;
@@ -247,6 +249,8 @@ bool http_client::parse(const char* text)
 
         strtrim(strtext);
         //printf(">>>>> %s\r\n", strtext.c_str());
+        
+        //format the header line.
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)
         {
@@ -260,13 +264,40 @@ bool http_client::parse(const char* text)
             if(strtext[c] == ':' || strtext[c] == ' ')
                 break;
         }
+        
         if(strcmp(strtext.c_str(),"") == 0)
         {
+            if(m_out_of_cache_header_scope)
+            {
+                m_use_cache = false;
+            }
+    
             if(CHttpBase::m_enable_http_tunneling_cache && m_use_cache && has_content_length() && m_content_length <= CHttpBase::m_single_tunneling_cache_size && m_content_length > 0) //only cache the little size data
             {
                 m_cache_buf = (char*)malloc(m_content_length + 1);
                 m_cache_data_len = 0;
             }
+            
+            if(!m_has_via)
+            {
+                string strVia = "Via: HTTP/1.1 ";
+                strVia += CHttpBase::m_localhostname.c_str();
+                strVia += "(Heaphttpd/1.0)\r\n\r\n"; //append additional \r\n for ending header
+                if(_Send_(m_client_sockfd, strVia.c_str(), strVia.length()) < 0)
+                {
+                    close(m_client_sockfd);
+                    close(m_backend_sockfd);
+                    return false;
+                }
+            }
+            
+            if(_Send_(m_client_sockfd, "\r\n", 2) < 0) // not x + 4 since need to append Via header fragment.
+            {
+                close(m_client_sockfd);
+                close(m_backend_sockfd);
+                return false;
+            }
+        
             break;
         }
         else if(strncasecmp(strtext.c_str(), "HTTP/1.0 ", 9) == 0
@@ -388,23 +419,39 @@ bool http_client::parse(const char* text)
             strcut(strtext.c_str(), "Content-Type:", NULL, m_content_type);
             strtrim(m_content_type);
         }
+        else if(strncasecmp(strtext.c_str(), "Via:", 4) == 0)
+        {
+            m_has_via = true;
+            
+            strtext += ", HTTP/1.1 ";
+            strtext += CHttpBase::m_localhostname.c_str();
+            strtext += "(Heaphttpd/1.0)";
+        }
         else if(strncasecmp(strtext.c_str(), "Connection:", 11) == 0 
             || strncasecmp(strtext.c_str(), "Accept-Ranges:", 14) == 0
-            || strncasecmp(strtext.c_str(), "Date:", 5) == 0
-            || strncasecmp(strtext.c_str(), "Via:", 4) == 0)
+            || strncasecmp(strtext.c_str(), "Date:", 5) == 0)
         {
             //do nothing
         }
         else
         {
-            //printf("Out of scope: %s\r\n", strtext.c_str());
-            out_of_cache_header_scope = true;
+            m_out_of_cache_header_scope = true;
         }
-    }
-	
-    if(out_of_cache_header_scope)
-    {
-        m_use_cache = false;
+        
+        //send each header line with \r\n
+        if(_Send_(m_client_sockfd, strtext.c_str(), strtext.length()) < 0) // not x + 4 since need to append Via header fragment.
+        {
+            close(m_client_sockfd);
+            close(m_backend_sockfd);
+            return false;
+        }
+        
+        if(_Send_(m_client_sockfd, "\r\n", 2) < 0) // not x + 4 since need to append Via header fragment.
+        {
+            close(m_client_sockfd);
+            close(m_backend_sockfd);
+            return false;
+        }
     }
 	return true;
 }
@@ -443,25 +490,9 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                     
                     if(!parse(m_buf))
 						return false;
-                    
-                    if(_Send_(m_client_sockfd, m_buf, x + 2) < 0) // not x + 4 since need to append Via header fragment.
-                    {
-                        close(m_client_sockfd);
-                        close(m_backend_sockfd);
-                        return false;
-                    }
-                    
-                    //Add the proxy tag
-                    string strVia = "Via: HTTP/1.1 ";
-                    strVia += CHttpBase::m_localhostname.c_str();
-                    strVia += "(Heaphttpd/1.0)\r\n\r\n"; //append additional \r\n for ending header
-                    if(_Send_(m_client_sockfd, strVia.c_str(), strVia.length()) < 0)
-                    {
-                        close(m_client_sockfd);
-                        close(m_backend_sockfd);
-                        return false;
-                    }
-                
+                    /*
+                        The header has been sent in parse(...) function
+                    */
                     memmove(m_buf, m_buf + x + 4, m_buf_used_len - x - 4);
                     m_buf_used_len = m_buf_used_len - x - 4;
                     

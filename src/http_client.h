@@ -68,6 +68,9 @@ public:
     bool has_content_length() { return m_has_content_length; }
     
 protected:
+    bool m_out_of_cache_header_scope;
+    bool m_has_via;
+    
     string m_line_text;
     bool m_has_content_length;
     int m_content_length;
