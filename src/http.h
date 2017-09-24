@@ -126,7 +126,9 @@ public:
     {
         m_request_hdr.GetField(name, val);
     }
-
+    
+    BOOL RequestNoCache() { return m_request_no_cache; }
+    
     map<string, string> _POST_VARS_; /* var in post data */
 	map<string, string> _GET_VARS_; /* var in query string */
     map<string, string> _COOKIE_VARS_; /* var in cookie */
@@ -230,6 +232,8 @@ protected:
     string m_http_tunneling_url;   
     
     http_tunneling* m_http_tunneling;
+    
+    BOOL m_request_no_cache;
 };
 
 #endif /* _HTTP_H_ */

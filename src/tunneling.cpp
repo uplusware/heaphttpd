@@ -29,11 +29,11 @@ http_tunneling::~http_tunneling()
     m_backend_sockfd = -1;
 }
 
-bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, const char* http_url)
+bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, const char* http_url, BOOL request_no_cache)
 {
 	m_http_tunneling_url = http_url;
 	
-    if(CHttpBase::m_enable_http_tunneling_cache)
+    if(CHttpBase::m_enable_http_tunneling_cache && !request_no_cache)
     {
         m_cache->rdlock_tunneling_cache();
         m_cache->_find_tunneling_(m_http_tunneling_url.c_str(), &m_tunneling_cache_instance);
@@ -41,6 +41,7 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         
         if(m_tunneling_cache_instance)
         {
+            printf("find cache: %s\n", http_url);
             return true;
         }
     }
@@ -271,13 +272,24 @@ bool http_tunneling::recv_relay_reply()
                 
                 header.SetField("Connection", "Keep-Alive");
                 
-                string strVia = "HTTP/1.1 ";
-                strVia += CHttpBase::m_localhostname.c_str();
-                strVia += "(Heaphttpd/1.0)";
+                string strVia;
+                
+                if(tunneling_cache_data->via == "")
+                {
+                    strVia = "HTTP/1.1 ";
+                    strVia += CHttpBase::m_localhostname.c_str();
+                    strVia += "(Heaphttpd/1.0)";                    
+                }
+                else
+                {
+                    strVia = tunneling_cache_data->via;
+                    strVia += ", HTTP/1.1 ";
+                    strVia += CHttpBase::m_localhostname.c_str();
+                    strVia += "(Heaphttpd/1.0)";
+                }
                 
                 header.SetField("Via", strVia.c_str());
                 
-                //printf("%s",  header.Text());
                 if(_Send_(m_client_sockfd, header.Text(), header.Length()) < 0 || _Send_(m_client_sockfd, "\r\n", 2) < 0)
                 {
                     m_tunneling_cache_instance->tunneling_unlock();

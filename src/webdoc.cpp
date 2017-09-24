@@ -105,7 +105,7 @@ void doc::Response()
     
     bool file_cache_available = false;
     m_session->m_cache->rdlock_file_cache();
-    if(m_session->m_cache->_find_file_(strResourceFullPath.c_str(), &file_cache_instance)
+    if(!m_session->RequestNoCache() && m_session->m_cache->_find_file_(strResourceFullPath.c_str(), &file_cache_instance)
         && file_cache_instance)
     {
         file_cache_data = file_cache_instance->file_rdlock();

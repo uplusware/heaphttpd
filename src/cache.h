@@ -53,6 +53,7 @@ typedef struct {
     string expires;
     string last_modified;
     string server;
+    string via;
     volatile time_t t_access;
 } TUNNELING_CACHE_DATA;
 
@@ -131,7 +132,7 @@ public:
         const char* allow,
         const char* encoding,
         const char* language,
-        const char* etag, const char* last_modified, const char* expires, const char* server, unsigned int max_age)
+        const char* etag, const char* last_modified, const char* expires, const char* server, const char* via, unsigned int max_age)
     {
         pthread_rwlock_init(&m_tunneling_lock, NULL);
         
@@ -148,7 +149,7 @@ public:
         m_cache_data.last_modified = last_modified;
         m_cache_data.expires = expires;
         m_cache_data.server = server;
-                
+        m_cache_data.via = via;
         m_cache_max_time = time(NULL) + max_age;
     }
     
@@ -272,12 +273,18 @@ public:
     
     //tunneling
     bool _find_tunneling_(const char * name, tunneling_cache** t_out);
-    bool _push_tunneling_(const char* name, 
-        char* buf, unsigned int len, const char* type, const char* cache,
+    bool _push_tunneling_(const char* name, char* buf, unsigned int len,
+        const char* type,
+        const char* cache,
         const char* allow,
         const char* encoding,
         const char* language,
-        const char* last_modify, const char* etag, const char* expires, const char* server, unsigned int max_age,
+        const char* last_modify,
+        const char* etag,
+        const char* expires,
+        const char* server,
+        const char* via,
+        unsigned int max_age,
         tunneling_cache** t_out);
     
     //tunneling_cache* lock_tunneling_cache(const char * name, TUNNELING_CACHE_DATA ** cache_data);

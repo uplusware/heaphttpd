@@ -15,7 +15,7 @@ void ApiPerf::Response()
     sprintf(szTmp, "%lu", time(NULL));
     header.SetStatusCode(SC200);
     header.SetField("Content-Type", "text/plain");
-
+    header.SetField("Cache-Control", "max-age=0");
     strResp = szTmp;
     header.SetField("Content-Length", strResp.length());
     

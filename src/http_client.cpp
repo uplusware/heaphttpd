@@ -189,6 +189,8 @@ http_client::http_client(int client_sockfd, int backend_sockfd, memory_cache* ca
     
     m_content_length = -1;
     m_cache_max_age = 300;
+    m_cache_shared_max_age = -1;
+    
     m_has_content_length = false;
     m_is_chunked = false;
     
@@ -223,7 +225,7 @@ http_client::~http_client()
             m_allow.c_str(),
             m_encoding.c_str(),
             m_language.c_str(),
-            m_last_modified.c_str(), m_etag.c_str(), m_expires.c_str(), m_server.c_str(), m_cache_max_age, &c_out);
+            m_last_modified.c_str(), m_etag.c_str(), m_expires.c_str(), m_server.c_str(), m_via.c_str(), m_cache_shared_max_age > 0 ? m_cache_shared_max_age : m_cache_max_age, &c_out);
         m_cache->unlock_tunneling_cache();
     }
 
@@ -282,7 +284,7 @@ bool http_client::parse(const char* text)
             {
                 string strVia = "Via: HTTP/1.1 ";
                 strVia += CHttpBase::m_localhostname.c_str();
-                strVia += "(Heaphttpd/1.0)\r\n\r\n"; //append additional \r\n for ending header
+                strVia += "(Heaphttpd/1.0)\r\n"; //append additional \r\n for ending header
                 if(_Send_(m_client_sockfd, strVia.c_str(), strVia.length()) < 0)
                 {
                     close(m_client_sockfd);
@@ -291,6 +293,7 @@ bool http_client::parse(const char* text)
                 }
             }
             
+            //send the empty line
             if(_Send_(m_client_sockfd, "\r\n", 2) < 0) // not x + 4 since need to append Via header fragment.
             {
                 close(m_client_sockfd);
@@ -364,6 +367,28 @@ bool http_client::parse(const char* text)
                         m_use_cache = false;
                     }
                 }
+                
+                const char* p_shared_max_age = strstr(m_cache_control.c_str() + 14, "s-maxage="); // eg.: Cache-Control:public, max-age=31536000
+                
+                if(p_shared_max_age != NULL)
+                {
+                    string str_shared_max_age;
+                    strcut(p_shared_max_age, "s-maxage=", NULL, str_shared_max_age);
+                    strtrim(str_shared_max_age);	
+                    int n_shared_max_age = atoi(str_shared_max_age.c_str());
+                    
+                    m_cache_shared_max_age = n_shared_max_age < m_cache_shared_max_age ? (n_shared_max_age < 0 ? 0 : n_shared_max_age) : m_cache_shared_max_age;
+                
+                    if(m_cache_shared_max_age > 0 && m_is_200_ok)
+                    {
+                        m_use_cache = true;
+                    }
+                    else
+                    {
+                        m_use_cache = false;
+                    }
+                }
+                /* s-maxage */
             }            
         }
         else if(strncasecmp(strtext.c_str(), "ETag:", 5) == 0)
@@ -421,11 +446,16 @@ bool http_client::parse(const char* text)
         }
         else if(strncasecmp(strtext.c_str(), "Via:", 4) == 0)
         {
+            strcut(strtext.c_str(), "Server:", NULL, m_via);
+            strtrim(m_via);
+            
             m_has_via = true;
             
+            // add the current via
             strtext += ", HTTP/1.1 ";
             strtext += CHttpBase::m_localhostname.c_str();
             strtext += "(Heaphttpd/1.0)";
+            
         }
         else if(strncasecmp(strtext.c_str(), "Connection:", 11) == 0 
             || strncasecmp(strtext.c_str(), "Accept-Ranges:", 14) == 0

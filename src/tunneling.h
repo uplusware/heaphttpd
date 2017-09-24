@@ -42,7 +42,7 @@ public:
     http_tunneling(int client_socked, HTTPTunneling type, memory_cache* cache);
     virtual ~http_tunneling();
     
-    bool connect_backend(const char* szAddr, unsigned short nPort, const char* http_url);
+    bool connect_backend(const char* szAddr, unsigned short nPort, const char* http_url, BOOL request_no_cache);
     
     bool send_request(const char* hbuf, int hlen, const char* dbuf, int dlen);
     bool recv_relay_reply();

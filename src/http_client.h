@@ -77,6 +77,8 @@ protected:
     bool m_is_200_ok;
     bool m_use_cache;
     int m_cache_max_age;
+    int m_cache_shared_max_age;
+    
     string m_cache_control;
     string m_content_type;
     string m_allow;
@@ -86,6 +88,7 @@ protected:
     string m_last_modified;
     string m_expires;
     string m_server;
+    string m_via;
     
     bool m_is_chunked;
     

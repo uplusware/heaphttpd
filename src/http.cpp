@@ -118,6 +118,8 @@ CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, cons
     
     m_http2 = phttp2;
     m_http2_stream_ind = http2_stream_ind;
+    
+    m_request_no_cache = FALSE;
 }
 
 CHttp::~CHttp()
@@ -569,7 +571,7 @@ void CHttp::Tunneling()
         
         if(!m_http_tunneling)
             m_http_tunneling = new http_tunneling(m_sockfd, m_http_tunneling_connection, m_cache);
-        if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str())) //connected
+        if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(), m_request_no_cache)) //connected
         {
             if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
             {
@@ -1177,6 +1179,29 @@ Http_Connection CHttp::LineParse(const char* text)
                 }
                 
             }
+            else if(strncasecmp(strtext.c_str(), "Cache-Control:", 14) == 0)
+            {
+                string strcache;
+                strcut(strtext.c_str(), "Cache-Control:", NULL, strcache);
+                strtrim(strcache);
+                if(strcasecmp(strcache.c_str(), "no-cache") == 0 || strcasecmp(strcache.c_str(), "no-store") == 0)
+                {
+                    m_request_no_cache = TRUE;
+                }
+                
+            }
+            else if(strncasecmp(strtext.c_str(), "Pragma:", 7) == 0)
+            {
+                string strcache;
+                strcut(strtext.c_str(), "Pragma:", NULL, strcache);
+                strtrim(strcache);
+                if(strcasecmp(strcache.c_str(), "no-cache") == 0)
+                {
+                    m_request_no_cache = TRUE;
+                }
+                
+            }
+            /*  */
             else if(m_web_socket_handshake == Websocket_Sync && strncasecmp(strtext.c_str(), "Sec-WebSocket-Key", 17) == 0)
             {
                //Web-socket
