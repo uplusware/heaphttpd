@@ -284,7 +284,7 @@ bool http_client::parse(const char* text)
             {
                 string strVia = "Via: HTTP/1.1 ";
                 strVia += CHttpBase::m_localhostname.c_str();
-                strVia += "(Heaphttpd/1.0)\r\n"; //append additional \r\n for ending header
+                strVia += "(Heaphttpd/1.1)\r\n"; //append additional \r\n for ending header
                 if(_Send_(m_client_sockfd, strVia.c_str(), strVia.length()) < 0)
                 {
                     close(m_client_sockfd);
@@ -454,7 +454,7 @@ bool http_client::parse(const char* text)
             // add the current via
             strtext += ", HTTP/1.1 ";
             strtext += CHttpBase::m_localhostname.c_str();
-            strtext += "(Heaphttpd/1.0)";
+            strtext += "(Heaphttpd/1.1)";
             
         }
         else if(strncasecmp(strtext.c_str(), "Connection:", 11) == 0 

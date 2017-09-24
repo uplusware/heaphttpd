@@ -278,14 +278,14 @@ bool http_tunneling::recv_relay_reply()
                 {
                     strVia = "HTTP/1.1 ";
                     strVia += CHttpBase::m_localhostname.c_str();
-                    strVia += "(Heaphttpd/1.0)";                    
+                    strVia += "(Heaphttpd/1.1)";                    
                 }
                 else
                 {
                     strVia = tunneling_cache_data->via;
                     strVia += ", HTTP/1.1 ";
                     strVia += CHttpBase::m_localhostname.c_str();
-                    strVia += "(Heaphttpd/1.0)";
+                    strVia += "(Heaphttpd/1.1)";
                 }
                 
                 header.SetField("Via", strVia.c_str());

@@ -12,7 +12,7 @@
 //CHttpBase
 //
 //Software Version
-string CHttpBase::m_sw_version = "1.0";
+string CHttpBase::m_sw_version = "1.1";
 
 //Global
 BOOL CHttpBase::m_close_stderr = TRUE;

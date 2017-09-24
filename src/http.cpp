@@ -575,7 +575,7 @@ void CHttp::Tunneling()
         {
             if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
             {
-                const char* connect_resp = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: Heaphttpd Web Server/1.0\r\n\r\n";
+                const char* connect_resp = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: Heaphttpd Web Server/1.1\r\n\r\n";
                 HttpSend(connect_resp, strlen(connect_resp));
                 
                 m_http_tunneling->relay_processing();
