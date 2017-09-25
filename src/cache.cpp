@@ -5,6 +5,8 @@
 #include "cache.h"
 #include "util/general.h"
 #include "util/md5.h"
+#include "tinyxml/tinyxml.h"
+#include "util/security.h"
 
 #ifdef _WITH_MEMCACHED_
     memory_cache::memory_cache(const char* service_name, int process_seq, const char* dirpath, map<string, int> &memcached_list)
@@ -31,7 +33,8 @@
     pthread_rwlock_init(&m_server_var_rwlock, NULL);
     pthread_rwlock_init(&m_file_rwlock, NULL);
     pthread_rwlock_init(&m_tunneling_rwlock, NULL);
-
+    pthread_rwlock_init(&m_users_rwlock, NULL);
+    
 	m_file_cache.clear();
     m_tunneling_cache.clear();
 	m_cookies.clear();
@@ -58,7 +61,7 @@
 memory_cache::~memory_cache()
 {
 	unload();
-	
+	pthread_rwlock_destroy(&m_users_rwlock);
     pthread_rwlock_destroy(&m_tunneling_rwlock);
 	pthread_rwlock_destroy(&m_file_rwlock);
 	pthread_rwlock_destroy(&m_cookie_rwlock);
@@ -627,6 +630,64 @@ void memory_cache::_save_server_vars_()
 	}
 }
 
+void memory_cache::_reload_users_()
+{
+	TiXmlDocument xmlFileterDoc;
+	xmlFileterDoc.LoadFile(CHttpBase::m_users_list_file.c_str());
+	TiXmlElement * pRootElement = xmlFileterDoc.RootElement();
+	if(pRootElement)
+	{
+        m_users_list.clear();
+        
+		TiXmlNode* pChildNode = pRootElement->FirstChild("user");
+		while(pChildNode)
+		{
+			if(pChildNode && pChildNode->ToElement())
+			{
+                if(pChildNode->ToElement()->Attribute("id") && strcmp(pChildNode->ToElement()->Attribute("id"), "") != 0)
+                {
+                    
+                    string strPwd;
+                    if(!pChildNode->ToElement()->Attribute("password") || strcmp(pChildNode->ToElement()->Attribute("password"), "") == 0)
+                    {
+                        strPwd = "";
+                    }
+                    else
+                    {
+                        Security::Decrypt(pChildNode->ToElement()->Attribute("password") , strlen(pChildNode->ToElement()->Attribute("password") ), strPwd);
+                    }
+                                        
+                    m_users_list[pChildNode->ToElement()->Attribute("id")] = strPwd;
+                }
+			}
+			pChildNode = pChildNode->NextSibling("user");
+		}
+	}
+}
+
+
+bool memory_cache::_find_user_(const char * id, string & pwd)
+{
+    bool ret = false;
+    map<string, string>::iterator iter = m_users_list.find(id);
+    if(iter != m_users_list.end())
+    {
+        pwd = iter->second;
+        ret = true;
+    }
+    
+    return ret;
+}
+
+bool memory_cache::find_user(const char * id, string & pwd)
+{
+    pthread_rwlock_rdlock(&m_users_rwlock);
+    bool ret = _find_user_(id, pwd);
+    pthread_rwlock_unlock(&m_users_rwlock);
+    
+    return ret;
+}
+
 void memory_cache::_reload_server_vars_()
 {
 #if 0    
@@ -733,6 +794,13 @@ void memory_cache::reload_server_vars()
     pthread_rwlock_wrlock(&m_server_var_rwlock);
     _reload_server_vars_();
     pthread_rwlock_unlock(&m_server_var_rwlock);
+}
+
+void memory_cache::reload_users()
+{
+    pthread_rwlock_wrlock(&m_users_rwlock);
+    _reload_users_();
+    pthread_rwlock_unlock(&m_users_rwlock);
 }
 
 void memory_cache::clear_server_vars()
@@ -1246,7 +1314,9 @@ void memory_cache::unload()
 void memory_cache::load()
 {
 	unload();
-	reload_server_vars();
+	reload_users();
+    
+    reload_server_vars();
 	reload_session_vars();
 	
 	//create the multitype list

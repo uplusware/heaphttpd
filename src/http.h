@@ -107,7 +107,9 @@ public:
     virtual http_tunneling* GetHttpTunneling() { return m_http_tunneling; }
     
 	memory_cache* m_cache;
-
+    
+    memory_cache* GetCache() { return m_cache; }
+    
 	string m_servername;
 	unsigned short m_serverport;
 	string m_clientip;

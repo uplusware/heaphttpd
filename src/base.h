@@ -49,6 +49,7 @@ using namespace std;
 #define MSG_REJECT_APPEND   	0xFC
 #define MSG_ACCESS_RELOAD		0xFB
 #define MSG_EXTENSION_RELOAD	0xFA
+#define MSG_USERS_RELOAD	    0xF0
 
 typedef struct
 {
@@ -449,6 +450,7 @@ public:
 	static string	m_private_path;
 	static string 	m_work_path;
 	static string   m_ext_list_file;
+    static string   m_users_list_file;
 
 	static vector<http_extension_t> m_ext_list;
 

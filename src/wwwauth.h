@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <string>
 #include <map>
+
+class CHttp;
+
 using namespace std;
 
 typedef enum
@@ -17,6 +20,6 @@ typedef enum
 	asDigest
 } AUTH_SCHEME;
 
-bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, string &keywords, const char* method = "GET");
+bool WWW_Auth(CHttp* psession, AUTH_SCHEME scheme, const char* authinfo, string& username, string &keywords, const char* method = "GET");
 
 #endif /* _WWW_AUTH_ */

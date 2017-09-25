@@ -46,7 +46,7 @@ static void daemon_init()
 	setsid();
 	chdir("/");
 	umask(0);
-	
+    
 	close(STDIN_FILENO);
 	close(STDOUT_FILENO);
     if(CHttpBase::m_close_stderr)
@@ -161,6 +161,15 @@ static int ReloadExtension()
 	Service http_svr(stHTTP);
 	http_svr.ReloadExtension();
 }
+
+static int ReloadUsers()
+{
+	printf("Reload heaphttpd users ...\n");
+
+	Service http_svr(stHTTP);
+	http_svr.ReloadUsers();
+}
+
 static int processcmd(const char* cmd, const char* conf, const char* permit, const char* reject, const char* data)
 {
 	CHttpBase::SetConfigFile(conf, permit, reject);
@@ -193,6 +202,10 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 	else if(strcasecmp(cmd, "extension") == 0)
 	{
 		ReloadExtension();
+	}
+    else if(strcasecmp(cmd, "users") == 0)
+	{
+		ReloadUsers();
 	}
 	else if(strcasecmp(cmd, "status") == 0)
 	{

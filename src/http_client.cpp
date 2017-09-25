@@ -388,7 +388,7 @@ bool http_client::parse(const char* text)
                         m_use_cache = false;
                     }
                 }
-                /* s-maxage */
+                
             }            
         }
         else if(strncasecmp(strtext.c_str(), "ETag:", 5) == 0)

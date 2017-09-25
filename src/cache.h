@@ -233,11 +233,15 @@ public:
 	void _save_session_vars_();
 	void _reload_session_vars_();
 	void reload_session_vars();
+    
 	void save_session_vars();
 	void push_session_var(const char* uid, const char* name, const char* value);
 	int  get_session_var(const char* uid, const char* name, string& value);
 	void clear_session_vars();
 	
+    void _reload_users_();
+    void reload_users();
+    
     void _save_server_vars_();
     void _reload_server_vars_();
     void save_server_vars();
@@ -245,6 +249,10 @@ public:
 	void push_server_var(const char* name, const char* value);
 	int  get_server_var(const char* name, string& value);
 	void clear_server_vars();
+    
+    bool _find_user_(const char * id, string & pwd);
+    bool find_user(const char * id, string & pwd);
+    
 	
     //file
 	file_cache* lock_file(const char * name, FILE_CACHE_DATA ** cache_data);
@@ -325,9 +333,13 @@ private:
     pthread_rwlock_t m_server_var_rwlock;
     pthread_rwlock_t m_file_rwlock;
     pthread_rwlock_t m_tunneling_rwlock;
+    pthread_rwlock_t m_users_rwlock;
     map<string, unsigned long> m_server_vars_file_versions;
     map<string, unsigned long> m_session_vars_file_versions;
     string m_localhostname;
+    
+    map<string, string> m_users_list;
+    
 #ifdef _WITH_MEMCACHED_  
     memcached_st * m_memcached;
     map<pthread_t, memcached_st *> m_memcached_map;

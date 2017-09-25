@@ -1128,7 +1128,7 @@ Http_Connection CHttp::LineParse(const char* text)
                 
                 string php_auth_pwd;
                 
-                if(WWW_Auth(asBasic, strauth.c_str(), m_username, php_auth_pwd))
+                if(WWW_Auth(this, asBasic, strauth.c_str(), m_username, php_auth_pwd))
                 {
                     m_passed_wwwauth = TRUE;
                     m_cgi.SetMeta("REMOTE_USER", m_username.c_str());
@@ -1146,7 +1146,7 @@ Http_Connection CHttp::LineParse(const char* text)
                 
                 m_cgi.SetMeta("AUTH_TYPE", "Digest");
                 
-                if(WWW_Auth(asDigest, strauth.c_str(), m_username, php_digest, HTTP_METHOD_NAME[m_http_method]))
+                if(WWW_Auth(this, asDigest, strauth.c_str(), m_username, php_digest, HTTP_METHOD_NAME[m_http_method]))
                 {
                     m_passed_wwwauth = TRUE;
                     m_cgi.SetMeta("REMOTE_USER", m_username.c_str());
@@ -1161,7 +1161,7 @@ Http_Connection CHttp::LineParse(const char* text)
 
                 string php_auth_pwd;
                 
-                if(WWW_Auth(asBasic, strauth.c_str(), m_username, php_auth_pwd))
+                if(WWW_Auth(this, asBasic, strauth.c_str(), m_username, php_auth_pwd))
                 {
                     m_passed_proxyauth = TRUE;
                 }
@@ -1173,7 +1173,7 @@ Http_Connection CHttp::LineParse(const char* text)
                 
                 string php_digest;
                 
-                if(WWW_Auth(asDigest, strauth.c_str(), m_username, php_digest, HTTP_METHOD_NAME[m_http_method]))
+                if(WWW_Auth(this, asDigest, strauth.c_str(), m_username, php_digest, HTTP_METHOD_NAME[m_http_method]))
                 {
                     m_passed_proxyauth = TRUE;
                 }

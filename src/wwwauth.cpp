@@ -106,7 +106,7 @@ void __inline__ _strtrim_dquote_(string &src) /* icnluding double quote mark*/
 	}
 }
 
-bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, string &keywords, const char* method)
+bool WWW_Auth(CHttp* psession, AUTH_SCHEME scheme, const char* authinfo, string& username, string &keywords, const char* method)
 {
 	string password, real_password;
 	if(scheme == asBasic)
@@ -125,7 +125,7 @@ bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, string
         
         keywords = password;
         
-		if(heaphttpd_usrdef_get_password(username.c_str(), real_password) && password == real_password)
+		if(heaphttpd_usrdef_get_password(psession, username.c_str(), real_password) && password == real_password)
         {
             keywords = real_password;
 			return true;
@@ -174,7 +174,7 @@ bool WWW_Auth(AUTH_SCHEME scheme, const char* authinfo, string& username, string
 			x++;
 		}
 		
-		if(!heaphttpd_usrdef_get_password(DigestMap["username"].c_str(), real_password))
+		if(!heaphttpd_usrdef_get_password(psession, DigestMap["username"].c_str(), real_password))
 			return false;
        
 		char * pszNonce = (char*)DigestMap["nonce"].c_str();

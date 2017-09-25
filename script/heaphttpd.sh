@@ -21,6 +21,7 @@ SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
 cd /
 umask 0
 
+# valgrind debug: valgrind --leak-check=yes --track-fds=yes /usr/bin/heaphttpd start
 heaphttpd_start()
 {
 	/usr/bin/heaphttpd start
@@ -55,6 +56,11 @@ heaphttpd_reject()
 heaphttpd_extension()
 {
 	/usr/bin/heaphttpd extension
+}
+
+heaphttpd_users()
+{
+	/usr/bin/heaphttpd users
 }
 
 heaphttpd_version()
@@ -96,7 +102,11 @@ case "${1:-''}" in
     'extension')
 	heaphttpd_extension
 	;;
-
+    
+    'users')
+	heaphttpd_users
+	;;
+    
 	'status')
 	heaphttpd_status
 	;;
@@ -106,7 +116,7 @@ case "${1:-''}" in
 	;;
 	
 	*)
-	echo "Usage: $SELF Usage:heaphttpd start | stop | status | reload | access | reject [ip] | extension | version"
+	echo "Usage: $SELF Usage:heaphttpd start | stop | status | reload | access | reject [ip] | extension | users | version"
 	exit 1
 	;;
 esac

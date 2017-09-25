@@ -1,0 +1,10 @@
+<!--
+	Copyright (c) openheap, uplusware. uplusware@gmail.com
+    Heaphttpd user:
+        Please make sure id is unique.
+-->
+<? xml version="1.0" encoding="UTF-8" ?>
+<heaphttpd>
+	<user id="user1" description="Heaphttpd user example 1" password="KR9axMmsokE=" />
+	<user id="user2" description="Heaphttpd user example 1" password="YTJjnbwdYbc=" />
+</heaphttpd>

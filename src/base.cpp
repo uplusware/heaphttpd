@@ -21,6 +21,7 @@ string CHttpBase::m_encoding = "UTF-8";
 string CHttpBase::m_private_path = "/tmp/heaphttpd/private";
 string CHttpBase::m_work_path = "/var/heaphttpd/";
 string CHttpBase::m_ext_list_file = "/etc/heaphttpd/extension.xml";
+string CHttpBase::m_users_list_file = "/etc/heaphttpd/users.xml";
 vector<http_extension_t> CHttpBase::m_ext_list;
 
 string CHttpBase::m_localhostname = "localhost";
@@ -187,6 +188,11 @@ BOOL CHttpBase::LoadConfig()
 			{
 				strcut(strline.c_str(), "=", NULL, m_ext_list_file);
 				strtrim(m_ext_list_file);
+			}
+            else if(strncasecmp(strline.c_str(), "UserListFile", sizeof("UserListFile") - 1) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_users_list_file);
+				strtrim(m_users_list_file);
 			}
 			else if(strncasecmp(strline.c_str(), "LocalHostName", sizeof("LocalHostName") - 1) == 0)
 			{
@@ -624,13 +630,14 @@ void CHttpBase::_load_ext_()
     {
     	dlclose(m_ext_list[x].handle);
     }
-    m_ext_list.clear();
 
 	TiXmlDocument xmlFileterDoc;
 	xmlFileterDoc.LoadFile(m_ext_list_file.c_str());
 	TiXmlElement * pRootElement = xmlFileterDoc.RootElement();
 	if(pRootElement)
 	{
+        m_ext_list.clear();
+        
 		TiXmlNode* pChildNode = pRootElement->FirstChild("extension");
 		while(pChildNode)
 		{

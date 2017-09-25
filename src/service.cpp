@@ -78,12 +78,12 @@ int RECV_FD(int sfd, int* fd_file, CLIENT_PARAM* param)
     {  
         if(cmptr->cmsg_level != SOL_SOCKET)  
         {  
-            printf("control level != SOL_SOCKET/n");  
+            fprintf(stderr, "control level != SOL_SOCKET/n");  
             exit(-1);  
         }  
         if(cmptr->cmsg_type != SCM_RIGHTS)  
         {  
-            printf("control type != SCM_RIGHTS/n");  
+            fprintf(stderr, "control type != SCM_RIGHTS/n");  
             exit(-1);  
         } 
         *fd_file = *((int*)CMSG_DATA(cmptr));  
@@ -91,11 +91,12 @@ int RECV_FD(int sfd, int* fd_file, CLIENT_PARAM* param)
     else  
     {  
         if(cmptr == NULL)
-			perror("null cmptr, fd not passed");  
+        {
+			perror("null cmptr, fd not passed");
+        }
         else
         {
-            perror("recvmsg");
-			printf("message len[%d] if incorrect.\n", cmptr->cmsg_len);  
+			fprintf(stderr, "message len[%d] if incorrect: %s\n", cmptr->cmsg_len, strerror(errno));  
         }
         *fd_file = -1; // descriptor was not passed  
     }   
@@ -505,6 +506,11 @@ void Worker::Working(CUplusTrace& uTrace)
 			printf("Reload extensions\n");
 			CHttpBase::LoadExtensionList();
 		}
+        else if(client_param.ctrl == SessionParamUsers)
+		{
+			printf("Reload Users\n");
+			m_cache->reload_users();
+		}
 		else
 		{
 			SESSION_PARAM* session_param = new SESSION_PARAM;
@@ -689,6 +695,35 @@ void Service::ReloadExtension()
 	if(m_service_sid != SEM_FAILED)
 		sem_close(m_service_sid);
 }
+
+void Service::ReloadUsers()
+{
+	string strqueue = HEAPHTTPD_POSIX_PREFIX;
+	strqueue += m_service_name;
+	strqueue += HEAPHTTPD_POSIX_QUEUE_SUFFIX;
+
+	string strsem = HEAPHTTPD_POSIX_PREFIX;
+	strsem += m_service_name;
+	strsem += HEAPHTTPD_POSIX_SEMAPHORE_SUFFIX;
+	
+	m_service_qid = mq_open(strqueue.c_str(), O_RDWR);
+	m_service_sid = sem_open(strsem.c_str(), O_RDWR);
+
+	if(m_service_qid == (mqd_t)-1 || m_service_sid == SEM_FAILED)
+		return;
+
+	stQueueMsg qMsg;
+	qMsg.cmd = MSG_USERS_RELOAD;
+	sem_wait(m_service_sid);
+	mq_send(m_service_qid, (const char*)&qMsg, sizeof(stQueueMsg), 0);
+	sem_post(m_service_sid);
+	
+	if(m_service_qid != (mqd_t)-1)
+		mq_close(m_service_qid);
+	if(m_service_sid != SEM_FAILED)
+		sem_close(m_service_sid);
+}
+
 
 int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct sockaddr_storage& clt_addr, socklen_t clt_size)
 {
@@ -1133,6 +1168,16 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 					{
 						CLIENT_PARAM client_param;
 						client_param.ctrl = SessionParamExt;
+						if(m_work_processes[j].sockfds[0] > 0)
+                            SEND_FD(m_work_processes[j].sockfds[0], 0, &client_param);
+					}
+				}
+                else if(pQMsg->cmd == MSG_USERS_RELOAD)
+				{
+					for(int j = 0; j < m_work_processes.size(); j++)
+					{
+						CLIENT_PARAM client_param;
+						client_param.ctrl = SessionParamUsers;
 						if(m_work_processes[j].sockfds[0] > 0)
                             SEND_FD(m_work_processes[j].sockfds[0], 0, &client_param);
 					}
