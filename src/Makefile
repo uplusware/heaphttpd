@@ -41,10 +41,10 @@ INCDIR = -I../$(OPENSSL_DIR)/include
 LDDIRS = -L.
     
 ifdef memcached
-    LDLIST_HTTP = -lstdc++ -lmemcached -lheapauth -lheapwebsocket
+    LDLIST_HTTP = -lstdc++ -lcrypt -lmemcached -lheapauth -lheapwebsocket
     MEMCACHED_DEF = _WITH_MEMCACHED_
 else
-    LDLIST_HTTP = -lstdc++ -lheapauth -lheapwebsocket
+    LDLIST_HTTP = -lstdc++ -lcrypt -lheapauth -lheapwebsocket
     MEMCACHED_DEF = _WITHOUT_MEMCACHED_
 endif
 

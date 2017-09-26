@@ -472,6 +472,8 @@ public:
     
     static vector<string> m_default_webpages;
     
+    static BOOL		m_integrate_local_users;
+    
 	static string 	m_www_authenticate;
     static string   m_proxy_authenticate;
 	static BOOL 	m_client_cer_check;

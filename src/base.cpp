@@ -115,6 +115,8 @@ vector<string> CHttpBase::m_permit_list;
 
 vector<string> CHttpBase::m_default_webpages;
 
+BOOL CHttpBase::m_integrate_local_users = FALSE;
+
 #ifdef _WITH_MEMCACHED_
     map<string, int> CHttpBase::m_memcached_list;
 #endif /* _WITH_MEMCACHED_ */
@@ -189,7 +191,7 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, m_ext_list_file);
 				strtrim(m_ext_list_file);
 			}
-            else if(strncasecmp(strline.c_str(), "UserListFile", sizeof("UserListFile") - 1) == 0)
+            else if(strncasecmp(strline.c_str(), "UsersListFile", sizeof("UsersListFile") - 1) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_users_list_file);
 				strtrim(m_users_list_file);
@@ -326,6 +328,13 @@ BOOL CHttpBase::LoadConfig()
 			{
 				strcut(strline.c_str(), "=", NULL, m_proxy_authenticate );
 				strtrim(m_proxy_authenticate);
+			}
+            else if(strncasecmp(strline.c_str(), "IntegrateLocalUsers", sizeof("IntegrateLocalUsers") - 1) == 0)
+			{
+				string IntegrateLocalUsers;
+				strcut(strline.c_str(), "=", NULL, IntegrateLocalUsers );
+				strtrim(IntegrateLocalUsers);
+				m_integrate_local_users = (strcasecmp(IntegrateLocalUsers.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
             else if(strncasecmp(strline.c_str(), "DefaultWebPages", sizeof("DefaultWebPages") - 1) == 0)
             {

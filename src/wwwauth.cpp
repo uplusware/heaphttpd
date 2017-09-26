@@ -5,6 +5,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
+#include <crypt.h>
+#include <shadow.h>
+#include <string.h>
+#include <unistd.h>
 #include "wwwauth.h"
 #include "util/digcalc.h"
 #include "util/base64.h"
@@ -106,7 +111,7 @@ void __inline__ _strtrim_dquote_(string &src) /* icnluding double quote mark*/
 	}
 }
 
-bool WWW_Auth(CHttp* psession, AUTH_SCHEME scheme, const char* authinfo, string& username, string &keywords, const char* method)
+bool WWW_Auth(CHttp* psession, AUTH_SCHEME scheme, bool integrate_local_users, const char* authinfo, string& username, string &keywords, const char* method)
 {
 	string password, real_password;
 	if(scheme == asBasic)
@@ -125,13 +130,44 @@ bool WWW_Auth(CHttp* psession, AUTH_SCHEME scheme, const char* authinfo, string&
         
         keywords = password;
         
-		if(heaphttpd_usrdef_get_password(psession, username.c_str(), real_password) && password == real_password)
+        if(integrate_local_users)
         {
-            keywords = real_password;
-			return true;
+            if(strcasecmp(username.c_str(),"root") == 0)// forbid root for login for security reason.
+            {
+                return false;
+            }
+            //Get shadow password.
+            struct spwd *spw_info = getspnam(username.c_str());
+            if (!spw_info)
+            {
+                 return false;
+            }
+
+            // Hash and report.
+            struct crypt_data pwd_data;
+            pwd_data.initialized = 0;
+            char *pwd_hashed = crypt_r(password.c_str(), spw_info->sp_pwdp, &pwd_data);
+            if (pwd_hashed && strcmp(spw_info->sp_pwdp, pwd_hashed) == 0)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+
+            
         }
-		else
-			return false;
+        else
+        {
+            if(heaphttpd_usrdef_get_password(psession, username.c_str(), real_password) && password == real_password)
+            {
+                keywords = real_password;
+                return true;
+            }
+            else
+                return false;
+        }
 	}
 	else if(scheme == asDigest)
 	{
