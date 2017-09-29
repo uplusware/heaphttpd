@@ -1,5 +1,5 @@
 ## Heaphttpd
-* Lightweight distributed web server with HTTP/1.1 HTTP/2 and HTTPS C++ framework.
+* Lightweight distributed web server/proxy/tunneling/C++ framework with HTTP/1.1 HTTP/2 and HTTPS.
 * Supports extension, API, cgi/fast-cgi/scgi, php/php-fpm, web.py and WebSocket natively.
 * Support HTTP proxy/tunneling
 * Support Service Object (For example, a persistent MariabDB or MongoDB connection)
