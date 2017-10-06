@@ -1,5 +1,5 @@
 ## Heaphttpd
-* Lightweight distributed web server/proxy/tunneling/framework with HTTP/1.1 HTTP/2 and HTTPS.
+* Lightweight distributed web server with HTTP/1.1 HTTP/2 and HTTPS on Linux.
 * Supports extension, API, cgi/fast-cgi/scgi, php/php-fpm, web.py and WebSocket natively.
 * Support HTTP proxy and HTTPS tunneling
 * Support Service Object (For example, a persistent MariabDB or MongoDB connection)
