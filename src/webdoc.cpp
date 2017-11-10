@@ -93,8 +93,6 @@ void doc::Response()
     char* file_buf = NULL;
     char szQETagQ[FILE_ETAG_LEN + 2 + 1];
     string strDateTime;    
-        
-	strResourceFullPath = m_session->GetResource();
     
     strResourceFullPath = m_work_path.c_str();
     strResourceFullPath += "/html/";

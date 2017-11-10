@@ -413,8 +413,9 @@ void CHttp::ParseMethod(string & strtext)
             memset(sz_querystring, 0, buf_len + 1);
             
             sscanf(strtext.c_str(), "%*[^/]%[^? \t\r\n]?%[^ \t\r\n]", sz_resource, sz_querystring);
-            
-            m_resource = sz_resource;
+                
+            NIU_URLFORMAT_DECODE((const unsigned char *)sz_resource, m_resource);
+    
             m_querystring = sz_querystring;
             free(sz_resource);
             free(sz_querystring);

@@ -19,7 +19,7 @@ void ApiSample::Response()
        
         header.SetStatusCode(SC200);
 		header.SetField("Content-Type", "text/html");
-		strResp = "<html></head><title>API Sample</title></head><body>API Sample: couldn't get the corresponding POST data</body></html>";
+		strResp = "<html><head><title>API Sample</title></head><body>API Sample: couldn't get the corresponding POST data</body></html>";
         header.SetField("Content-Length", strResp.length());
 	}
 	else

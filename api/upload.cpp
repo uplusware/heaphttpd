@@ -14,7 +14,7 @@ void ApiUpload::Response()
     header.SetField("Content-Type", "text/html");
     
     string strResp;
-    strResp = "<html></head><title>API Sample</title></head><body><h1>"VERSION_STRING"</h1><hr>";
+    strResp = "<html><head><title>API Sample</title></head><body><h1>"VERSION_STRING"</h1><hr>";
     
     string filename;
     string filetype;
@@ -50,6 +50,9 @@ void ApiUpload::Response()
             string strEscapedFilename, strEscapedFiletype;
             escapeHTML(filename.c_str(), strEscapedFilename);
             escapeHTML(filetype.c_str(), strEscapedFiletype);
+            
+            string strURIFilename;
+            encodeURI(filename.c_str(), strURIFilename);
             strResp += "<p><b>Path:</b> /var/heaphttpd/html/upload/";
             strResp += strEscapedFilename;
             strResp += "<br><b>Type:</b> ";
@@ -60,7 +63,7 @@ void ApiUpload::Response()
             if(strncasecmp(filetype.c_str(), "image/", sizeof("image/") - 1) == 0)
             {
                 strResp += "<hr><img src=\"/upload/";
-                strResp += filename;
+                strResp += strURIFilename;
                 strResp += "\" />";
             }
         }
@@ -85,6 +88,10 @@ void ApiUpload::Response()
             string strEscapedFilename, strEscapedFiletype;
             escapeHTML(filename.c_str(), strEscapedFilename);
             escapeHTML(filetype.c_str(), strEscapedFiletype);
+            
+            string strURIFilename;
+            encodeURI(filename.c_str(), strURIFilename);
+            
             strResp += "<p><b>Path:</b> /var/heaphttpd/html/upload/";
             strResp += strEscapedFilename;
             strResp += "<br><b>Type:</b> ";
@@ -95,7 +102,7 @@ void ApiUpload::Response()
             if(strncasecmp(filetype.c_str(), "image/", sizeof("image/") - 1) == 0)
             {
                 strResp += "<hr><img src=\"/upload/";
-                strResp += filename;
+                strResp += strURIFilename;
                 strResp += "\" />";
             }
         }
@@ -120,6 +127,10 @@ void ApiUpload::Response()
             string strEscapedFilename, strEscapedFiletype;
             escapeHTML(filename.c_str(), strEscapedFilename);
             escapeHTML(filetype.c_str(), strEscapedFiletype);
+            
+            string strURIFilename;
+            encodeURI(filename.c_str(), strURIFilename);
+            
             strResp += "<p><b>Path:</b> /var/heaphttpd/html/upload/";
             strResp += strEscapedFilename;
             strResp += "<br><b>Type:</b> ";
@@ -130,7 +141,7 @@ void ApiUpload::Response()
             if(strncasecmp(filetype.c_str(), "image/", sizeof("image/") - 1) == 0)
             {
                 strResp += "<hr><img src=\"/upload/";
-                strResp += filename;
+                strResp += strURIFilename;
                 strResp += "\" />";
             }
         }
