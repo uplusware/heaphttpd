@@ -32,13 +32,15 @@ enum HTTP_Client_Parse_State
 class http_chunk
 {
 public:
-    http_chunk(int client_sockfd, int backend_sockfd);
+    http_chunk(int client_sockfd, SSL* client_ssl, int backend_sockfd);
     virtual ~http_chunk();
+    int client_send(const char* buf, int len);
     bool parse(const char* text);
     bool processing(const char* buf, int buf_len, int& next_recv_len);
 
 protected:
     int m_client_sockfd;
+    SSL* m_client_ssl;
     int m_backend_sockfd;
     int m_chunk_len;
     int m_sent_chunk;
@@ -55,9 +57,9 @@ protected:
 class http_client
 {
 public:
-    http_client(int client_sockfd, int backend_sockfd, memory_cache* cache, const char* http_url);
+    http_client(int client_sockfd, SSL* client_ssl, int backend_sockfd, memory_cache* cache, const char* http_url);
     virtual ~http_client();
-    
+    int client_send(const char* buf, int len);
     bool parse(const char* text);
     
     bool processing(const char* buf, int buf_len, int& next_recv_len);
@@ -101,6 +103,7 @@ protected:
     int m_buf_used_len;
     
     int m_client_sockfd;
+    SSL* m_client_ssl;
     int m_backend_sockfd;
     
     int m_sent_content;

@@ -7,11 +7,12 @@
 #include "http_client.h"
 #include "httpcomm.h"
 
-http_tunneling::http_tunneling(int client_socked, HTTPTunneling type, memory_cache* cache)
+http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache)
 {
     m_address = "";
     m_port = 0;
     m_client_sockfd = client_socked;
+    m_client_ssl = client_ssl;
     m_backend_sockfd = -1;
     m_type = type;
     m_cache = cache;
@@ -29,6 +30,16 @@ http_tunneling::~http_tunneling()
     m_backend_sockfd = -1;
 }
 
+int http_tunneling::client_send(const char* buf, int len)
+{
+	if(m_client_ssl)
+		return SSLWrite(m_client_sockfd, m_client_ssl, buf, len);
+	else
+		return _Send_( m_client_sockfd, buf, len);
+		
+}
+
+
 bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, const char* http_url, BOOL request_no_cache)
 {
 	m_http_tunneling_url = http_url;
@@ -41,7 +52,6 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         
         if(m_tunneling_cache_instance)
         {
-            printf("find cache: %s\n", http_url);
             return true;
         }
     }
@@ -290,14 +300,14 @@ bool http_tunneling::recv_relay_reply()
                 
                 header.SetField("Via", strVia.c_str());
                 
-                if(_Send_(m_client_sockfd, header.Text(), header.Length()) < 0 || _Send_(m_client_sockfd, "\r\n", 2) < 0)
+                if(client_send(header.Text(), header.Length()) < 0 || client_send( "\r\n", 2) < 0)
                 {
                     m_tunneling_cache_instance->tunneling_unlock();
                     return false;
                 }                
                 if(tunneling_cache_data->buf && tunneling_cache_data->len > 0)
                 {
-                    if(_Send_(m_client_sockfd, tunneling_cache_data->buf, tunneling_cache_data->len) < 0)
+                    if(client_send( tunneling_cache_data->buf, tunneling_cache_data->len) < 0)
                     {
                         m_tunneling_cache_instance->tunneling_unlock();
                         return false;
@@ -312,7 +322,7 @@ bool http_tunneling::recv_relay_reply()
         int http_header_length = -1;
         int http_content_length = -1;
             
-        http_client the_client(m_client_sockfd, m_backend_sockfd, m_cache, m_http_tunneling_url.c_str());
+        http_client the_client(m_client_sockfd, m_client_ssl, m_backend_sockfd, m_cache, m_http_tunneling_url.c_str());
         string str_header;
         int received_len = 0;
         char response_buf[4096];

@@ -407,6 +407,11 @@ void CHttp::ParseMethod(string & strtext)
         }
         else
         {
+            /*
+                Reverse proxy, HA proxy and load balance server hook code position.
+                Add http://x.x.x.x before the relative resource path.
+            */
+            
             char* sz_resource = (char*)malloc(buf_len + 1);
             char* sz_querystring = (char*)malloc(buf_len + 1);
             memset(sz_resource, 0, buf_len + 1);
@@ -571,7 +576,8 @@ void CHttp::Tunneling()
         }
         
         if(!m_http_tunneling)
-            m_http_tunneling = new http_tunneling(m_sockfd, m_http_tunneling_connection, m_cache);
+            m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache);
+        
         if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(), m_request_no_cache)) //connected
         {
             if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
@@ -865,7 +871,6 @@ Http_Connection CHttp::LineParse(const char* text)
                     }
                     else if(GetWWWAuthScheme() == asDigest)
                     {
-                        
                         struct timeval tval;
                         struct timezone tzone;
                         gettimeofday(&tval, &tzone);

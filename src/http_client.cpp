@@ -6,9 +6,10 @@
 #include "http_client.h"
 
 //http_chunk
-http_chunk::http_chunk(int client_sockfd, int backend_sockfd)
+http_chunk::http_chunk(int client_sockfd, SSL* client_ssl, int backend_sockfd)
 {
     m_client_sockfd = client_sockfd;
+    m_client_ssl = client_ssl;
     m_backend_sockfd = backend_sockfd;
     m_chunk_len = 0;
     m_sent_chunk = 0;
@@ -24,6 +25,15 @@ http_chunk::~http_chunk()
 {
     if(m_buf)
         free(m_buf);
+}
+
+int http_chunk::client_send(const char* buf, int len)
+{
+	if(m_client_ssl)
+		return SSLWrite(m_client_sockfd, m_client_ssl, buf, len);
+	else
+		return _Send_( m_client_sockfd, buf, len);
+		
 }
 
 bool http_chunk::parse(const char* text)
@@ -81,9 +91,8 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
                     if(!parse(m_buf))
 						return false;
 					
-                    if(_Send_(m_client_sockfd, m_buf, x + 2) < 0)
+                    if(client_send( m_buf, x + 2) < 0)
                         return false;
-                    
                     memmove(m_buf, m_buf + x + 2, m_buf_used_len - x - 2);
                     m_buf_used_len = m_buf_used_len - x - 2;
                     
@@ -91,7 +100,8 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
                     
                     if(m_buf_used_len > 0) /* begin to send chunk data */
                     {
-                        if(_Send_(m_client_sockfd, m_buf, m_buf_used_len) < 0)
+
+                        if(client_send( m_buf, m_buf_used_len) < 0)
                             return false;
                         m_sent_chunk += m_buf_used_len;
                         m_buf_used_len = 0;
@@ -119,7 +129,7 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
         //Send the left data from the last send.
         if(m_buf_used_len > 0)
         {
-            if(_Send_(m_client_sockfd, m_buf, m_buf_used_len) < 0)
+            if(client_send( m_buf, m_buf_used_len) < 0)
                 return false;
             m_sent_chunk += m_buf_used_len;
             m_buf_used_len = 0;
@@ -137,9 +147,8 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
             int expected_send_len = m_chunk_len - m_sent_chunk;
             
             int should_send_len = buf_len < expected_send_len ? buf_len : expected_send_len;
-            
-            if(_Send_(m_client_sockfd, buf, should_send_len) < 0)
-                    return false;
+            if(client_send( buf, should_send_len) < 0)
+                return false;
             
             m_sent_chunk += should_send_len;
             
@@ -178,9 +187,10 @@ bool http_chunk::processing(const char* buf, int buf_len, int& next_recv_len)
 
 
 // http_client
-http_client::http_client(int client_sockfd, int backend_sockfd, memory_cache* cache, const char* http_url)
+http_client::http_client(int client_sockfd, SSL* client_ssl, int backend_sockfd, memory_cache* cache, const char* http_url)
 {
     m_client_sockfd = client_sockfd;
+    m_client_ssl = client_ssl;
     m_backend_sockfd = backend_sockfd;
     
     m_http_tunneling_url = http_url;
@@ -239,6 +249,15 @@ http_client::~http_client()
         delete m_chunk;
 }
 
+int http_client::client_send(const char* buf, int len)
+{
+	if(m_client_ssl)
+		return SSLWrite(m_client_sockfd, m_client_ssl, buf, len);
+	else
+		return _Send_( m_client_sockfd, buf, len);
+		
+}
+
 bool http_client::parse(const char* text)
 {
     string strtext;
@@ -285,7 +304,8 @@ bool http_client::parse(const char* text)
                 string strVia = "Via: HTTP/1.1 ";
                 strVia += CHttpBase::m_localhostname.c_str();
                 strVia += "(Heaphttpd/1.1)\r\n"; //append additional \r\n for ending header
-                if(_Send_(m_client_sockfd, strVia.c_str(), strVia.length()) < 0)
+                
+                if(client_send( strVia.c_str(), strVia.length()) < 0)
                 {
                     close(m_client_sockfd);
                     close(m_backend_sockfd);
@@ -294,13 +314,13 @@ bool http_client::parse(const char* text)
             }
             
             //send the empty line
-            if(_Send_(m_client_sockfd, "\r\n", 2) < 0) // not x + 4 since need to append Via header fragment.
+            if(client_send( "\r\n", 2) < 0) // not x + 4 since need to append Via header fragment.
             {
                 close(m_client_sockfd);
                 close(m_backend_sockfd);
                 return false;
             }
-        
+                
             break;
         }
         else if(strncasecmp(strtext.c_str(), "HTTP/1.0 ", 9) == 0
@@ -469,14 +489,13 @@ bool http_client::parse(const char* text)
         }
         
         //send each header line with \r\n
-        if(_Send_(m_client_sockfd, strtext.c_str(), strtext.length()) < 0) // not x + 4 since need to append Via header fragment.
+        if(client_send( strtext.c_str(), strtext.length()) < 0) // not x + 4 since need to append Via header fragment.
         {
             close(m_client_sockfd);
             close(m_backend_sockfd);
             return false;
         }
-        
-        if(_Send_(m_client_sockfd, "\r\n", 2) < 0) // not x + 4 since need to append Via header fragment.
+        if(client_send( "\r\n", 2) < 0) // not x + 4 since need to append Via header fragment.
         {
             close(m_client_sockfd);
             close(m_backend_sockfd);
@@ -534,7 +553,7 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                     if(is_chunked())
                     {
                         if(!m_chunk)
-                            m_chunk = new http_chunk(m_client_sockfd, m_backend_sockfd);
+                            m_chunk = new http_chunk(m_client_sockfd, m_client_ssl, m_backend_sockfd);
                         if(!m_chunk->processing(m_buf, m_buf_used_len, next_recv_len))
                             return false;
                     }
@@ -547,7 +566,8 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                                 memcpy(m_cache_buf + m_cache_data_len, m_buf, m_buf_used_len);
                                 m_cache_data_len += m_buf_used_len;
                             }
-                            if(_Send_(m_client_sockfd, m_buf, m_buf_used_len) < 0)
+                            
+                            if(client_send( m_buf, m_buf_used_len) < 0)
                             {
                                 close(m_client_sockfd);
                                 close(m_backend_sockfd);
@@ -582,7 +602,7 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
         if(is_chunked())
         {
             if(!m_chunk)
-                m_chunk = new http_chunk(m_client_sockfd, m_backend_sockfd);
+                m_chunk = new http_chunk(m_client_sockfd, m_client_ssl, m_backend_sockfd);
             m_chunk->processing(buf, buf_len, next_recv_len);
         }
         else
@@ -596,8 +616,8 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                     memcpy(m_cache_buf + m_cache_data_len, m_buf, m_buf_used_len);
                     m_cache_data_len += m_buf_used_len;
                 }
-                
-                if(_Send_(m_client_sockfd, m_buf, m_buf_used_len) < 0)
+            
+                if(client_send( m_buf, m_buf_used_len) < 0)
                 {
                     close(m_client_sockfd);
                     close(m_backend_sockfd);
@@ -624,8 +644,7 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
                     memcpy(m_cache_buf + m_cache_data_len, buf, should_send_len);
                     m_cache_data_len += should_send_len;
                 }
-                
-                if(_Send_(m_client_sockfd, buf, should_send_len) < 0)
+                if(client_send( buf, should_send_len) < 0)
                 {
                     close(m_client_sockfd);
                     close(m_backend_sockfd);

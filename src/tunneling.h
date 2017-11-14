@@ -39,8 +39,9 @@ typedef struct
 class http_tunneling
 {
 public:
-    http_tunneling(int client_socked, HTTPTunneling type, memory_cache* cache);
+    http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache);
     virtual ~http_tunneling();
+    int client_send(const char* buf, int len);
     
     bool connect_backend(const char* szAddr, unsigned short nPort, const char* http_url, BOOL request_no_cache);
     
