@@ -451,6 +451,7 @@ public:
 	static string 	m_work_path;
 	static string   m_ext_list_file;
     static string   m_users_list_file;
+	static string   m_reverse_list_file;
 
 	static vector<http_extension_t> m_ext_list;
 
@@ -461,6 +462,8 @@ public:
     static BOOL     m_enable_http_tunneling;
     static BOOL     m_enable_http_tunneling_cache;
     
+	static BOOL     m_enable_http_reverse_proxy;
+	
 	static BOOL		m_enablehttp;
 	static unsigned short	m_httpport;
 	

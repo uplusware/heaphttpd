@@ -407,11 +407,11 @@ void CHttp::ParseMethod(string & strtext)
         }
         else
         {
-            /*
-                Reverse proxy, HA proxy and load balance server hook code position.
-                Add http://x.x.x.x before the relative resource path.
-            */
-            
+            if(CHttpBase::m_enable_http_reverse_proxy)
+			{
+				
+			}
+			
             char* sz_resource = (char*)malloc(buf_len + 1);
             char* sz_querystring = (char*)malloc(buf_len + 1);
             memset(sz_resource, 0, buf_len + 1);

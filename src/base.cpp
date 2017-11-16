@@ -22,6 +22,8 @@ string CHttpBase::m_private_path = "/tmp/heaphttpd/private";
 string CHttpBase::m_work_path = "/var/heaphttpd/";
 string CHttpBase::m_ext_list_file = "/etc/heaphttpd/extension.xml";
 string CHttpBase::m_users_list_file = "/etc/heaphttpd/users.xml";
+string CHttpBase::m_reverse_list_file = "/etc/heaphttpd/httpreverse.xml";
+
 vector<http_extension_t> CHttpBase::m_ext_list;
 
 string CHttpBase::m_localhostname = "localhost";
@@ -29,6 +31,8 @@ string CHttpBase::m_hostip = "";
 
 BOOL   CHttpBase::m_enable_http_tunneling = FALSE;
 BOOL   CHttpBase::m_enable_http_tunneling_cache = FALSE;
+
+BOOL   CHttpBase::m_enable_http_reverse_proxy = FALSE;
 
 BOOL   CHttpBase::m_enablehttp = TRUE;
 unsigned short	CHttpBase::m_httpport = 5080;
@@ -196,6 +200,11 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, m_users_list_file);
 				strtrim(m_users_list_file);
 			}
+			else if(strncasecmp(strline.c_str(), "HTTPReverseProxyDeliveryList", sizeof("HTTPReverseProxyDeliveryList") - 1) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_reverse_list_file);
+				strtrim(m_reverse_list_file);
+			}
 			else if(strncasecmp(strline.c_str(), "LocalHostName", sizeof("LocalHostName") - 1) == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_localhostname );
@@ -273,6 +282,13 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, HTTPTunnelingCacheEnable );
 				strtrim(HTTPTunnelingCacheEnable);
 				m_enable_http_tunneling_cache = (strcasecmp(HTTPTunnelingCacheEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
+			}
+			else if(strncasecmp(strline.c_str(), "HTTPReverseProxyEnable", sizeof("HTTPReverseProxyEnable") - 1) == 0)
+			{
+				string HTTPReverseProxyEnable;
+				strcut(strline.c_str(), "=", NULL, HTTPReverseProxyEnable );
+				strtrim(HTTPReverseProxyEnable);
+				m_enable_http_reverse_proxy = (strcasecmp(HTTPReverseProxyEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
             else if(strncasecmp(strline.c_str(), "HTTPEnable", sizeof("HTTPEnable") - 1) == 0)
 			{

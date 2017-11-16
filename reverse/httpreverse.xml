@@ -1,0 +1,9 @@
+<!-- 
+	Copyright (c) openheap, uplusware. uplusware@gmail.com
+    heaphttpd extension:
+        Please make sure name is unique.
+-->
+<? xml version="1.0" encoding="UTF-8" ?>
+<heaphttpd>
+	<reverse libso="/var/heaphttpd/reverse/libreversesample.so" name="reverse" description="Heaphttpd reverse example" parameters="" />
+</heaphttpd>
