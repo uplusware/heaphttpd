@@ -5,5 +5,7 @@
 -->
 <? xml version="1.0" encoding="UTF-8" ?>
 <heaphttpd>
+<!--
 	<httpreverse libso="/var/heaphttpd/reverse/libhttpreverse.so" name="reverse" description="Heaphttpd reverse example" parameters="" />
+-->
 </heaphttpd>

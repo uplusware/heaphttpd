@@ -22,9 +22,10 @@ string CHttpBase::m_private_path = "/tmp/heaphttpd/private";
 string CHttpBase::m_work_path = "/var/heaphttpd/";
 string CHttpBase::m_ext_list_file = "/etc/heaphttpd/extension.xml";
 string CHttpBase::m_users_list_file = "/etc/heaphttpd/users.xml";
-string CHttpBase::m_reverse_list_file = "/etc/heaphttpd/httpreverse.xml";
+string CHttpBase::m_reverse_ext_list_file = "/etc/heaphttpd/httpreverse.xml";
 
 vector<http_extension_t> CHttpBase::m_ext_list;
+vector<http_extension_t> CHttpBase::m_reverse_ext_list;
 
 string CHttpBase::m_localhostname = "localhost";
 string CHttpBase::m_hostip = "";
@@ -202,8 +203,8 @@ BOOL CHttpBase::LoadConfig()
 			}
 			else if(strncasecmp(strline.c_str(), "HTTPReverseProxyDeliveryList", sizeof("HTTPReverseProxyDeliveryList") - 1) == 0)
 			{
-				strcut(strline.c_str(), "=", NULL, m_reverse_list_file);
-				strtrim(m_reverse_list_file);
+				strcut(strline.c_str(), "=", NULL, m_reverse_ext_list_file);
+				strtrim(m_reverse_ext_list_file);
 			}
 			else if(strncasecmp(strline.c_str(), "LocalHostName", sizeof("LocalHostName") - 1) == 0)
 			{
@@ -565,7 +566,8 @@ BOOL CHttpBase::LoadConfig()
 	_load_permit_();
 	_load_reject_();
 	_load_ext_();
-
+    _load_reverse_ext_();
+    
 	m_runtime = time(NULL);
 
 	return TRUE;
@@ -604,6 +606,11 @@ BOOL CHttpBase::LoadAccessList()
 BOOL CHttpBase::LoadExtensionList()
 {
 	_load_ext_();
+}
+
+BOOL CHttpBase::LoadReverseExtensionList()
+{
+	_load_reverse_ext_();
 }
 
 void CHttpBase::_load_permit_()
@@ -686,12 +693,58 @@ void CHttpBase::_load_ext_()
 }
 
 
+void CHttpBase::_load_reverse_ext_()
+{
+	for(int x = 0; x < m_reverse_ext_list.size(); x++)
+    {
+    	dlclose(m_reverse_ext_list[x].handle);
+    }
+
+	TiXmlDocument xmlFileterDoc;
+	xmlFileterDoc.LoadFile(m_reverse_ext_list_file.c_str());
+    
+	TiXmlElement * pRootElement = xmlFileterDoc.RootElement();
+	if(pRootElement)
+	{
+        m_reverse_ext_list.clear();
+        
+		TiXmlNode* pChildNode = pRootElement->FirstChild("httpreverse");
+		while(pChildNode)
+		{
+			if(pChildNode && pChildNode->ToElement())
+			{
+				http_extension_t ext;
+                
+				ext.handle = dlopen(pChildNode->ToElement()->Attribute("libso"), RTLD_NOW);
+				
+				if(ext.handle)
+				{
+                    ext.name = pChildNode->ToElement()->Attribute("name") ? pChildNode->ToElement()->Attribute("name") : "";
+					ext.description = pChildNode->ToElement()->Attribute("description") ? pChildNode->ToElement()->Attribute("description") : "";
+                    ext.parameters = pChildNode->ToElement()->Attribute("parameters") ? pChildNode->ToElement()->Attribute("parameters") : "";
+					m_reverse_ext_list.push_back(ext);
+				}
+			}
+			pChildNode = pChildNode->NextSibling("httpreverse");
+		}
+	}
+}
+
 BOOL CHttpBase::UnLoadConfig()
 {
+    //extension
 	for(int x = 0; x < m_ext_list.size(); x++)
     {
     	dlclose(m_ext_list[x].handle);
     }
     m_ext_list.clear();
+    
+    //http reverse extension
+    for(int x = 0; x < m_reverse_ext_list.size(); x++)
+    {
+    	dlclose(m_reverse_ext_list[x].handle);
+    }
+    m_reverse_ext_list.clear();
+    
 	return TRUE;
 }

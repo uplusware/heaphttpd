@@ -43,6 +43,8 @@ cp script/heaphttpd.conf $3-heaphttpd-bin-$2-${m}-${o}/heaphttpd.conf
 cp script/permit.list $3-heaphttpd-bin-$2-${m}-${o}/
 cp script/reject.list $3-heaphttpd-bin-$2-${m}-${o}/
 cp script/extension.xml $3-heaphttpd-bin-$2-${m}-${o}/
+cp script/httpreverse.xml $3-heaphttpd-bin-$2-${m}-${o}/
+cp script/users.xml $3-heaphttpd-bin-$2-${m}-${o}/
 
 cp script/heaphttpd.sh $3-heaphttpd-bin-$2-${m}-${o}/
 

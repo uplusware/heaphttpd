@@ -31,7 +31,7 @@ const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DEL
 
 CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
-	const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, const char* php_mode, 
+	const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
     cgi_socket_t fpm_socktype, const char* fpm_sockfile,
     const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
     map<string, cgi_cfg_t>* cgi_list,
@@ -51,6 +51,7 @@ CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, cons
 	m_cache = ch;
 
     m_ext_list = ext_list;
+    m_reverse_ext_list = reverse_ext_list;
     m_default_webpages = default_webpages;
     
     m_client_cert = client_cert;
@@ -362,6 +363,30 @@ void CHttp::ParseMethod(string & strtext)
     }
     else
     {
+        if(CHttpBase::m_enable_http_reverse_proxy)
+        {
+            //reverse extension hook
+            for(int x = 0; x < m_reverse_ext_list->size(); x++)
+            {
+                void* (*reverse_delivery)(const char *, const char *, const char *, const char*, const char*, string *, int *);
+                reverse_delivery = (void*(*)(const char *, const char *, const char *, const char*, const char*, string *, int *))dlsym((*m_reverse_ext_list)[x].handle, "reverse_delivery");
+                const char* errmsg;
+                if((errmsg = dlerror()) == NULL)
+                {
+                    int skip;
+                    string new_method_url;
+                    reverse_delivery((*m_reverse_ext_list)[x].name.c_str(), (*m_reverse_ext_list)[x].description.c_str(), (*m_reverse_ext_list)[x].parameters.c_str(),
+                        m_clientip.c_str(), strtext.c_str(), &new_method_url, &skip);
+                    
+                    strtext = new_method_url.c_str();
+                    if(skip != 0)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+            
         const char* p_temp = strtext.c_str() + strlen(sz_method);
         if(strncasecmp(p_temp, "http://", 7) == 0)
         {
@@ -407,11 +432,6 @@ void CHttp::ParseMethod(string & strtext)
         }
         else
         {
-            if(CHttpBase::m_enable_http_reverse_proxy)
-			{
-				
-			}
-			
             char* sz_resource = (char*)malloc(buf_len + 1);
             char* sz_querystring = (char*)malloc(buf_len + 1);
             memset(sz_resource, 0, buf_len + 1);

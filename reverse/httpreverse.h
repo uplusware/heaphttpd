@@ -16,7 +16,7 @@ using namespace std;
 extern "C"
 {
 #endif /* __cplusplus */
-    void* reverse_delivery(const char * name, const char * description, const char * parameters, const char* input_url, string * output_url);
+    void* reverse_delivery(const char * name, const char * description, const char * parameters, const char* clientip, const char* input_method_url, string * output_method_url, int * skip);
 #ifdef __cplusplus
 };
 #endif /* __cplusplus */

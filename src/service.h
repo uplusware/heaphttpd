@@ -178,6 +178,7 @@ typedef struct
 enum CLIENT_PARAM_CTRL{
 	SessionParamData = 0,
 	SessionParamExt,
+    SessionParamReverseExt,
     SessionParamUsers,
 	SessionParamQuit
 };
@@ -238,6 +239,7 @@ public:
 	void ReloadConfig();
 	void ReloadAccess();
 	void ReloadExtension();
+    void ReloadReverseExtension();
     void ReloadUsers();
 	void AppendReject(const char* data);
 

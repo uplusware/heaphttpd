@@ -58,6 +58,11 @@ heaphttpd_extension()
 	/usr/bin/heaphttpd extension
 }
 
+heaphttpd_reverse()
+{
+	/usr/bin/heaphttpd reverse
+}
+
 heaphttpd_users()
 {
 	/usr/bin/heaphttpd users
@@ -103,6 +108,10 @@ case "${1:-''}" in
 	heaphttpd_extension
 	;;
     
+    'reverse')
+	heaphttpd_reverse
+	;;
+    
     'users')
 	heaphttpd_users
 	;;
@@ -116,7 +125,7 @@ case "${1:-''}" in
 	;;
 	
 	*)
-	echo "Usage: $SELF Usage:heaphttpd start | stop | status | reload | access | reject [ip] | extension | users | version"
+	echo "Usage: $SELF Usage:heaphttpd start | stop | status | reload | access | reject [ip] | extension | reverse | users | version"
 	exit 1
 	;;
 esac

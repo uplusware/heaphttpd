@@ -506,6 +506,11 @@ void Worker::Working(CUplusTrace& uTrace)
 			printf("Reload extensions\n");
 			CHttpBase::LoadExtensionList();
 		}
+        else if(client_param.ctrl == SessionParamReverseExt)
+		{
+			printf("Reload Reverse extensions\n");
+			CHttpBase::LoadReverseExtensionList();
+		}
         else if(client_param.ctrl == SessionParamUsers)
 		{
 			printf("Reload Users\n");
@@ -686,6 +691,34 @@ void Service::ReloadExtension()
 
 	stQueueMsg qMsg;
 	qMsg.cmd = MSG_EXTENSION_RELOAD;
+	sem_wait(m_service_sid);
+	mq_send(m_service_qid, (const char*)&qMsg, sizeof(stQueueMsg), 0);
+	sem_post(m_service_sid);
+	
+	if(m_service_qid != (mqd_t)-1)
+		mq_close(m_service_qid);
+	if(m_service_sid != SEM_FAILED)
+		sem_close(m_service_sid);
+}
+
+void Service::ReloadReverseExtension()
+{
+	string strqueue = HEAPHTTPD_POSIX_PREFIX;
+	strqueue += m_service_name;
+	strqueue += HEAPHTTPD_POSIX_QUEUE_SUFFIX;
+
+	string strsem = HEAPHTTPD_POSIX_PREFIX;
+	strsem += m_service_name;
+	strsem += HEAPHTTPD_POSIX_SEMAPHORE_SUFFIX;
+	
+	m_service_qid = mq_open(strqueue.c_str(), O_RDWR);
+	m_service_sid = sem_open(strsem.c_str(), O_RDWR);
+
+	if(m_service_qid == (mqd_t)-1 || m_service_sid == SEM_FAILED)
+		return;
+
+	stQueueMsg qMsg;
+	qMsg.cmd = MSG_REVERSE_EXTENSION_RELOAD;
 	sem_wait(m_service_sid);
 	mq_send(m_service_qid, (const char*)&qMsg, sizeof(stQueueMsg), 0);
 	sem_post(m_service_sid);
@@ -1168,6 +1201,17 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 					{
 						CLIENT_PARAM client_param;
 						client_param.ctrl = SessionParamExt;
+						if(m_work_processes[j].sockfds[0] > 0)
+                            SEND_FD(m_work_processes[j].sockfds[0], 0, &client_param);
+					}
+				}
+                else if(pQMsg->cmd == MSG_REVERSE_EXTENSION_RELOAD)
+				{
+					CHttpBase::LoadReverseExtensionList();
+					for(int j = 0; j < m_work_processes.size(); j++)
+					{
+						CLIENT_PARAM client_param;
+						client_param.ctrl = SessionParamReverseExt;
 						if(m_work_processes[j].sockfds[0] > 0)
                             SEND_FD(m_work_processes[j].sockfds[0], 0, &client_param);
 					}

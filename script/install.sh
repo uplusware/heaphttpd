@@ -77,6 +77,9 @@ chmod a-x /etc/heaphttpd/reject.list
 test -x /etc/heaphttpd/extension.xml || cp -f ${path}/extension.xml /etc/heaphttpd/extension.xml
 chmod a-x /etc/heaphttpd/extension.xml
 
+test -x /etc/heaphttpd/httpreverse.xml || cp -f ${path}/httpreverse.xml /etc/heaphttpd/httpreverse.xml
+chmod a-x /etc/heaphttpd/httpreverse.xml
+
 test -x /etc/heaphttpd/users.xml || cp -f ${path}/users.xml /etc/heaphttpd/users.xml
 chmod a-x /etc/heaphttpd/users.xml
 

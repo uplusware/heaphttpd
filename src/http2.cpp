@@ -76,7 +76,7 @@
 
 CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
-		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, const char* php_mode, 
+		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list,
@@ -108,6 +108,7 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
     m_ch = ch;
     m_work_path = work_path;
     m_ext_list = ext_list;
+    m_reverse_ext_list = reverse_ext_list;
     m_default_webpages = default_webpages;
     m_php_mode = php_mode;
     m_fpm_socktype = fpm_socktype;
@@ -399,6 +400,7 @@ http2_stream* CHttp2::create_stream_instance(uint_32 stream_ind)
                                                 m_work_path.c_str(),
                                                 m_default_webpages,
                                                 m_ext_list,
+                                                m_reverse_ext_list,
                                                 m_php_mode.c_str(),
                                                 m_fpm_socktype,
                                                 m_fpm_sockfile.c_str(),

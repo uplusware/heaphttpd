@@ -44,12 +44,13 @@ using namespace std;
 #define MAX_PASSWORD_LEN	16
 #define MAX_EMAIL_LEN	5000 //about 5M attachment file
 
-#define MSG_EXIT				0xFF
-#define MSG_GLOBAL_RELOAD		0xFE
-#define MSG_REJECT_APPEND   	0xFC
-#define MSG_ACCESS_RELOAD		0xFB
-#define MSG_EXTENSION_RELOAD	0xFA
-#define MSG_USERS_RELOAD	    0xF0
+#define MSG_EXIT				        0xFF
+#define MSG_GLOBAL_RELOAD		        0xFE
+#define MSG_REJECT_APPEND   	        0xFC
+#define MSG_ACCESS_RELOAD		        0xFB
+#define MSG_EXTENSION_RELOAD	        0xFA
+#define MSG_USERS_RELOAD	            0xF9
+#define MSG_REVERSE_EXTENSION_RELOAD	0xF8
 
 typedef struct
 {
@@ -449,11 +450,14 @@ public:
     
 	static string	m_private_path;
 	static string 	m_work_path;
-	static string   m_ext_list_file;
+	
+    static string   m_ext_list_file;
+    static string   m_reverse_ext_list_file;
+    
     static string   m_users_list_file;
-	static string   m_reverse_list_file;
 
 	static vector<http_extension_t> m_ext_list;
+    static vector<http_extension_t> m_reverse_ext_list;
 
 	static string	m_localhostname;
 	static string	m_encoding;
@@ -532,6 +536,7 @@ public:
 
 	static BOOL LoadAccessList();
 	static BOOL LoadExtensionList();
+    static BOOL LoadReverseExtensionList();
 	
 	/* Pure virual function	*/
 	virtual BOOL LineParse(char* text) = 0;
@@ -541,6 +546,7 @@ private:
 	static void _load_permit_();
 	static void _load_reject_();
 	static void _load_ext_();
+    static void _load_reverse_ext_();
 };
 
 #endif /* _MAILSYS_H_ */

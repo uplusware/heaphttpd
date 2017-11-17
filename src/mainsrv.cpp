@@ -37,7 +37,7 @@ using namespace std;
 
 static void usage()
 {
-	printf("Usage:heaphttpd start | stop | status | reload | access | reject [ip] | extension | version\n");
+	printf("Usage:heaphttpd start | stop | status | reload | access | reject [ip] | extension | reverse | version\n");
 }
 
 //set to daemon mode
@@ -162,6 +162,13 @@ static int ReloadExtension()
 	http_svr.ReloadExtension();
 }
 
+static int ReloadReverseExtension()
+{
+	printf("Reload heaphttpd reverse extension ...\n");
+
+	Service http_svr(stHTTP);
+	http_svr.ReloadReverseExtension();
+}
 static int ReloadUsers()
 {
 	printf("Reload heaphttpd users ...\n");
@@ -202,6 +209,10 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 	else if(strcasecmp(cmd, "extension") == 0)
 	{
 		ReloadExtension();
+	}
+    else if(strcasecmp(cmd, "reverse") == 0)
+	{
+		ReloadReverseExtension();
 	}
     else if(strcasecmp(cmd, "users") == 0)
 	{

@@ -13,6 +13,7 @@ all: reverse
 
 install: all
 	test -x /var/heaphttpd/reverse || mkdir /var/heaphttpd/reverse
+	cp httpreverse.xml /etc/heaphttpd/
 	cp libhttpreverse.so /var/heaphttpd/reverse/
     
 reverse: $(HTTPREVERSE)
