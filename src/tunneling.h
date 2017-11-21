@@ -43,7 +43,10 @@ public:
     virtual ~http_tunneling();
     int client_send(const char* buf, int len);
     
-    bool connect_backend(const char* szAddr, unsigned short nPort, const char* http_url, BOOL request_no_cache);
+    bool connect_backend(const char* szAddr, unsigned short nPort, const char* http_url,
+        const char* szAddrBackup1, unsigned short nPortBackup1, const char* http_url_backup1,
+        const char* szAddrBackup2, unsigned short nPortBackup2, const char* http_url_backup2,
+        BOOL request_no_cache);
     
     bool send_request(const char* hbuf, int hlen, const char* dbuf, int dlen);
     bool recv_relay_reply();

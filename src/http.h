@@ -232,7 +232,17 @@ protected:
     
     string m_http_tunneling_backend_address;
     unsigned short m_http_tunneling_backend_port;
-    string m_http_tunneling_url;   
+    string m_http_tunneling_url;
+    
+    //back backends is only availiable in reverse proxy enabled;
+    string m_http_tunneling_backend_address_backup1;
+    unsigned short m_http_tunneling_backend_port_backup1;
+    string m_http_tunneling_url_backup1;
+    
+    string m_http_tunneling_backend_address_backup2;
+    unsigned short m_http_tunneling_backend_port_backup2;
+    string m_http_tunneling_url_backup2;
+       
     
     http_tunneling* m_http_tunneling;
     

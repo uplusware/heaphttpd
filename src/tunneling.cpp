@@ -40,8 +40,12 @@ int http_tunneling::client_send(const char* buf, int len)
 }
 
 
-bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, const char* http_url, BOOL request_no_cache)
+bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, const char* http_url,
+    const char* szAddrBackup1, unsigned short nPortBackup1, const char* http_url_backup1,
+    const char* szAddrBackup2, unsigned short nPortBackup2, const char* http_url_backup2,
+    BOOL request_no_cache)
 {
+    //try 1st one cache
 	m_http_tunneling_url = http_url;
 	
     if(CHttpBase::m_enable_http_tunneling_cache && !request_no_cache)
@@ -54,142 +58,212 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         {
             return true;
         }
-    }
-    
-	if(m_address == szAddr && m_port == nPort && m_backend_sockfd > 0)
-		return true;
-	
-	//connect to the new address:port
-	m_address = szAddr;
-    m_port = nPort;
-	
-    unsigned short backhost_port = m_port;
-    
-    /* Get the IP from the name */
-	char backhost_ip[INET6_ADDRSTRLEN];
-	struct addrinfo hints;      
-    struct addrinfo *servinfo, *curr;  
-    struct sockaddr_in *sa;
-    struct sockaddr_in6 *sa6;
-
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_flags = AI_CANONNAME; 
-    
-    for(;;)
-    {
-        int rval = getaddrinfo(m_address.c_str(), NULL, &hints, &servinfo);
-        if (rval != 0)
-        {
-            if(rval == EAI_AGAIN)
-                continue;
-/*            
-            string strError = m_address;
-            strError += " ";
-            strError += strerror(errno);
-            
-            fprintf(stderr, "%s(line:%d): %s\n", __FILE__, __LINE__, strError.c_str());
-*/            
-            return false;
-        }
         else
-            break;
-    }
-    
-    bool found = false;
-    curr = servinfo; 
-    while (curr && curr->ai_canonname)
-    {  
-        if(servinfo->ai_family == AF_INET6)
         {
-            sa6 = (struct sockaddr_in6 *)curr->ai_addr;  
-            inet_ntop(AF_INET6, (void*)&sa6->sin6_addr, backhost_ip, sizeof (backhost_ip));
-            found = TRUE;
-        }
-        else if(servinfo->ai_family == AF_INET)
-        {
-            sa = (struct sockaddr_in *)curr->ai_addr;  
-            inet_ntop(AF_INET, (void*)&sa->sin_addr, backhost_ip, sizeof (backhost_ip));
-            found = TRUE;
-        }
-        curr = curr->ai_next;
-    }     
-
-    freeaddrinfo(servinfo);
-
-    if(found == false)
-    {
-        fprintf(stderr, "couldn't find ip for %s\n", m_address.c_str());
-        return false;
-    }
-    
-	int res; 
-	
-	/* struct addrinfo hints; */
-    struct addrinfo *server_addr, *rp;
-    
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
-    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-    hints.ai_protocol = 0;          /* Any protocol */
-    hints.ai_canonname = NULL;
-    hints.ai_addr = NULL;
-    hints.ai_next = NULL;
-    
-    char szPort[32];
-    sprintf(szPort, "%u", backhost_port);
-    for(;;)
-    {
-        int rval = getaddrinfo((backhost_ip && backhost_ip[0] != '\0') ? backhost_ip : NULL, szPort, &hints, &server_addr);
-        if (rval != 0)
-        {
-           
-           if(rval == EAI_AGAIN)
-               continue;
-            string strError = backhost_ip;
-            strError += ":";
-            strError += szPort;
-            strError += " ";
-            strError += strerror(errno);
+            // try 2nd one cache
+            m_http_tunneling_url = http_url_backup1;
+            m_cache->rdlock_tunneling_cache();
+            m_cache->_find_tunneling_(m_http_tunneling_url.c_str(), &m_tunneling_cache_instance);
+            m_cache->unlock_tunneling_cache();
             
-            fprintf(stderr, "%s(line:%s): %s\n", __FILE__, __LINE__, strError.c_str());
-            return false;
-        }
-        else
-            break;
-    }
-    
-    bool connected = false;
-    for (rp = server_addr; rp != NULL; rp = rp->ai_next)
-    {
-        m_backend_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (m_backend_sockfd == -1)
-            continue;
-       
-	    int flags = fcntl(m_backend_sockfd, F_GETFL, 0); 
-	    fcntl(m_backend_sockfd, F_SETFL, flags | O_NONBLOCK);
-
-        fd_set mask_r, mask_w; 
-        struct timeval timeout; 
-    
-        timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
-	    timeout.tv_usec = 0;
-        
-        int s = connect(m_backend_sockfd, rp->ai_addr, rp->ai_addrlen);
-        if(s == 0 || (s < 0 && errno == EINPROGRESS))
-        {
-
-            FD_ZERO(&mask_r);
-            FD_ZERO(&mask_w);
-        
-            FD_SET(m_backend_sockfd, &mask_r);
-            FD_SET(m_backend_sockfd, &mask_w);
-            int ret_val = select(m_backend_sockfd + 1, &mask_r, &mask_w, NULL, &timeout);
-            if(ret_val > 0)
+            if(m_tunneling_cache_instance)
             {
-                connected = true;
-                break;  /* Success */
+                
+                return true;
+            }
+            else
+            {
+                // try 3rd one cache
+                m_http_tunneling_url = http_url_backup2;
+                m_cache->rdlock_tunneling_cache();
+                m_cache->_find_tunneling_(m_http_tunneling_url.c_str(), &m_tunneling_cache_instance);
+                m_cache->unlock_tunneling_cache();
+                
+                if(m_tunneling_cache_instance)
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    
+	if((m_address == szAddr && m_port == nPort && m_backend_sockfd > 0)
+        || (m_address == szAddrBackup1 && nPortBackup1 == nPort && m_backend_sockfd > 0)
+        || (m_address == szAddrBackup2 && nPortBackup2 == nPort && m_backend_sockfd > 0))
+		return true;
+    
+    for(int t = 0; t < 3; t++)
+    {
+        //connect to the new address:port
+        if(t == 0)
+        {
+            if(*szAddr == '\0' || nPort == 0)
+                continue;
+            m_address = szAddr;
+            m_port = nPort;
+            m_http_tunneling_url = http_url;
+        }
+        else if(t == 1)
+        {
+            if(*szAddrBackup1 == '\0' || nPortBackup1 == 0)
+                continue;
+            m_address = szAddrBackup1;
+            m_port = nPortBackup1;
+            m_http_tunneling_url = http_url_backup1;
+        }
+        else if(t == 2)
+        {
+            if(*szAddrBackup2 == '\0'|| nPortBackup2 == 0)
+                continue;
+            m_address = szAddrBackup2;
+            m_port = nPortBackup2;
+            m_http_tunneling_url = http_url_backup2;
+        }
+        
+        unsigned short backhost_port = m_port;
+        
+        /* Get the IP from the name */
+        char backhost_ip[INET6_ADDRSTRLEN];
+        struct addrinfo hints;      
+        struct addrinfo *servinfo, *curr;  
+        struct sockaddr_in *sa;
+        struct sockaddr_in6 *sa6;
+
+        memset(&hints, 0, sizeof hints);
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_flags = AI_CANONNAME; 
+        
+        bool success_getaddrinfo = false;
+        for(;;)
+        {
+            int rval = getaddrinfo(m_address.c_str(), NULL, &hints, &servinfo);
+            if (rval != 0)
+            {
+                if(rval == EAI_AGAIN)
+                    continue;         
+                break;
+            }
+            else
+            {
+                success_getaddrinfo = true;
+                break;
+            }
+        }
+        
+        if(!success_getaddrinfo)
+            continue;
+        
+        bool found_ip = false;
+        curr = servinfo; 
+        while (curr && curr->ai_canonname)
+        {  
+            if(servinfo->ai_family == AF_INET6)
+            {
+                sa6 = (struct sockaddr_in6 *)curr->ai_addr;  
+                inet_ntop(AF_INET6, (void*)&sa6->sin6_addr, backhost_ip, sizeof (backhost_ip));
+                found_ip = TRUE;
+            }
+            else if(servinfo->ai_family == AF_INET)
+            {
+                sa = (struct sockaddr_in *)curr->ai_addr;  
+                inet_ntop(AF_INET, (void*)&sa->sin_addr, backhost_ip, sizeof (backhost_ip));
+                found_ip = TRUE;
+            }
+            curr = curr->ai_next;
+        }     
+
+        freeaddrinfo(servinfo);
+
+        if(found_ip == false)
+        {
+            fprintf(stderr, "couldn't find ip for %s\n", m_address.c_str());
+            continue; //to to next backup
+        }
+        
+        int res; 
+        
+        /* struct addrinfo hints; */
+        struct addrinfo *server_addr, *rp;
+        
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+        hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+        hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+        hints.ai_protocol = 0;          /* Any protocol */
+        hints.ai_canonname = NULL;
+        hints.ai_addr = NULL;
+        hints.ai_next = NULL;
+        
+        char szPort[32];
+        sprintf(szPort, "%u", backhost_port);
+        
+        success_getaddrinfo = false;
+        for(;;)
+        {
+            int rval = getaddrinfo((backhost_ip && backhost_ip[0] != '\0') ? backhost_ip : NULL, szPort, &hints, &server_addr);
+            if (rval != 0)
+            {
+               
+               if(rval == EAI_AGAIN)
+                   continue;
+                string strError = backhost_ip;
+                strError += ":";
+                strError += szPort;
+                strError += " ";
+                strError += strerror(errno);
+                
+                fprintf(stderr, "%s(line:%s): %s\n", __FILE__, __LINE__, strError.c_str());
+                break;
+            }
+            else
+            {
+                success_getaddrinfo = true;
+                break;
+            }
+        }
+        
+        if(!success_getaddrinfo)
+            continue;
+        
+        bool connected = false;
+        
+        for (rp = server_addr; rp != NULL; rp = rp->ai_next)
+        {
+            m_backend_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+            if (m_backend_sockfd == -1)
+                continue;
+           
+            int flags = fcntl(m_backend_sockfd, F_GETFL, 0); 
+            fcntl(m_backend_sockfd, F_SETFL, flags | O_NONBLOCK);
+
+            fd_set mask_r, mask_w; 
+            struct timeval timeout; 
+        
+            timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
+            timeout.tv_usec = 0;
+            
+            int s = connect(m_backend_sockfd, rp->ai_addr, rp->ai_addrlen);
+            if(s == 0 || (s < 0 && errno == EINPROGRESS))
+            {
+
+                FD_ZERO(&mask_r);
+                FD_ZERO(&mask_w);
+            
+                FD_SET(m_backend_sockfd, &mask_r);
+                FD_SET(m_backend_sockfd, &mask_w);
+                int ret_val = select(m_backend_sockfd + 1, &mask_r, &mask_w, NULL, &timeout);
+                if(ret_val > 0)
+                {
+                    connected = true;
+                    break;  /* Success */
+                }
+                else
+                {
+                    if(m_backend_sockfd > 0)
+                        close(m_backend_sockfd);
+                    m_backend_sockfd = -1;
+                    continue;
+                }  
             }
             else
             {
@@ -197,38 +271,26 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
                     close(m_backend_sockfd);
                 m_backend_sockfd = -1;
                 continue;
-            }  
+            }
         }
-        else
-        {
+
+        freeaddrinfo(server_addr);           /* No longer needed */
+        
+        if(!connected)
+        {            
             if(m_backend_sockfd > 0)
                 close(m_backend_sockfd);
             m_backend_sockfd = -1;
+                    
             continue;
         }
+        
+        //connected!
+        return true;
     }
-
-    freeaddrinfo(server_addr);           /* No longer needed */
     
-    if(!connected)
-    {
-        /*
-        string strError = backhost_ip;
-        strError += ":";
-        strError += szPort;
-        strError += " ";
-        strError += strerror(errno);
-        
-        fprintf(stderr, "HTTP Tunneling: %s\n", strError.c_str());
-        */
-        
-        if(m_backend_sockfd > 0)
-            close(m_backend_sockfd);
-        m_backend_sockfd = -1;
-                
-        return false;
-    }
-    return true;
+    // have try 3 one, and couldn't connect to any backend server.
+    return false;
 }
 
 bool http_tunneling::send_request(const char* hbuf, int hlen, const char* dbuf, int dlen)

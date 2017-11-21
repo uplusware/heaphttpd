@@ -393,42 +393,167 @@ void CHttp::ParseMethod(string & strtext)
             bool isCached = FALSE;
             m_http_tunneling_connection = HTTP_Tunneling_Without_CONNECT;
             
-            char* sz_url = (char*)malloc(buf_len + 1);
-            char* sz_host = (char*)malloc(buf_len + 1);
-            char* sz_relatived = (char*)malloc(buf_len + 1);
-            memset(sz_host, 0, buf_len + 1);
-            memset(sz_relatived, 0, buf_len + 1);
-            memset(sz_url, 0, buf_len + 1);
-            
-            sscanf(p_temp, "%[^ ]", sz_url);
-            
-            MD5_CTX_OBJ context;
-            
-            m_http_tunneling_url = sz_url;
-
-            sscanf(p_temp + 7, "%[^/]", sz_host);
-            
-            strcpy(sz_relatived, p_temp + 7 + strlen(sz_host));
-            
-            m_http_tunneling_backend_port = 80;
-            
-            char* p = strstr(sz_host, ":");
-            if(p)
+            if(CHttpBase::m_enable_http_reverse_proxy)
             {
-                *p = '\0';
-                m_http_tunneling_backend_address = sz_host;
-                m_http_tunneling_backend_port = atoi(p + 1);
+                char* sz_url = (char*)malloc(buf_len + 1);
+                char* sz_host = (char*)malloc(buf_len + 1);
+                char* sz_relatived = (char*)malloc(buf_len + 1);
+                memset(sz_host, 0, buf_len + 1);
+                memset(sz_relatived, 0, buf_len + 1);
+                memset(sz_url, 0, buf_len + 1);
+                
+                sscanf(p_temp, "%[^ ]", sz_url);
+
+                sscanf(p_temp + 7, "%[^/|]", sz_host);
+                
+                int first_host_strlen = strlen(sz_host);
+                
+                strcpy(sz_relatived, p_temp + 7 + first_host_strlen);
+                
+                m_http_tunneling_backend_port = 80;
+                
+                char* p = strstr(sz_host, ":");
+                if(p)
+                {
+                    *p = '\0';
+                    m_http_tunneling_backend_address = sz_host;
+                    m_http_tunneling_backend_port = atoi(p + 1);
+                }
+                else
+                {
+                    m_http_tunneling_backend_address = sz_host;
+                }
+                 
+                if(*(p_temp + 7 + first_host_strlen) == '|')
+                {
+                    memset(sz_host, 0, buf_len + 1);
+                    memset(sz_relatived, 0, buf_len + 1);
+                    memset(sz_url, 0, buf_len + 1);
+
+                    sscanf(p_temp + 7 + first_host_strlen + 1, "%[^/|]", sz_host);
+                
+                    int second_host_strlen = strlen(sz_host);
+                    
+                    strcpy(sz_relatived, p_temp + 7 + first_host_strlen + 1 + second_host_strlen);
+                    
+                    m_http_tunneling_backend_port_backup1 = 80;
+                    
+                    char* p = strstr(sz_host, ":");
+                    if(p)
+                    {
+                        *p = '\0';
+                        m_http_tunneling_backend_address_backup1 = sz_host;
+                        m_http_tunneling_backend_port_backup1 = atoi(p + 1);
+                    }
+                    else
+                    {
+                        m_http_tunneling_backend_address_backup1 = sz_host;
+                    }
+                    
+                    if(*(p_temp + 7 + first_host_strlen + 1 + second_host_strlen) == '|')
+                    {
+                        memset(sz_host, 0, buf_len + 1);
+                        memset(sz_relatived, 0, buf_len + 1);
+                        memset(sz_url, 0, buf_len + 1);
+
+                        sscanf(p_temp + 7 + first_host_strlen + 1 +  second_host_strlen + 1, "%[^/|]", sz_host);
+                    
+                        int third_host_strlen = strlen(sz_host);
+                        
+                        strcpy(sz_relatived, p_temp + 7 + first_host_strlen + 1 + second_host_strlen + 1 + third_host_strlen);
+                        
+                        m_http_tunneling_backend_port_backup2 = 80;
+                        
+                        char* p = strstr(sz_host, ":");
+                        if(p)
+                        {
+                            *p = '\0';
+                            m_http_tunneling_backend_address_backup2 = sz_host;
+                            m_http_tunneling_backend_port_backup2 = atoi(p + 1);
+                        }
+                        else
+                        {
+                            m_http_tunneling_backend_address_backup2 = sz_host;
+                        }
+                        
+                    }
+                    
+                }
+                
+                
+                strtext = sz_method;
+                strtext += sz_relatived;
+                
+                char tmp_szport[32];
+                
+                sprintf(tmp_szport, "%d", m_http_tunneling_backend_port);
+                m_http_tunneling_url = "http://";
+                m_http_tunneling_url += m_http_tunneling_backend_address;
+                m_http_tunneling_url += ":";
+                m_http_tunneling_url += tmp_szport;
+                m_http_tunneling_url += sz_relatived;
+                
+                
+                if(m_http_tunneling_backend_address_backup1 != "")
+                {
+                    sprintf(tmp_szport, "%d", m_http_tunneling_backend_port_backup1);
+                    m_http_tunneling_url_backup1 = "http://";
+                    m_http_tunneling_url_backup1 += m_http_tunneling_backend_address_backup1;
+                    m_http_tunneling_url_backup1 += ":";
+                    m_http_tunneling_url_backup1 += tmp_szport;
+                    m_http_tunneling_url_backup1 += sz_relatived;
+                }
+                if(m_http_tunneling_backend_address_backup2 != "")
+                {
+                    sprintf(tmp_szport, "%d", m_http_tunneling_backend_port_backup2);
+                    m_http_tunneling_url_backup2 = "http://";
+                    m_http_tunneling_url_backup2 += m_http_tunneling_backend_address_backup2;
+                    m_http_tunneling_url_backup2 += ":";
+                    m_http_tunneling_url_backup2 += tmp_szport;
+                    m_http_tunneling_url_backup2 += sz_relatived;
+                }
+                
+                free(sz_relatived);
+                free(sz_host);
+                free(sz_url);
             }
             else
             {
-                m_http_tunneling_backend_address = sz_host;
+                char* sz_url = (char*)malloc(buf_len + 1);
+                char* sz_host = (char*)malloc(buf_len + 1);
+                char* sz_relatived = (char*)malloc(buf_len + 1);
+                memset(sz_host, 0, buf_len + 1);
+                memset(sz_relatived, 0, buf_len + 1);
+                memset(sz_url, 0, buf_len + 1);
+                
+                sscanf(p_temp, "%[^ ]", sz_url);
+                
+                m_http_tunneling_url = sz_url;
+
+                sscanf(p_temp + 7, "%[^/]", sz_host);
+                
+                strcpy(sz_relatived, p_temp + 7 + strlen(sz_host));
+                
+                m_http_tunneling_backend_port = 80;
+                
+                char* p = strstr(sz_host, ":");
+                if(p)
+                {
+                    *p = '\0';
+                    m_http_tunneling_backend_address = sz_host;
+                    m_http_tunneling_backend_port = atoi(p + 1);
+                }
+                else
+                {
+                    m_http_tunneling_backend_address = sz_host;
+                }
+                strtext = sz_method;
+                strtext += sz_relatived;
+                
+                free(sz_relatived);
+                free(sz_host);
+                free(sz_url);
             }
-            strtext = sz_method;
-            strtext += sz_relatived;
-            
-            free(sz_relatived);
-            free(sz_host);
-            free(sz_url);
         }
         else
         {
@@ -598,7 +723,10 @@ void CHttp::Tunneling()
         if(!m_http_tunneling)
             m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache);
         
-        if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(), m_request_no_cache)) //connected
+        if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
+            m_http_tunneling_backend_address_backup1.c_str(), m_http_tunneling_backend_port_backup1, m_http_tunneling_url_backup1.c_str(),
+            m_http_tunneling_backend_address_backup2.c_str(), m_http_tunneling_backend_port_backup2, m_http_tunneling_url_backup2.c_str(),
+            m_request_no_cache)) //connected
         {
             if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
             {
