@@ -9,8 +9,9 @@
 void* reverse_delivery(const char * name, const char * description, const char * parameters, const char* clientip, const char* input_method_url, string * output_method_url, int * skip)
 {
 	/*
-	Reverse proxy, HA proxy and load balance server hook code position.
-	Add http://x.x.x.x before the relative resource path.
+        Reverse proxy, HA proxy and load balance server hook code position.
+        Add http://domain_name_or_ip before the relative resource path.
+        Use | to append HA host(support 3 hosts). Eg.: http://domain_name_or_ip1|domain_name_or_ip2|domain_name_or_ip3
 	*/
 	
 	/* sample code without any url changing */
@@ -34,7 +35,9 @@ void* reverse_delivery(const char * name, const char * description, const char *
     free(sz_resource);
     free(sz_querystring);
             
-    *skip = 0; // zero is not skip, non-zero is skip
+    *skip = 0; // zero is not to skip the follow-up reverse extension, non-zero is to skip them.
+    
+    /* test code, doesn't do any change for request method and url. */
     *output_method_url = input_method_url;
     
     printf("Original URL: [%s], Reverse URL: [%s] from %s\n", input_method_url, output_method_url->c_str(), clientip);
