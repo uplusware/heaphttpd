@@ -119,7 +119,7 @@ public:
 		return rlen;
 	}
 	
-	int lrecv(char* pbuf, int blen)
+	int lrecv(char* pbuf, int blen, int alive_timeout)
 	{
 		int taketime = 0;
 		int res;
@@ -177,7 +177,7 @@ public:
 			if(nRecv >= blen)
 				break;
 			
-			timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
+			timeout.tv_sec = alive_timeout > 0 ? alive_timeout : MAX_SOCKET_TIMEOUT; 
 			timeout.tv_usec = 0;
 					
 			FD_SET(sockfd, &mask);
@@ -289,7 +289,7 @@ public:
 		return rlen;
 	}
 	
-	int lrecv(char* pbuf, int blen)
+	int lrecv(char* pbuf, int blen, int alive_timeout)
 	{
 		int taketime = 0;
 		int res;
@@ -359,7 +359,7 @@ public:
                 ret = SSL_get_error(sslhd, len);
                 if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
                 {
-                    timeout.tv_sec = MAX_SOCKET_TIMEOUT;
+                    timeout.tv_sec = alive_timeout > 0 ? alive_timeout : MAX_SOCKET_TIMEOUT;
                     timeout.tv_usec = 0;
 
                     FD_ZERO(&mask);
@@ -506,7 +506,10 @@ public:
 	static BOOL m_instance_prestart;
     static string m_instance_balance_scheme;
 	static unsigned int	m_runtime;
-
+    
+    static unsigned int	m_keep_alive_timeout;
+    static unsigned int	m_keep_alive_max;
+    
 	static string	m_config_file;
 	static string	m_permit_list_file;
 	static string	m_reject_list_file;

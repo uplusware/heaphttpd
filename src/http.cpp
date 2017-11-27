@@ -42,8 +42,18 @@ CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, cons
     m_protocol_upgrade = FALSE;
     m_upgrade_protocol = "";
     m_web_socket_handshake = Websocket_None;
-    m_keep_alive = TRUE; //HTTP/1.1 Keep-Alive is enabled as default
-    m_enabled_keep_alive = TRUE; //default is true in a session
+    
+    if(CHttpBase::m_keep_alive_timeout > 0)
+    {
+        m_keep_alive = TRUE; //HTTP/1.1 Keep-Alive is enabled as default
+        m_enabled_keep_alive = TRUE; //default is true in a session
+    }
+    else
+    {
+        m_enabled_keep_alive = FALSE; //default is true in a session
+        m_keep_alive = FALSE;
+    }
+
 	m_passed_wwwauth = FALSE;
     m_passed_proxyauth = FALSE;
 	m_wwwauth_scheme = wwwauth_scheme;
@@ -169,9 +179,9 @@ int CHttp::HttpRecv(char* buf, int len)
 int CHttp::ProtRecv(char* buf, int len)
 {
     if(m_ssl)
-        return m_lssl->lrecv(buf, len);
+        return m_lssl->lrecv(buf, len, CHttpBase::m_keep_alive_timeout);
     else
-        return m_lsockfd->lrecv(buf, len);
+        return m_lsockfd->lrecv(buf, len, CHttpBase::m_keep_alive_timeout);
 }
 
 Http_Connection CHttp::Processing()

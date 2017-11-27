@@ -51,8 +51,16 @@ void Session::Process()
     
     Http_Connection httpConn = httpKeepAlive;
     
+    unsigned int keep_alive_ticket = CHttpBase::m_keep_alive_max;
+    time_t first_connection_time = time(NULL);
+    
     while(httpConn != httpClose)
     {
+        if(keep_alive_ticket > 0)
+        {
+            keep_alive_ticket--;
+        }
+        
         IHttp * pProtocol;
         try
         {
@@ -108,6 +116,11 @@ void Session::Process()
 			m_http_tunneling  = pProtocol->GetHttpTunneling();
         }
         delete pProtocol;
+        
+        if(keep_alive_ticket == 0 || (time(NULL) - first_connection_time) > CHttpBase::m_keep_alive_timeout)
+        {
+            httpConn = httpClose;
+        }
     }
 }
 

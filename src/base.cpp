@@ -110,6 +110,9 @@ unsigned int CHttpBase::m_max_instance_thread_num = 1024;
 BOOL CHttpBase::m_instance_prestart = FALSE;
 string CHttpBase::m_instance_balance_scheme = "R";
 
+unsigned int	CHttpBase::m_keep_alive_timeout = 5;
+unsigned int	CHttpBase::m_keep_alive_max = 100;
+    
 unsigned int CHttpBase::m_runtime = 0;
 string	CHttpBase::m_config_file = CONFIG_FILE_PATH;
 string	CHttpBase::m_permit_list_file = PERMIT_FILE_PATH;
@@ -222,6 +225,20 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, inst_num );
 				strtrim(inst_num);
 				m_max_instance_num = atoi(inst_num.c_str());
+			}
+            else if(strncasecmp(strline.c_str(), "HTTPKeepAliveTimeout", sizeof("HTTPKeepAliveTimeout") - 1) == 0)
+			{
+				string keep_alive_timeout;
+				strcut(strline.c_str(), "=", NULL, keep_alive_timeout );
+				strtrim(keep_alive_timeout);
+				m_keep_alive_timeout = atoi(keep_alive_timeout.c_str());
+			}
+            else if(strncasecmp(strline.c_str(), "HTTPKeepAliveMax", sizeof("HTTPKeepAliveMax") - 1) == 0)
+			{
+				string keep_alive_max;
+				strcut(strline.c_str(), "=", NULL, keep_alive_max );
+				strtrim(keep_alive_max);
+				m_keep_alive_max = atoi(keep_alive_max.c_str());
 			}
             else if(strncasecmp(strline.c_str(), "TotalLocalFileCacheSize", sizeof("TotalLocalFileCacheSize") - 1) == 0)
 			{
