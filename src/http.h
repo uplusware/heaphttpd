@@ -66,7 +66,7 @@ public:
     virtual int HttpRecv(char* buf, int len);
 	virtual Http_Connection Processing();
     
-    int ProtRecv(char* buf, int len);
+    int ProtRecv(char* buf, int len, int alive_timeout);
     void PushPostData(const char* buf, int len);
     void RecvPostData();
     void Response();

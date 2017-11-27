@@ -176,12 +176,12 @@ int CHttp::HttpRecv(char* buf, int len)
 		return m_lsockfd->drecv(buf, len);	
 }
 
-int CHttp::ProtRecv(char* buf, int len)
+int CHttp::ProtRecv(char* buf, int len, int alive_timeout)
 {
     if(m_ssl)
-        return m_lssl->lrecv(buf, len, CHttpBase::m_keep_alive_timeout);
+        return m_lssl->lrecv(buf, len, alive_timeout);
     else
-        return m_lsockfd->lrecv(buf, len, CHttpBase::m_keep_alive_timeout);
+        return m_lsockfd->lrecv(buf, len, alive_timeout);
 }
 
 Http_Connection CHttp::Processing()
@@ -191,7 +191,7 @@ Http_Connection CHttp::Processing()
     char sz_http_data[4096];
     while(1)
     {
-        result = ProtRecv(sz_http_data, 4095);
+        result = ProtRecv(sz_http_data, 4095, CHttpBase::m_keep_alive_timeout);
         if(result <= 0)
         {
             httpConn = httpClose; // socket is broken. close the keep-alive connection
