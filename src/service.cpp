@@ -167,11 +167,15 @@ static int alpn_cb(SSL *ssl,
 }
 
 std::queue<SESSION_PARAM*> Worker::m_STATIC_THREAD_POOL_ARG_QUEUE;
-volatile BOOL Worker::m_STATIC_THREAD_POOL_EXIT = TRUE;
+volatile char Worker::m_STATIC_THREAD_POOL_EXIT = TRUE;
 pthread_mutex_t Worker::m_STATIC_THREAD_POOL_MUTEX;
 sem_t Worker::m_STATIC_THREAD_POOL_SEM;
 volatile unsigned int Worker::m_STATIC_THREAD_POOL_SIZE = 0;
+pthread_mutex_t Worker::m_STATIC_THREAD_POOL_SIZE_MUTEX;
 
+pthread_rwlock_t Worker::m_STATIC_THREAD_WORKING_NUM_LOCK;
+volatile unsigned int Worker::m_STATIC_THREAD_WORKING_NUM;
+    
 void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 {    
 	BOOL isHttp2 = FALSE;
@@ -372,17 +376,24 @@ void Worker::INIT_THREAD_POOL_HANDLER()
 {
 	m_STATIC_THREAD_POOL_EXIT = TRUE;
 	m_STATIC_THREAD_POOL_SIZE = 0;
+    m_STATIC_THREAD_WORKING_NUM = 0;
 	while(!m_STATIC_THREAD_POOL_ARG_QUEUE.empty())
 	{
 		m_STATIC_THREAD_POOL_ARG_QUEUE.pop();
 	}
 	pthread_mutex_init(&m_STATIC_THREAD_POOL_MUTEX, NULL);
+    pthread_mutex_init(&m_STATIC_THREAD_POOL_SIZE_MUTEX, NULL);
+    pthread_rwlock_init(&m_STATIC_THREAD_WORKING_NUM_LOCK, NULL);
+    
 	sem_init(&m_STATIC_THREAD_POOL_SEM, 0, 0);
 }
 
 void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 {
+    pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
 	m_STATIC_THREAD_POOL_SIZE++;
+    pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+    
 	struct timespec ts;
 	while(m_STATIC_THREAD_POOL_EXIT)
 	{
@@ -401,12 +412,23 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 			pthread_mutex_unlock(&m_STATIC_THREAD_POOL_MUTEX);
 			if(session_param)
 			{
+                /*pthread_rwlock_wrlock(&m_STATIC_THREAD_WORKING_NUM_LOCK);
+                m_STATIC_THREAD_WORKING_NUM++;
+                pthread_rwlock_unlock(&m_STATIC_THREAD_WORKING_NUM_LOCK);*/
+                
 				SESSION_HANDLING(session_param);
 				delete session_param;
+                
+                /*pthread_rwlock_wrlock(&m_STATIC_THREAD_WORKING_NUM_LOCK);
+                m_STATIC_THREAD_WORKING_NUM--;
+                pthread_rwlock_unlock(&m_STATIC_THREAD_WORKING_NUM_LOCK);*/
+                
 			}
 		}
 	}
+    pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
 	m_STATIC_THREAD_POOL_SIZE--;
+    pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
 	if(arg != NULL)
 		delete arg;
 	
@@ -418,7 +440,6 @@ void Worker::LEAVE_THREAD_POOL_HANDLER()
 	printf("LEAVE_THREAD_POOL_HANDLER\n");
 	m_STATIC_THREAD_POOL_EXIT = FALSE;
 
-	pthread_mutex_destroy(&m_STATIC_THREAD_POOL_MUTEX);
 	sem_close(&m_STATIC_THREAD_POOL_SEM);
 
     char local_sockfile[256];
@@ -426,12 +447,22 @@ void Worker::LEAVE_THREAD_POOL_HANDLER()
 
     unlink(local_sockfile);
 
-	unsigned long timeout = 200;
-	while(m_STATIC_THREAD_POOL_SIZE > 0 && timeout > 0)
+    BOOL still_have_threads = TRUE;
+	while(still_have_threads)
 	{
-		usleep(1000*10);
-		timeout--;
+        pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+        if(m_STATIC_THREAD_POOL_SIZE <= 0)
+        {
+            still_have_threads = FALSE;
+        }
+        pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+        if(still_have_threads)
+            usleep(1000*10);
 	}	
+    
+    pthread_mutex_destroy(&m_STATIC_THREAD_POOL_MUTEX);
+    pthread_mutex_destroy(&m_STATIC_THREAD_POOL_SIZE_MUTEX);    
+    pthread_rwlock_destroy(&m_STATIC_THREAD_WORKING_NUM_LOCK);
 }
 
 void CLEAR_QUEUE(mqd_t qid)
@@ -856,6 +887,11 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
             int work_pid = fork();
             if(work_pid == 0)
             {
+                if(m_sockfd > 0)
+                    close(m_sockfd); //close service socket
+                if(m_sockfd_ssl > 0)
+                    close(m_sockfd_ssl); //close ssl service socket
+                
                 close(clt_sockfd);
                 
                 if(lock_pid_file(pid_file) == false)
@@ -987,6 +1023,11 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
             int work_pid = fork();
             if(work_pid == 0)
             {
+                if(m_sockfd > 0)
+                    close(m_sockfd); //close service socket
+                if(m_sockfd_ssl > 0)
+                    close(m_sockfd_ssl); //close ssl service socket
+                
                 if(lock_pid_file(pid_file) == false)
                 {
                     printf("lock pid file failed: %s\n", pid_file);

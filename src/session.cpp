@@ -51,14 +51,14 @@ void Session::Process()
     
     Http_Connection httpConn = httpKeepAlive;
     
-    unsigned int keep_alive_ticket = CHttpBase::m_keep_alive_max;
+    unsigned int connection_keep_alive_ticket = CHttpBase::m_keep_alive_max;
     time_t first_connection_time = time(NULL);
     
     while(httpConn != httpClose)
     {
-        if(keep_alive_ticket > 0)
+        if(connection_keep_alive_ticket > 0)
         {
-            keep_alive_ticket--;
+            connection_keep_alive_ticket--;
         }
         
         IHttp * pProtocol;
@@ -117,7 +117,7 @@ void Session::Process()
         }
         delete pProtocol;
         
-        if(keep_alive_ticket == 0 || (time(NULL) - first_connection_time) > CHttpBase::m_keep_alive_timeout)
+        if(connection_keep_alive_ticket == 0 || (time(NULL) - first_connection_time) > CHttpBase::m_keep_alive_timeout)
         {
             httpConn = httpClose;
         }

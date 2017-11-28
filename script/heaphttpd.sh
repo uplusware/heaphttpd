@@ -30,7 +30,6 @@ heaphttpd_start()
 heaphttpd_stop()
 {
 	/usr/bin/heaphttpd stop
-	sleep 5
 }
 
 heaphttpd_status()
@@ -76,6 +75,7 @@ heaphttpd_version()
 heaphttpd_restart()
 {
 	heaphttpd_stop
+    sleep 1
 	heaphttpd_start
 }
 

@@ -218,10 +218,14 @@ private:
     
     //static variables
     static std::queue<SESSION_PARAM*> m_STATIC_THREAD_POOL_ARG_QUEUE;
-    static volatile BOOL m_STATIC_THREAD_POOL_EXIT;
+    static volatile char m_STATIC_THREAD_POOL_EXIT;
     static pthread_mutex_t m_STATIC_THREAD_POOL_MUTEX;
     static sem_t m_STATIC_THREAD_POOL_SEM;
     static volatile unsigned int m_STATIC_THREAD_POOL_SIZE;
+    static pthread_mutex_t m_STATIC_THREAD_POOL_SIZE_MUTEX;
+    
+    static pthread_rwlock_t m_STATIC_THREAD_WORKING_NUM_LOCK;
+    static volatile unsigned int m_STATIC_THREAD_WORKING_NUM;
 };
 
 typedef struct {

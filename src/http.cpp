@@ -45,12 +45,12 @@ CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, cons
     
     if(CHttpBase::m_keep_alive_timeout > 0)
     {
-        m_keep_alive = TRUE; //HTTP/1.1 Keep-Alive is enabled as default
-        m_enabled_keep_alive = TRUE; //default is true in a session
+        m_keep_alive = TRUE; /* HTTP/1.1 Keep-Alive is enabled as default */
+        m_enabled_keep_alive = TRUE; 
     }
     else
     {
-        m_enabled_keep_alive = FALSE; //default is true in a session
+        m_enabled_keep_alive = FALSE;
         m_keep_alive = FALSE;
     }
 
@@ -224,9 +224,6 @@ void CHttp::SetCookie(const char* szName, const char* szValue,
     if(iter != m_set_cookies.end())
         m_set_cookies.erase(iter);
     m_set_cookies.insert(map<string, string>::value_type(szName, strCookie.c_str()));
-    
-    /* Don't save cookie in ther server side */
-	/* m_cache->push_cookie(szName, ck);*/
 }
 
 void CHttp::SetSessionVar(const char* szName, const char* szValue)
