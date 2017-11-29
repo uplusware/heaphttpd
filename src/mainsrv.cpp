@@ -51,6 +51,7 @@ static void daemon_init()
 	close(STDOUT_FILENO);
     if(CHttpBase::m_close_stderr)
         close(STDERR_FILENO);
+
 }
 
 char PIDFILE[256] = "/tmp/heaphttpd/heaphttpd.pid";

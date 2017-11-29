@@ -15,92 +15,137 @@
 #include <queue>
 #include <sys/syscall.h>
 #define gettid() syscall(__NR_gettid)
+#define gettid2() syscall(SYS_gettid)
 #include "service.h"
 #include "session.h"
 #include "cache.h"
 #include "pool.h"
 #include "util/trace.h"
 
-int SEND_FD(int sfd, int fd_file, CLIENT_PARAM* param) 
+int SEND_FD(int sfd, int fd_file, CLIENT_PARAM* param, int wait_timeout = 0) 
 {
-	struct msghdr msg;  
-    struct iovec iov[1];  
-    union{  
-        struct cmsghdr cm;  
-        char control[CMSG_SPACE(sizeof(int))];  
-    }control_un;  
-    struct cmsghdr *cmptr;     
-    msg.msg_control = control_un.control;   
-    msg.msg_controllen = sizeof(control_un.control);  
-    cmptr = CMSG_FIRSTHDR(&msg);  
-    cmptr->cmsg_len = CMSG_LEN(sizeof(int));
-    cmptr->cmsg_level = SOL_SOCKET;   
-    cmptr->cmsg_type = SCM_RIGHTS;
-    *((int*)CMSG_DATA(cmptr)) = fd_file;
-    msg.msg_name = NULL;  
-    msg.msg_namelen = 0;  
-    iov[0].iov_base = param;  
-    iov[0].iov_len = sizeof(CLIENT_PARAM);  
-    msg.msg_iov = iov;  
-    msg.msg_iovlen = 1;
+    int res;
+	fd_set mask; 
+	struct timeval timeout; 
+    FD_ZERO(&mask);
+    FD_SET(sfd, &mask);
+    
+    timeout.tv_sec = wait_timeout; 
+    timeout.tv_usec = 0;
+    
+    res = select(sfd + 1, NULL, &mask, NULL, wait_timeout > 0 ? &timeout : NULL);// 0 means recieve block mode
+	
+    if(res == 1) 
+	{ 
+        struct msghdr msg;  
+        struct iovec iov[1];  
+        union{  
+            struct cmsghdr cm;  
+            char control[CMSG_SPACE(sizeof(int))];  
+        }control_un;  
+        struct cmsghdr *cmptr;     
+        msg.msg_control = control_un.control;   
+        msg.msg_controllen = sizeof(control_un.control);  
+        cmptr = CMSG_FIRSTHDR(&msg);  
+        cmptr->cmsg_len = CMSG_LEN(sizeof(int));
+        cmptr->cmsg_level = SOL_SOCKET;   
+        cmptr->cmsg_type = SCM_RIGHTS;
+        *((int*)CMSG_DATA(cmptr)) = fd_file;
+        msg.msg_name = NULL;  
+        msg.msg_namelen = 0;  
+        iov[0].iov_base = param;  
+        iov[0].iov_len = sizeof(CLIENT_PARAM);  
+        msg.msg_iov = iov;  
+        msg.msg_iovlen = 1;
 
-    return sendmsg(sfd, &msg, 0); 
+        return sendmsg(sfd, &msg, 0); 
+    }
+    else if(res == 0)
+    {
+        return -2; //timeout
+    }
+    else
+    {
+        return -1;
+    }
 
 }
 
-int RECV_FD(int sfd, int* fd_file, CLIENT_PARAM* param) 
+int RECV_FD(int sfd, int* fd_file, CLIENT_PARAM* param, int wait_timeout = 0) 
 {
-    struct msghdr msg;  
-    struct iovec iov[1];  
-    int nrecv;  
-    union{
-		struct cmsghdr cm;  
-		char control[CMSG_SPACE(sizeof(int))];  
-    }control_un;  
-    struct cmsghdr *cmptr;  
-    msg.msg_control = control_un.control;  
-    msg.msg_controllen = sizeof(control_un.control);
-    msg.msg_name = NULL;  
-    msg.msg_namelen = 0;  
+    int res;
+	fd_set mask; 
+	struct timeval timeout; 
+    FD_ZERO(&mask);
+    FD_SET(sfd, &mask);
+    
+    timeout.tv_sec = wait_timeout; 
+    timeout.tv_usec = 0;
+    
+    res = select(sfd + 1, &mask, NULL, NULL, wait_timeout > 0 ? &timeout : NULL);// 0 means recieve block mode
+	
+    if(res == 1) 
+	{    
+        struct msghdr msg;  
+        struct iovec iov[1];  
+        int nrecv;  
+        union{
+            struct cmsghdr cm;  
+            char control[CMSG_SPACE(sizeof(int))];  
+        }control_un;  
+        struct cmsghdr *cmptr;  
+        msg.msg_control = control_un.control;  
+        msg.msg_controllen = sizeof(control_un.control);
+        msg.msg_name = NULL;  
+        msg.msg_namelen = 0;  
 
-    iov[0].iov_base = param;  
-    iov[0].iov_len = sizeof(CLIENT_PARAM);  
-    msg.msg_iov = iov;  
-    msg.msg_iovlen = 1;
-
-    if((nrecv = recvmsg(sfd, &msg, 0)) <= 0)  
-    {  
-        return nrecv;  
-    }
-
-    cmptr = CMSG_FIRSTHDR(&msg);  
-    if((cmptr != NULL) && (cmptr->cmsg_len == CMSG_LEN(sizeof(int))))  
-    {  
-        if(cmptr->cmsg_level != SOL_SOCKET)  
+        iov[0].iov_base = param;  
+        iov[0].iov_len = sizeof(CLIENT_PARAM);  
+        msg.msg_iov = iov;  
+        msg.msg_iovlen = 1;
+        
+        if((nrecv = recvmsg(sfd, &msg, 0)) < 0)  
         {  
-            fprintf(stderr, "control level != SOL_SOCKET/n");  
-            exit(-1);  
+            return nrecv;  
+        }
+
+        cmptr = CMSG_FIRSTHDR(&msg);  
+        if((cmptr != NULL) && (cmptr->cmsg_len == CMSG_LEN(sizeof(int))))  
+        {  
+            if(cmptr->cmsg_level != SOL_SOCKET)  
+            {  
+                fprintf(stderr, "control level != SOL_SOCKET/n");  
+                return -1;
+            }  
+            if(cmptr->cmsg_type != SCM_RIGHTS)  
+            {  
+                fprintf(stderr, "control type != SCM_RIGHTS/n");  
+                return -1; 
+            }
+            *fd_file = *((int*)CMSG_DATA(cmptr));  
         }  
-        if(cmptr->cmsg_type != SCM_RIGHTS)  
+        else  
         {  
-            fprintf(stderr, "control type != SCM_RIGHTS/n");  
-            exit(-1);  
-        } 
-        *fd_file = *((int*)CMSG_DATA(cmptr));  
-    }  
-    else  
-    {  
-        if(cmptr == NULL)
-        {
-			perror("null cmptr, fd not passed");
-        }
-        else
-        {
-			fprintf(stderr, "message len[%d] if incorrect: %s\n", cmptr->cmsg_len, strerror(errno));  
-        }
-        *fd_file = -1; // descriptor was not passed  
-    }   
-    return *fd_file;  
+            if(cmptr == NULL)
+            {
+                perror("null cmptr, fd not passed");
+            }
+            else
+            {
+                fprintf(stderr, "message len[%d] if incorrect: %s\n", cmptr->cmsg_len, strerror(errno));  
+            }
+            *fd_file = -1; // descriptor was not passed  
+        }   
+        return *fd_file;
+    }
+    else if(res == 0)
+    {
+        return -2; //timeout
+    }
+    else
+    {
+        return -1;
+    }
 }
 
 /*
@@ -431,7 +476,7 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
     pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
 	if(arg != NULL)
 		delete arg;
-	
+	//printf("    QUIT from thread #%llu in %llu\n", gettid(), getpid());
 	pthread_exit(0);
 }
 
@@ -497,6 +542,9 @@ Worker::Worker(const char* service_name, int process_seq, int thread_num, int so
     m_cache = new memory_cache(m_service_name.c_str(), m_process_seq, CHttpBase::m_work_path.c_str());
 #endif /* _WITH_MEMCACHED_ */    
 	m_cache->load();
+    
+    int flags = fcntl(m_sockfd, F_GETFL, 0); 
+	fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK); 
 }
 
 Worker::~Worker()
@@ -504,6 +552,8 @@ Worker::~Worker()
 	if(m_cache)
 		delete m_cache;
 	m_srvobjmap.ReleaseAll();
+    if(m_sockfd > 0)
+        close(m_sockfd);
 }
 
 void Worker::Working(CUplusTrace& uTrace)
@@ -517,10 +567,15 @@ void Worker::Working(CUplusTrace& uTrace)
 
 		int clt_sockfd;
 		CLIENT_PARAM client_param;
-		if(RECV_FD(m_sockfd, &clt_sockfd, &client_param)  < 0)
+        int res = RECV_FD(m_sockfd, &clt_sockfd, &client_param, MAX_SOCKET_TIMEOUT);
+        if( res < 0)
 		{
-			continue;
+            close(m_sockfd);
+            m_sockfd = -1;
+            bQuit = true;
+			break;
 		}
+        
 		if(clt_sockfd < 0)
 		{
 			fprintf(stderr, "RECV_FD error, clt_sockfd = %d %s %d", clt_sockfd, __FILE__, __LINE__);
@@ -919,6 +974,9 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
                 wpinfo.sockfds[1] = -1;
                 wpinfo.pid = work_pid;
                 
+                int flags = fcntl(wpinfo.sockfds[0], F_GETFL, 0); 
+                fcntl(wpinfo.sockfds[0], F_SETFL, flags | O_NONBLOCK);
+                
                 if(m_work_processes[m_next_process].sockfds[0] > 0)
                     close(m_work_processes[m_next_process].sockfds[0]);
                 
@@ -951,10 +1009,34 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
         client_param.client_cer_check = CHttpBase::m_client_cer_check;
 
         client_param.ctrl = SessionParamData;
-        if(m_work_processes[m_next_process].sockfds[0] > 0)
-            SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param);
+            
+        BOOL sent_fd_ok = TRUE;
+        do{
+            
+            if(m_work_processes[m_next_process].sockfds[0] > 0)
+            {
+                int sent_res = SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param, 5);
+                if(sent_res < 0)
+                {
+                    printf("fail to sent fd\n");
+                    m_next_process++;
+                    m_next_process = m_next_process % m_work_processes.size();
+                    sent_fd_ok = FALSE;
+                }
+                else
+                {
+                    sent_fd_ok = TRUE;
+                }
+            }
+            else
+            {
+                m_next_process++;
+                m_next_process = m_next_process % m_work_processes.size();
+                sent_fd_ok = FALSE;
+            }
+        }while(!sent_fd_ok);
+            
         close(clt_sockfd);
-
     }
     
     return 0;
@@ -1054,6 +1136,9 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
                 wpinfo.sockfds[1] = -1;
                 
                 wpinfo.pid = work_pid;
+                
+                int flags = fcntl(wpinfo.sockfds[0], F_GETFL, 0); 
+                fcntl(wpinfo.sockfds[0], F_SETFL, flags | O_NONBLOCK); 
                 
             }
             else
