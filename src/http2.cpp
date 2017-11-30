@@ -74,7 +74,7 @@
 
 #define PRE_MALLOC_SIZE 1024
 
-CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp2::CHttp2(time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -83,6 +83,10 @@ CHttp2::CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsign
         const char* private_path, AUTH_SCHEME wwwauth_scheme, AUTH_SCHEME proxyauth_scheme,
 		SSL* ssl)
 {
+    m_connection_first_request_time = connection_first_request_time;
+    m_connection_keep_alive_timeout = connection_keep_alive_timeout;
+    m_connection_keep_alive_request_tickets = connection_keep_alive_request_tickets;
+    
     m_peer_window_size = 0;
     m_local_window_size = 65536; // hardcode per rfc7540
     
@@ -390,7 +394,7 @@ http2_stream* CHttp2::create_stream_instance(uint_32 stream_ind)
 {
     if(stream_ind > 0)
     {
-        return new http2_stream(stream_ind, m_initial_local_window_size, m_initial_peer_window_size, this, m_srvobj,
+        return new http2_stream(stream_ind, m_initial_local_window_size, m_initial_peer_window_size, this, m_connection_first_request_time, m_connection_keep_alive_timeout, m_connection_keep_alive_request_tickets, m_srvobj,
                                                 m_sockfd,
                                                 m_servername.c_str(),
                                                 m_serverport,

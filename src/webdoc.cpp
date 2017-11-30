@@ -143,7 +143,7 @@ void doc::Response()
         stat(strResourceFullPath.c_str(), &info);
         if(S_ISDIR(info.st_mode)) /* Forbidden to access directory directly */
         {
-            CHttpResponseHdr header;
+            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
             header.SetStatusCode(SC404);
             header.SetField("Content-Type", "text/html");
             header.SetField("Content-Length", header.GetDefaultHTMLLength());
@@ -156,7 +156,7 @@ void doc::Response()
         if(get_file_length_lastmidifytime(strResourceFullPath.c_str(), nResourceLength, tLastModifyTime) == false)
         {
             /* No such file */
-            CHttpResponseHdr header;
+            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
             header.SetStatusCode(SC404);
             header.SetField("Content-Type", "text/html");
             header.SetField("Content-Length", header.GetDefaultHTMLLength());
@@ -180,7 +180,7 @@ void doc::Response()
         && strcmp(m_session->GetRequestField("If-Modified-Since"), strDateTime.c_str()) == 0)
     {
         /* No such file */
-        CHttpResponseHdr header;
+        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
         header.SetStatusCode(SC304);
         unsigned int zero = 0;
         header.SetField("Content-Length", zero);    
@@ -205,7 +205,7 @@ void doc::Response()
                 if(file_buf)
                     delete[] file_buf;
                     
-                CHttpResponseHdr header;
+                CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                 header.SetStatusCode(SC404);
                 header.SetField("Content-Type", "text/html");
                 header.SetField("Content-Length", header.GetDefaultHTMLLength());
@@ -243,7 +243,7 @@ void doc::Response()
         && strcmp(m_session->GetRequestField("If-None-Match"), "") != 0 
         && strcmp(m_session->GetRequestField("If-None-Match"), szQETagQ) == 0)
     {
-        CHttpResponseHdr header;
+        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
         header.SetStatusCode(SC304);
         unsigned int zero = 0;
         header.SetField("Content-Length", zero);    
@@ -320,7 +320,7 @@ void doc::Response()
     /* Has cache buff */
     if(file_cache_buf)
     {
-        CHttpResponseHdr header;
+        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
         if(strcmp(szHttpRequestRanges, "") != 0 && strContentRangeResponse != "")
             header.SetStatusCode(SC206);
         else
@@ -395,7 +395,7 @@ void doc::Response()
         string strline;
         if(!ifsResource.is_open())
         {
-            CHttpResponseHdr header;
+            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
             header.SetStatusCode(SC404);
             header.SetField("Content-Type", "text/html");
             header.SetField("Content-Length", header.GetDefaultHTMLLength());
@@ -404,7 +404,7 @@ void doc::Response()
         }
         else
         {
-            CHttpResponseHdr header;
+            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
             if(strcmp(szHttpRequestRanges, "") != 0 && strContentRangeResponse != "")
                 header.SetStatusCode(SC206);
             else

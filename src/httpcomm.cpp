@@ -110,6 +110,15 @@ CHttpResponseHdr::CHttpResponseHdr()
 	m_mapHeader.insert(map<string, string>::value_type("X-Powered-By", ""));
 }
 
+CHttpResponseHdr::CHttpResponseHdr(map<string, string> & map_header)
+{
+    map<string, string>::iterator it;
+    for(it = map_header.begin(); it != map_header.end(); ++it)
+    {
+        m_mapHeader[it->first] = it->second;
+    }
+}
+
 void CHttpResponseHdr::SetStatusCode(Http_StatsCode StatusCode)
 {
 	if(StatusCode == SC200)

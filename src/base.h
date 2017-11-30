@@ -507,7 +507,7 @@ public:
     static string m_instance_balance_scheme;
 	static unsigned int	m_runtime;
     
-    static unsigned int	m_keep_alive_timeout;
+    static unsigned int	m_connection_keep_alive_timeout;
     static unsigned int	m_keep_alive_max;
     
 	static string	m_config_file;

@@ -1010,31 +1010,28 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
 
         client_param.ctrl = SessionParamData;
             
-        BOOL sent_fd_ok = TRUE;
-        do{
-            
+        for(int t = 0; t < m_work_processes.size(); t++)
+        {
             if(m_work_processes[m_next_process].sockfds[0] > 0)
             {
-                int sent_res = SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param, 5);
-                if(sent_res < 0)
+                if(SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param, 5) < 0)
                 {
                     printf("fail to sent fd\n");
+                    usleep(100);
                     m_next_process++;
                     m_next_process = m_next_process % m_work_processes.size();
-                    sent_fd_ok = FALSE;
                 }
                 else
                 {
-                    sent_fd_ok = TRUE;
+                    break;
                 }
             }
             else
             {
                 m_next_process++;
                 m_next_process = m_next_process % m_work_processes.size();
-                sent_fd_ok = FALSE;
             }
-        }while(!sent_fd_ok);
+        }
             
         close(clt_sockfd);
     }

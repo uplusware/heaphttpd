@@ -49,7 +49,7 @@ class CHttp : public IHttp
 {
 public:
     friend class CHttp2;
-	CHttp(http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	CHttp(time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -160,6 +160,9 @@ public:
     
     void Http2PushPromise(const char * path);
     BOOL IsHttp2();
+    
+    CHttpResponseHdr* GetResponseHeader() { return &m_response_header; }
+    
 private:
     void ParseMethod(string & strtext);
 protected:
@@ -247,6 +250,12 @@ protected:
     http_tunneling* m_http_tunneling;
     
     BOOL m_request_no_cache;
+    
+    CHttpResponseHdr m_response_header;
+    
+    time_t m_connection_first_request_time;
+    time_t m_connection_keep_alive_timeout;
+    unsigned int m_connection_keep_alive_request_tickets;
 };
 
 #endif /* _HTTP_H_ */

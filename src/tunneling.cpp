@@ -7,7 +7,7 @@
 #include "http_client.h"
 #include "httpcomm.h"
 
-http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache)
+http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache, const CHttpResponseHdr* session_response_header)
 {
     m_address = "";
     m_port = 0;
@@ -18,6 +18,8 @@ http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling
     m_cache = cache;
     m_http_tunneling_url = "";
     m_tunneling_cache_instance = NULL;
+    
+    m_session_response_header = session_response_header;
 }
 
 http_tunneling::~http_tunneling()
@@ -321,7 +323,7 @@ bool http_tunneling::recv_relay_reply()
             TUNNELING_CACHE_DATA* tunneling_cache_data = m_tunneling_cache_instance->tunneling_rdlock();
             if(tunneling_cache_data)
             {
-                CHttpResponseHdr header;
+                CHttpResponseHdr header(*m_session_response_header);
                 header.SetStatusCode(SC200);
                 if(tunneling_cache_data->type != "")
                     header.SetField("Content-Type", tunneling_cache_data->type.c_str());

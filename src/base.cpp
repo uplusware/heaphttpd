@@ -110,7 +110,7 @@ unsigned int CHttpBase::m_max_instance_thread_num = 1024;
 BOOL CHttpBase::m_instance_prestart = FALSE;
 string CHttpBase::m_instance_balance_scheme = "R";
 
-unsigned int	CHttpBase::m_keep_alive_timeout = 5;
+unsigned int	CHttpBase::m_connection_keep_alive_timeout = 5;
 unsigned int	CHttpBase::m_keep_alive_max = 100;
     
 unsigned int CHttpBase::m_runtime = 0;
@@ -228,10 +228,10 @@ BOOL CHttpBase::LoadConfig()
 			}
             else if(strncasecmp(strline.c_str(), "HTTPKeepAliveTimeout", sizeof("HTTPKeepAliveTimeout") - 1) == 0)
 			{
-				string keep_alive_timeout;
-				strcut(strline.c_str(), "=", NULL, keep_alive_timeout );
-				strtrim(keep_alive_timeout);
-				m_keep_alive_timeout = atoi(keep_alive_timeout.c_str());
+				string connection_keep_alive_timeout;
+				strcut(strline.c_str(), "=", NULL, connection_keep_alive_timeout );
+				strtrim(connection_keep_alive_timeout);
+				m_connection_keep_alive_timeout = atoi(connection_keep_alive_timeout.c_str());
 			}
             else if(strncasecmp(strline.c_str(), "HTTPKeepAliveMax", sizeof("HTTPKeepAliveMax") - 1) == 0)
 			{

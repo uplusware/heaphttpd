@@ -14,6 +14,7 @@
 #include "cache.h"
 #include "base.h"
 #include "util/general.h"
+#include "httpcomm.h"
 
 #include <arpa/inet.h>
  
@@ -39,7 +40,7 @@ typedef struct
 class http_tunneling
 {
 public:
-    http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache);
+    http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache, const CHttpResponseHdr* session_response_header);
     virtual ~http_tunneling();
     int client_send(const char* buf, int len);
     
@@ -68,5 +69,7 @@ protected:
     memory_cache* m_cache;
     string m_http_tunneling_url;
     tunneling_cache* m_tunneling_cache_instance;
+    
+    const CHttpResponseHdr* m_session_response_header;
 };
 #endif /* _TUNNELING_H_ */

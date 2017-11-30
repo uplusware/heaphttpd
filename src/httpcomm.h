@@ -123,6 +123,9 @@ public:
     void SetMethod(Http_Method method);
     
     Http_Method GetMethod();
+    
+    
+    
 private:
 	map<string, string> m_mapHeader;
     Http_Method m_method;
@@ -274,6 +277,7 @@ private:
 	void _update_header_();
 public:
     CHttpResponseHdr();
+    CHttpResponseHdr(map<string, string> & map_header);
 	virtual ~CHttpResponseHdr();
 	void SetStatusCode(Http_StatsCode StatusCode);
     void SetStatusCode(const char* StrStatusCode);
@@ -290,6 +294,8 @@ public:
 	const char* Text();
 	
 	unsigned int Length();
+    
+    map<string, string>& GetMap() { return m_mapHeader; }
 };
     
 typedef enum

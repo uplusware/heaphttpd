@@ -25,7 +25,7 @@ void Htdoc::Response()
     {
         if(m_session->GetWebSocketHandShake() == Websocket_Nak)
         {
-            CHttpResponseHdr header;
+            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
             header.SetStatusCode(SC400);
 
             header.SetField("Content-Type", "text/html");
@@ -56,7 +56,7 @@ void Htdoc::Response()
                 string strwsaccept_b64 = szwsaccept_b64;
                 free(szwsaccept_b64);
                 
-                CHttpResponseHdr header;
+                CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                 header.SetStatusCode(SC101);
                 header.SetField("Upgrade", "websocket");
                 header.SetField("Connection", "Upgrade");
@@ -83,7 +83,7 @@ void Htdoc::Response()
                     struct stat statbuf;
                     if(stat(strLibName.c_str(), &statbuf) < 0)
                     {
-                        CHttpResponseHdr header;
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                         header.SetStatusCode(SC404);
             
                         header.SetField("Content-Type", "text/html");
@@ -96,7 +96,7 @@ void Htdoc::Response()
                     if(!lhandle)
                     {
                         fprintf(stderr, "dlopen %s\n", dlerror());
-                        CHttpResponseHdr header;
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                         header.SetStatusCode(SC500);
             
                         header.SetField("Content-Type", "text/html");
@@ -119,7 +119,7 @@ void Htdoc::Response()
                         {
                             fprintf(stderr, "dlsym %s\n", errmsg);
                             
-                            CHttpResponseHdr header;
+                            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                             header.SetStatusCode(SC500);
         
                             header.SetField("Content-Type", "text/html");
@@ -139,7 +139,7 @@ void Htdoc::Response()
 
 	if(m_session->GetMethod() != hmPost && m_session->GetMethod() != hmGet && m_session->GetMethod() != hmHead)
 	{
-        CHttpResponseHdr header;
+        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
 		header.SetStatusCode(SC501);
 		
         header.SetField("Content-Type", "text/html");
@@ -193,7 +193,7 @@ void Htdoc::Response()
 		struct stat statbuf;
         if(stat(strLibName.c_str(), &statbuf) < 0)
         {
-            CHttpResponseHdr header;
+            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
             header.SetStatusCode(SC404);
 
             header.SetField("Content-Type", "text/html");
@@ -206,7 +206,7 @@ void Htdoc::Response()
 		void *lhandle = dlopen(strLibName.c_str(), RTLD_LOCAL | RTLD_NOW);
 		if(!lhandle)
 		{
-            CHttpResponseHdr header;
+            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
 			header.SetStatusCode(SC500);
 			
             header.SetField("Content-Type", "text/html");
@@ -231,7 +231,7 @@ void Htdoc::Response()
 			}
 			else
 			{
-				CHttpResponseHdr header;
+				CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
 				header.SetStatusCode(SC500);
                 
                 header.SetField("Content-Type", "text/html");
@@ -295,7 +295,7 @@ void Htdoc::Response()
                         strHeader += "\r\n";
                     }
                     
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                     if(strncasecmp(strHeader.c_str(), "Status: ", sizeof("Status: ") - 1) == 0)
                     {
                         unsigned int nStatusCode = 200;
@@ -328,7 +328,7 @@ void Htdoc::Response()
                 }
                 else
                 {
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                     header.SetStatusCode(SC500);
                     
                     header.SetField("Content-Type", "text/html");
@@ -364,7 +364,7 @@ void Htdoc::Response()
 		}
 		else
 		{
-            CHttpResponseHdr header;
+            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
             header.SetStatusCode(SC403);
             
             header.SetField("Content-Type", "text/html");
@@ -415,7 +415,7 @@ void Htdoc::Response()
                 else
                 {
                     
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                     header.SetStatusCode(SC500);
                     
                     header.SetField("Content-Type", "text/html");
@@ -461,7 +461,7 @@ void Htdoc::Response()
                             strHeader += "\r\n";
                         }
                         
-                        CHttpResponseHdr header;
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                         if(strncasecmp(strHeader.c_str(), "Status: ", sizeof("Status: ") - 1) == 0)
                         {
                             unsigned int nStatusCode = 200;
@@ -496,7 +496,7 @@ void Htdoc::Response()
                     }
                     else
                     {
-                        CHttpResponseHdr header;
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                         header.SetStatusCode(SC500);
                         
                         header.SetField("Content-Type", "text/html");
@@ -508,7 +508,7 @@ void Htdoc::Response()
                 }
                 else
                 {
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                     header.SetStatusCode(SC500);
                     
                     header.SetField("Content-Type", "text/html");
@@ -526,7 +526,7 @@ void Htdoc::Response()
                     cgi_instance = new scgi(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
                 else
                 {
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                     header.SetStatusCode(SC500);
                     
                     header.SetField("Content-Type", "text/html");
@@ -559,7 +559,7 @@ void Htdoc::Response()
                             strHeader += "\r\n";
                         }
                         
-                        CHttpResponseHdr header;
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                         if(strncasecmp(strHeader.c_str(), "Status: ", sizeof("Status: ") - 1) == 0)
                         {
                             unsigned int nStatusCode = 200;
@@ -593,7 +593,7 @@ void Htdoc::Response()
                     }
                     else
                     {
-                        CHttpResponseHdr header;
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                         header.SetStatusCode(SC500);
                         
                         header.SetField("Content-Type", "text/html");
@@ -605,7 +605,7 @@ void Htdoc::Response()
                 }
                 else
                 {
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                     header.SetStatusCode(SC500);
                     
                     header.SetField("Content-Type", "text/html");
@@ -617,7 +617,7 @@ void Htdoc::Response()
             }
             else
             {
-                CHttpResponseHdr header;
+                CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                 header.SetStatusCode(SC500);
                 
                 header.SetField("Content-Type", "text/html");
@@ -651,7 +651,7 @@ void Htdoc::Response()
                 {
                     if(resoucefile[resoucefile.length() - 1] != '/')
                     {
-                        CHttpResponseHdr header;
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                         header.SetStatusCode(SC403);
                         
                         header.SetField("Content-Type", "text/html");
@@ -736,7 +736,7 @@ void Htdoc::Response()
                                 fprintf(stderr, "PHP Parse error:: %s\n", strParseError.c_str());
                             
                             
-                            CHttpResponseHdr header;
+                            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                             if(strncasecmp(strHeader.c_str(), "Status: ", sizeof("Status: ") - 1) == 0)
                             {
                                 unsigned int nStatusCode = 200;
@@ -769,7 +769,7 @@ void Htdoc::Response()
                         }
                         else
                         {
-                            CHttpResponseHdr header;
+                            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                             header.SetStatusCode(SC500);
                             
                             header.SetField("Content-Type", "text/html");
@@ -839,7 +839,7 @@ void Htdoc::Response()
                         fcgi_instance = new fastcgi(m_fpm_addr.c_str(), m_fpm_port);
                     else
                     {
-                        CHttpResponseHdr header;
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                         header.SetStatusCode(SC500);
                         
                         header.SetField("Content-Type", "text/html");
@@ -884,7 +884,7 @@ void Htdoc::Response()
                                 strHeader += "\r\n";
                             }
                             
-                            CHttpResponseHdr header;
+                            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                             
                             if(strncasecmp(strHeader.c_str(), "Status: ", sizeof("Status: ") - 1) == 0)
                             {
@@ -933,7 +933,7 @@ void Htdoc::Response()
                         }
                         else
                         {
-                            CHttpResponseHdr header;
+                            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                             header.SetStatusCode(SC500);
                             
                             header.SetField("Content-Type", "text/html");
@@ -945,7 +945,7 @@ void Htdoc::Response()
                     }
                     else
                     {
-                        CHttpResponseHdr header;
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                         header.SetStatusCode(SC500);
                         
                         header.SetField("Content-Type", "text/html");
@@ -960,7 +960,7 @@ void Htdoc::Response()
                 }
                 else
                 {
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
                     header.SetStatusCode(SC501);
                     
                     header.SetField("Content-Type", "text/html");

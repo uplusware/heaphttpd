@@ -3,7 +3,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //http2_stream
-http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, ServiceObjMap* srvobj, int sockfd,
+http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, ServiceObjMap* srvobj, int sockfd,
         const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
@@ -13,6 +13,10 @@ http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_3
         const char* private_path, AUTH_SCHEME wwwauth_scheme, AUTH_SCHEME proxyauth_scheme,
 		SSL* ssl)
 {
+    m_connection_first_request_time = connection_first_request_time;
+    m_connection_keep_alive_timeout = connection_keep_alive_timeout;
+    m_connection_keep_alive_request_tickets = connection_keep_alive_request_tickets;
+    
     m_path = "";
     m_method = "";
     m_authority = "";
@@ -45,7 +49,7 @@ http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_3
     
     m_http2 = phttp2;
     
-    m_http1 = new CHttp(NULL, m_srvobj,
+    m_http1 = new CHttp(m_connection_first_request_time, m_connection_keep_alive_timeout, m_connection_keep_alive_request_tickets, NULL, m_srvobj,
                             m_sockfd,
                             m_servername.c_str(),
                             m_serverport,

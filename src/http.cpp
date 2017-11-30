@@ -29,7 +29,7 @@
 
 const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" };
 
-CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp::CHttp(time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
 	const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
     cgi_socket_t fpm_socktype, const char* fpm_sockfile,
@@ -42,18 +42,27 @@ CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, cons
     m_protocol_upgrade = FALSE;
     m_upgrade_protocol = "";
     m_web_socket_handshake = Websocket_None;
+
+    m_connection_first_request_time = connection_first_request_time;
+    m_connection_keep_alive_timeout = connection_keep_alive_timeout;
+    m_connection_keep_alive_request_tickets = connection_keep_alive_request_tickets;
     
-    if(CHttpBase::m_keep_alive_timeout > 0)
-    {
-        m_keep_alive = TRUE; /* HTTP/1.1 Keep-Alive is enabled as default */
-        m_enabled_keep_alive = TRUE; 
-    }
-    else
+    if(m_connection_keep_alive_request_tickets == 1 || m_connection_keep_alive_timeout == 0 || (time(NULL) - m_connection_first_request_time) >=m_connection_keep_alive_timeout)
     {
         m_enabled_keep_alive = FALSE;
         m_keep_alive = FALSE;
     }
-
+    else
+    {
+        m_keep_alive = TRUE; /* HTTP/1.1 Keep-Alive is enabled as default */
+        m_enabled_keep_alive = TRUE; 
+    }
+    
+    if(!m_enabled_keep_alive)
+    {
+        m_response_header.SetField("Connection", "keep-alive, close");
+    }
+    
 	m_passed_wwwauth = FALSE;
     m_passed_proxyauth = FALSE;
 	m_wwwauth_scheme = wwwauth_scheme;
@@ -131,6 +140,7 @@ CHttp::CHttp(http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, cons
     m_http2_stream_ind = http2_stream_ind;
     
     m_request_no_cache = FALSE;
+    
 }
 
 CHttp::~CHttp()
@@ -191,7 +201,7 @@ Http_Connection CHttp::Processing()
     char sz_http_data[4096];
     while(1)
     {
-        result = ProtRecv(sz_http_data, 4095, CHttpBase::m_keep_alive_timeout);
+        result = ProtRecv(sz_http_data, 4095, CHttpBase::m_connection_keep_alive_timeout);
         if(result <= 0)
         {
             httpConn = httpClose; // socket is broken. close the keep-alive connection
@@ -716,7 +726,7 @@ void CHttp::Tunneling()
         }
         if(!session_is_continuing)
         {
-            CHttpResponseHdr header;
+            CHttpResponseHdr header(m_response_header.GetMap());
             header.SetStatusCode(SC405);
 
             header.SetField("Content-Type", "text/html");
@@ -728,7 +738,7 @@ void CHttp::Tunneling()
         }
         
         if(!m_http_tunneling)
-            m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache);
+            m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache, &m_response_header);
         
         if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
             m_http_tunneling_backend_address_backup1.c_str(), m_http_tunneling_backend_port_backup1, m_http_tunneling_url_backup1.c_str(),
@@ -995,13 +1005,14 @@ Http_Connection CHttp::LineParse(const char* text)
                 RecvPostData();
             }
             
+            
             //Authentication
             if(m_http_tunneling_connection == HTTP_Tunneling_None)
             {
                 if((GetWWWAuthScheme() == asBasic || GetWWWAuthScheme() == asDigest)
                     && !IsPassedWWWAuth())
                 {
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_response_header.GetMap());
                     string strRealm = "User or Administrator";
                     header.SetStatusCode(SC401);
                     
@@ -1063,7 +1074,7 @@ Http_Connection CHttp::LineParse(const char* text)
                 if((GetProxyAuthScheme() == asBasic || GetProxyAuthScheme() == asDigest)
                     && !IsPassedProxyAuth())
                 {
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_response_header.GetMap());
                     header.SetStatusCode(SC407);
                     string strRealm = "Proxy User or Administrator";
                     
@@ -1127,7 +1138,7 @@ Http_Connection CHttp::LineParse(const char* text)
             {
                 if(m_http_method == hmPut || m_http_method == hmDelete)
                 {
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_response_header.GetMap());
                     header.SetStatusCode(SC405);
 
                     header.SetField("Content-Type", "text/html");
@@ -1144,7 +1155,7 @@ Http_Connection CHttp::LineParse(const char* text)
             {
                 if(!CHttpBase::m_enable_http_tunneling && m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT)
                 {
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_response_header.GetMap());
                     header.SetStatusCode(SC404);
 
                     header.SetField("Content-Type", "text/html");
@@ -1154,7 +1165,7 @@ Http_Connection CHttp::LineParse(const char* text)
                 }
                 else if(!CHttpBase::m_enable_http_tunneling && m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
                 {
-                    CHttpResponseHdr header;
+                    CHttpResponseHdr header(m_response_header.GetMap());
                     header.SetStatusCode(SC405);
 
                     header.SetField("Content-Type", "text/html");

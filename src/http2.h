@@ -102,7 +102,7 @@ class http2_stream;
 class CHttp2 : public IHttp
 {
 public:
-	CHttp2(ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	CHttp2(time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -196,6 +196,10 @@ private:
     
     BOOL m_pushed_request;
     BOOL m_pushed_response;
+    
+    time_t m_connection_first_request_time;
+    time_t m_connection_keep_alive_timeout;
+    unsigned int m_connection_keep_alive_request_tickets;
 };
 
 #endif /* _HTTP2_H_ */
