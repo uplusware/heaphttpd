@@ -38,7 +38,7 @@
 
 #define MAX_STORAGE_CONN	32
 
-#define MAX_SOCKET_TIMEOUT 20
+#define MAX_SOCKET_TIMEOUT 90
 
 using namespace std;
 

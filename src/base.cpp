@@ -111,7 +111,7 @@ BOOL CHttpBase::m_instance_prestart = FALSE;
 string CHttpBase::m_instance_balance_scheme = "R";
 
 unsigned int	CHttpBase::m_connection_keep_alive_timeout = 5;
-unsigned int	CHttpBase::m_keep_alive_max = 100;
+unsigned int	CHttpBase::m_connection_keep_alive_max = 100;
     
 unsigned int CHttpBase::m_runtime = 0;
 string	CHttpBase::m_config_file = CONFIG_FILE_PATH;
@@ -238,7 +238,7 @@ BOOL CHttpBase::LoadConfig()
 				string keep_alive_max;
 				strcut(strline.c_str(), "=", NULL, keep_alive_max );
 				strtrim(keep_alive_max);
-				m_keep_alive_max = atoi(keep_alive_max.c_str());
+				m_connection_keep_alive_max = atoi(keep_alive_max.c_str());
 			}
             else if(strncasecmp(strline.c_str(), "TotalLocalFileCacheSize", sizeof("TotalLocalFileCacheSize") - 1) == 0)
 			{

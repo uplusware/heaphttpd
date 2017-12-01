@@ -508,7 +508,7 @@ public:
 	static unsigned int	m_runtime;
     
     static unsigned int	m_connection_keep_alive_timeout;
-    static unsigned int	m_keep_alive_max;
+    static unsigned int	m_connection_keep_alive_max;
     
 	static string	m_config_file;
 	static string	m_permit_list_file;

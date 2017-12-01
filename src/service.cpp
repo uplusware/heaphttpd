@@ -567,7 +567,7 @@ void Worker::Working(CUplusTrace& uTrace)
 
 		int clt_sockfd;
 		CLIENT_PARAM client_param;
-        int res = RECV_FD(m_sockfd, &clt_sockfd, &client_param, MAX_SOCKET_TIMEOUT);
+        int res = RECV_FD(m_sockfd, &clt_sockfd, &client_param, CHttpBase::m_connection_keep_alive_timeout);
         if( res < 0)
 		{
             close(m_sockfd);
@@ -1014,7 +1014,7 @@ int Service::Accept(CUplusTrace& uTrace, int& clt_sockfd, BOOL https, struct soc
         {
             if(m_work_processes[m_next_process].sockfds[0] > 0)
             {
-                if(SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param, 5) < 0)
+                if(SEND_FD(m_work_processes[m_next_process].sockfds[0], clt_sockfd, &client_param, CHttpBase::m_connection_keep_alive_timeout) < 0)
                 {
                     printf("fail to sent fd\n");
                     usleep(100);

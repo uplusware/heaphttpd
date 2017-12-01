@@ -35,8 +35,7 @@ public:
     http_chunk(int client_sockfd, SSL* client_ssl, int backend_sockfd);
     virtual ~http_chunk();
     int client_send(const char* buf, int len);
-    bool parse(const char* text);
-    bool processing(const char* buf, int buf_len, int& next_recv_len);
+    bool processing(char* & buf, int& buf_used_len, int& next_recv_len);
 
 protected:
     int m_client_sockfd;
@@ -45,10 +44,6 @@ protected:
     int m_chunk_len;
     int m_sent_chunk;
     HTTP_Client_Parse_State m_state;
-    
-    char* m_buf;
-    int m_buf_len;
-    int m_buf_used_len;
     
     string m_line_text;
     
@@ -106,7 +101,7 @@ protected:
     SSL* m_client_ssl;
     int m_backend_sockfd;
     
-    int m_sent_content;
+    int m_sent_content_length;
     
 
     http_chunk * m_chunk;

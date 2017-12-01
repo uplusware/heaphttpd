@@ -385,7 +385,7 @@ bool http_tunneling::recv_relay_reply()
         
         int http_header_length = -1;
         int http_content_length = -1;
-            
+                    
         http_client the_client(m_client_sockfd, m_client_ssl, m_backend_sockfd, m_cache, m_http_tunneling_url.c_str());
         string str_header;
         int received_len = 0;
@@ -406,7 +406,8 @@ bool http_tunneling::recv_relay_reply()
                 break; // quit from the loop since error or timeout
             }
             
-            int len = recv(m_backend_sockfd, response_buf, 4095 /*next_recv_len > 4095 ? 4095 : next_recv_len*/, 0);
+            int len = recv(m_backend_sockfd, response_buf, next_recv_len > 4095 ? 4095 : next_recv_len, 0);
+             
             if(len == 0)
             {
 				close(m_client_sockfd);
@@ -426,8 +427,11 @@ bool http_tunneling::recv_relay_reply()
             response_buf[len] = '\0';
             
             if(!the_client.processing(response_buf, len, next_recv_len))
+            {
                 break;
+            }
         }
+                    
     }
     return true;
 }

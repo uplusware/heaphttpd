@@ -51,15 +51,12 @@ void Session::Process()
     
     Http_Connection httpConn = httpKeepAlive;
     
-    unsigned int connection_keep_alive_tickets = CHttpBase::m_keep_alive_max;
+    unsigned int connection_keep_alive_tickets = CHttpBase::m_connection_keep_alive_max;
     time_t first_connection_request_time = time(NULL);
     
     while(httpConn != httpClose)
     {
-        if(connection_keep_alive_tickets > 0)
-        {
-            connection_keep_alive_tickets--;
-        }
+        
         
         IHttp * pProtocol;
         try
@@ -110,12 +107,27 @@ void Session::Process()
             m_sockfd = -1;
             return;
         }
+        int tmp1 = time(NULL);
+                    
         httpConn = pProtocol->Processing();
         if(!m_http2)
         {
 			m_http_tunneling  = pProtocol->GetHttpTunneling();
         }
         delete pProtocol;
+        
+        if(connection_keep_alive_tickets > 0)
+        {
+            connection_keep_alive_tickets--;
+        }
+        
+        if(connection_keep_alive_tickets == 0 || (time(NULL) - first_connection_request_time) > CHttpBase::m_connection_keep_alive_timeout)
+        {
+            httpConn = httpClose;
+        }
+        
     }
+    
+    //printf("out of session\n");
 }
 
