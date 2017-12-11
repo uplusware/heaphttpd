@@ -26,7 +26,8 @@ enum HTTP_Client_Parse_State
     HTTP_Client_Parse_State_Header = 0,
     HTTP_Client_Parse_State_Content,
     HTTP_Client_Parse_State_Chunk_Header,
-    HTTP_Client_Parse_State_Chunk_Content
+    HTTP_Client_Parse_State_Chunk_Content,
+    HTTP_Client_Parse_State_Chunk_Footer,
 };
 
 class http_chunk
@@ -35,7 +36,7 @@ public:
     http_chunk(int client_sockfd, SSL* client_ssl, int backend_sockfd);
     virtual ~http_chunk();
     int client_send(const char* buf, int len);
-    bool processing(char* & buf, int& buf_used_len, int& next_recv_len);
+    bool processing(char* & derived_buf, int& derived_buf_used_len);
 
 protected:
     int m_client_sockfd;
@@ -57,7 +58,7 @@ public:
     int client_send(const char* buf, int len);
     bool parse(const char* text);
     
-    bool processing(const char* buf, int buf_len, int& next_recv_len);
+    bool processing(const char* buf, int buf_len);
     
     int get_content_length() { return m_content_length; }
     
@@ -73,6 +74,7 @@ protected:
     int m_content_length;
     bool m_is_200_ok;
     bool m_use_cache;
+    bool m_cache_completed;
     int m_cache_max_age;
     int m_cache_shared_max_age;
     

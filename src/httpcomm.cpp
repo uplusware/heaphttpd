@@ -110,12 +110,16 @@ CHttpResponseHdr::CHttpResponseHdr()
 	m_mapHeader.insert(map<string, string>::value_type("X-Powered-By", ""));
 }
 
-CHttpResponseHdr::CHttpResponseHdr(map<string, string> & map_header)
+CHttpResponseHdr::CHttpResponseHdr(map<string, string> * map_header)
 {
-    map<string, string>::iterator it;
-    for(it = map_header.begin(); it != map_header.end(); ++it)
+    CHttpResponseHdr();
+    if(map_header)
     {
-        m_mapHeader[it->first] = it->second;
+        map<string, string>::iterator it;
+        for(it = map_header->begin(); it != map_header->end(); ++it)
+        {
+            m_mapHeader[it->first] = it->second;
+        }
     }
 }
 
@@ -220,7 +224,6 @@ CHttpResponseHdr::~CHttpResponseHdr()
 const char*CHttpResponseHdr::Text()
 {
 	_update_header_();
-	//printf("%s\n", m_strHeader.c_str());
 	return m_strHeader.c_str();
 }
 

@@ -369,10 +369,12 @@ void CHttp::ParseMethod(string & strtext)
             *p = '\0';
             m_http_tunneling_backend_address = sz_host;
             m_http_tunneling_backend_port = atoi(p + 1);
+            strtrim(m_http_tunneling_backend_address);
         }
         else
         {
             m_http_tunneling_backend_address = sz_host;
+            strtrim(m_http_tunneling_backend_address);
         }
         
         free(sz_host);
@@ -435,10 +437,12 @@ void CHttp::ParseMethod(string & strtext)
                     *p = '\0';
                     m_http_tunneling_backend_address = sz_host;
                     m_http_tunneling_backend_port = atoi(p + 1);
+                    strtrim(m_http_tunneling_backend_address);
                 }
                 else
                 {
                     m_http_tunneling_backend_address = sz_host;
+                    strtrim(m_http_tunneling_backend_address);
                 }
                  
                 if(*(p_temp + 7 + first_host_strlen) == '|')
@@ -461,10 +465,12 @@ void CHttp::ParseMethod(string & strtext)
                         *p = '\0';
                         m_http_tunneling_backend_address_backup1 = sz_host;
                         m_http_tunneling_backend_port_backup1 = atoi(p + 1);
+                        strtrim(m_http_tunneling_backend_address_backup1);
                     }
                     else
                     {
                         m_http_tunneling_backend_address_backup1 = sz_host;
+                        strtrim(m_http_tunneling_backend_address_backup1);
                     }
                     
                     if(*(p_temp + 7 + first_host_strlen + 1 + second_host_strlen) == '|')
@@ -487,10 +493,12 @@ void CHttp::ParseMethod(string & strtext)
                             *p = '\0';
                             m_http_tunneling_backend_address_backup2 = sz_host;
                             m_http_tunneling_backend_port_backup2 = atoi(p + 1);
+                            strtrim(m_http_tunneling_backend_address_backup2);
                         }
                         else
                         {
                             m_http_tunneling_backend_address_backup2 = sz_host;
+                            strtrim(m_http_tunneling_backend_address_backup2);
                         }
                         
                     }
@@ -545,7 +553,10 @@ void CHttp::ParseMethod(string & strtext)
                 
                 sscanf(p_temp, "%[^ ]", sz_url);
                 
+                
                 m_http_tunneling_url = sz_url;
+                
+                strtrim(m_http_tunneling_url);
 
                 sscanf(p_temp + 7, "%[^/]", sz_host);
                 
@@ -559,10 +570,12 @@ void CHttp::ParseMethod(string & strtext)
                     *p = '\0';
                     m_http_tunneling_backend_address = sz_host;
                     m_http_tunneling_backend_port = atoi(p + 1);
+                    strtrim(m_http_tunneling_backend_address);
                 }
                 else
                 {
                     m_http_tunneling_backend_address = sz_host;
+                    strtrim(m_http_tunneling_backend_address);
                 }
                 strtext = sz_method;
                 strtext += sz_relatived;
@@ -724,6 +737,7 @@ void CHttp::Tunneling()
                 }
             }
         }
+        
         if(!session_is_continuing)
         {
             CHttpResponseHdr header(m_response_header.GetMap());
@@ -738,7 +752,7 @@ void CHttp::Tunneling()
         }
         
         if(!m_http_tunneling)
-            m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache, &m_response_header);
+            m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache);
         
         if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
             m_http_tunneling_backend_address_backup1.c_str(), m_http_tunneling_backend_port_backup1, m_http_tunneling_url_backup1.c_str(),
@@ -772,7 +786,7 @@ void CHttp::Tunneling()
                 
                 if(m_http_tunneling->send_request(pRequestHeader, nRequestHeaderLen, pRequestData, nRequestDataLen))
                 {
-                    m_http_tunneling->recv_relay_reply();
+                    m_http_tunneling->recv_relay_reply(&m_response_header);
                 }
             }
         }

@@ -11,7 +11,7 @@ http_chunk::http_chunk(int client_sockfd, SSL* client_ssl, int backend_sockfd)
     m_client_sockfd = client_sockfd;
     m_client_ssl = client_ssl;
     m_backend_sockfd = backend_sockfd;
-    m_chunk_len = 0;
+    m_chunk_len = -1;
     m_sent_chunk = 0;
     m_state = HTTP_Client_Parse_State_Chunk_Header;
 }
@@ -30,111 +30,157 @@ int http_chunk::client_send(const char* buf, int len)
 		
 }
 
-bool http_chunk::processing(char* & buf, int& buf_used_len, int& next_recv_len)
+bool http_chunk::processing(char* & derived_buf, int& derived_buf_used_len)
 {
-    int search_pos = 0;
-    while(buf_used_len >= 2 && search_pos <= buf_used_len - 2)
+    //share buffer with http_client instance
+    while(derived_buf_used_len > 0)
     {
         if(m_state == HTTP_Client_Parse_State_Chunk_Header)
         {
-            next_recv_len = 1;
+            bool found_crlf = false;
             
-            if(buf_used_len >= 2)
+            if(derived_buf_used_len >= 2)
             {
-                bool found_endle = false;
-                for(search_pos = 0; search_pos <= buf_used_len - 2; search_pos++)
+                for(int last_search_pos_crlf = 0; last_search_pos_crlf <= derived_buf_used_len - 2; last_search_pos_crlf++)
                 {
-                    if(memcmp(buf + search_pos, "\r\n", 2) == 0)
+                    if(memcmp(derived_buf + last_search_pos_crlf, "\r\n", 2) == 0)
                     {
+                        found_crlf = true;
+                        
                         char chunked_len[32];
-                        memset(chunked_len, 0, 32);
-                        memcpy(chunked_len, buf, search_pos > 31 ? 31 : search_pos);
-                        chunked_len[search_pos > 31 ? 31 : search_pos] = '\0';
+                        memcpy(chunked_len, derived_buf, last_search_pos_crlf > 31 ? 31 : last_search_pos_crlf);                       
+                        chunked_len[last_search_pos_crlf > 31 ? 31 : last_search_pos_crlf] = '\0';
                         
-                        if(chunked_len[0] ==  '0')
-                            sscanf(chunked_len, "%x", &m_chunk_len);
-                        else
-                            sscanf(chunked_len, "%u", &m_chunk_len);
-                        
-                        if(m_chunk_len == 0)
-                            return false;
-
-                        m_chunk_len += 2;
-                        
-                        if(client_send(buf, search_pos + 2) < 0)
+                        if(sscanf(chunked_len, "%x", &m_chunk_len) != 1)
                             return false;
                         
-                        memmove(buf, buf + search_pos + 2, buf_used_len - search_pos - 2);
-                        buf_used_len = buf_used_len - search_pos - 2;
-                        
-                        m_state = HTTP_Client_Parse_State_Chunk_Content;
-                        
-                        if(buf_used_len > 0) /* begin to send chunk data */
+                        if(m_chunk_len > 0)
                         {
-                            int should_send_len = buf_used_len > (m_chunk_len - m_sent_chunk) ? (m_chunk_len - m_sent_chunk) : buf_used_len;
-                            
-                            if(client_send( buf, should_send_len) < 0)
+                            m_chunk_len += 2;
+                        
+                            if(client_send(derived_buf, last_search_pos_crlf + 2) < 0) //send both the length number and crlf
                                 return false;
                             
-                            memmove(buf, buf + should_send_len, buf_used_len - should_send_len);
+                            memmove(derived_buf, derived_buf + last_search_pos_crlf + 2, derived_buf_used_len - last_search_pos_crlf - 2);
+                            derived_buf_used_len = derived_buf_used_len - last_search_pos_crlf - 2;
                             
-                            m_sent_chunk += should_send_len;
-                            buf_used_len -= should_send_len;
-                            
-                            if(m_sent_chunk == m_chunk_len)
+                            m_state = HTTP_Client_Parse_State_Chunk_Content;
+                        
+                            if(derived_buf_used_len > 0) /* begin to send chunk data */
                             {
-                                if(m_chunk_len == 2)
-                                {
-                                    //ending of chunk
+                                int should_send_len = derived_buf_used_len > (m_chunk_len - m_sent_chunk) ? (m_chunk_len - m_sent_chunk) : derived_buf_used_len;
+                                
+                                if(client_send( derived_buf, should_send_len) < 0)
                                     return false;
-                                }
-                                else
+                                
+                                memmove(derived_buf, derived_buf + should_send_len, derived_buf_used_len - should_send_len);
+                                
+                                m_sent_chunk += should_send_len;
+                                derived_buf_used_len -= should_send_len;
+                                
+                                if(m_sent_chunk == m_chunk_len)
                                 {
                                     m_state = HTTP_Client_Parse_State_Chunk_Header;
                                     m_chunk_len = 0;
                                     m_sent_chunk = 0;
-                                }
+                                }                                
                             }
                             
-                        }
+                            break;
                         
-                        next_recv_len = m_chunk_len - m_sent_chunk;
-                        found_endle = true;
-                        break;
+                        
+                        }
+                        else if(m_chunk_len == 0)
+                        {
+                            if(client_send(derived_buf, last_search_pos_crlf) < 0) //only send the length number
+                                return false;
+                            
+                            memmove(derived_buf, derived_buf + last_search_pos_crlf, derived_buf_used_len - last_search_pos_crlf);
+                            derived_buf_used_len = derived_buf_used_len - last_search_pos_crlf;
+                            
+                            m_state = HTTP_Client_Parse_State_Chunk_Footer;
+                            
+                            bool found_2crlfs = false;
+                            
+                            if(derived_buf_used_len >= 4)
+                            {
+                                for(int last_search_pos_2crlfs = 0; last_search_pos_2crlfs <= derived_buf_used_len - 4; last_search_pos_2crlfs++)
+                                {
+                                    if(memcmp(derived_buf + last_search_pos_2crlfs, "\r\n\r\n", 4) == 0)
+                                    {
+                                        found_2crlfs = true;
+                                        if(client_send(derived_buf, last_search_pos_2crlfs + 4) < 0)
+                                            return false;
+                                        
+                                        memmove(derived_buf, derived_buf + last_search_pos_2crlfs + 4, derived_buf_used_len - last_search_pos_2crlfs - 4);
+                                        derived_buf_used_len = derived_buf_used_len - last_search_pos_2crlfs - 4;
+                                        return false;
+                                    }
+                                }
+                                
+                            }
+                            
+                            if(!found_2crlfs)
+                                return true;
+                        }
+                        else
+                        {
+                            return false;
+                        }
                     }
                 }
+                
+
             }
+            if(!found_crlf)
+                return true;
         }
         else if(m_state == HTTP_Client_Parse_State_Chunk_Content)
         {
             //Send the left data from the last send.
-            if(buf_used_len > 0)
+            if(derived_buf_used_len > 0)
             {
-                int should_send_len = buf_used_len > (m_chunk_len - m_sent_chunk) ? (m_chunk_len - m_sent_chunk) : buf_used_len;
-                if(client_send( buf, should_send_len) < 0)
+                int should_send_len = derived_buf_used_len > (m_chunk_len - m_sent_chunk) ? (m_chunk_len - m_sent_chunk) : derived_buf_used_len;
+                if(client_send( derived_buf, should_send_len) < 0)
                     return false;
                 
-                memmove(buf, buf + should_send_len, buf_used_len - should_send_len);
+                memmove(derived_buf, derived_buf + should_send_len, derived_buf_used_len - should_send_len);
                 
                 m_sent_chunk += should_send_len;
-                buf_used_len -= should_send_len;
+                derived_buf_used_len -= should_send_len;
                 
                 if(m_sent_chunk == m_chunk_len)
                 {
-                    if(m_chunk_len == 2)
+                    m_state = HTTP_Client_Parse_State_Chunk_Header;
+                    m_chunk_len = 0;
+                    m_sent_chunk = 0;                    
+                }
+            }
+        }
+        else if(m_state == HTTP_Client_Parse_State_Chunk_Footer)
+        {            
+            bool found_2crlfs = false;
+            
+            if(derived_buf_used_len >= 4)
+            {
+                for(int last_search_pos_2crlfs = 0; last_search_pos_2crlfs <= derived_buf_used_len - 4; last_search_pos_2crlfs++)
+                {
+                    if(memcmp(derived_buf + last_search_pos_2crlfs, "\r\n\r\n", 4) == 0)
                     {
-                        //ending of chunk
+                        found_2crlfs = true;
+                        
+                        if(client_send(derived_buf, last_search_pos_2crlfs + 4) < 0)
+                            return false;
+                        
+                        memmove(derived_buf, derived_buf + last_search_pos_2crlfs + 4, derived_buf_used_len - last_search_pos_2crlfs - 4);
+                        derived_buf_used_len = derived_buf_used_len - last_search_pos_2crlfs - 4;
                         return false;
                     }
-                    else
-                    {
-                        m_state = HTTP_Client_Parse_State_Chunk_Header;
-                        m_chunk_len = 0;
-                        m_sent_chunk = 0;
-                    }
                 }
-            
             }
+            
+            if(!found_2crlfs)
+                return true;
         }
     }
     return true;
@@ -149,6 +195,8 @@ http_client::http_client(int client_sockfd, SSL* client_ssl, int backend_sockfd,
     m_backend_sockfd = backend_sockfd;
     
     m_http_tunneling_url = http_url;
+    
+    strtrim(m_http_tunneling_url);
     
     m_state = HTTP_Client_Parse_State_Header;
     
@@ -177,12 +225,14 @@ http_client::http_client(int client_sockfd, SSL* client_ssl, int backend_sockfd,
     m_cache_buf = NULL;
     m_cache_data_len = 0;
     
+    m_cache_completed = false;
+    
     m_is_200_ok = false;
 }
 
 http_client::~http_client()
 {
-    if(CHttpBase::m_enable_http_tunneling_cache && m_use_cache && m_cache_buf && m_cache_data_len > 0)
+    if(CHttpBase::m_enable_http_tunneling_cache && m_use_cache && m_cache_completed && m_cache_buf && m_cache_data_len > 0 && m_http_tunneling_url != "")
     {
         tunneling_cache* c_out;
         m_cache->wrlock_tunneling_cache();
@@ -248,7 +298,8 @@ bool http_client::parse(const char* text)
                 m_use_cache = false;
             }
     
-            if(CHttpBase::m_enable_http_tunneling_cache && m_use_cache && has_content_length() && m_content_length <= CHttpBase::m_single_tunneling_cache_size && m_content_length > 0) //only cache the little size data
+            if(CHttpBase::m_enable_http_tunneling_cache && m_use_cache && has_content_length()
+                && m_content_length <= CHttpBase::m_single_tunneling_cache_size && m_content_length > 0) //only cache the little size data
             {
                 m_cache_buf = (char*)malloc(m_content_length + 1);
                 m_cache_data_len = 0;
@@ -311,6 +362,7 @@ bool http_client::parse(const char* text)
             if(strstr(strEncoding.c_str(), "chunked") != NULL)
             {
                 m_is_chunked = true;
+                m_use_cache = false; //unavailable in chunk mode
             }
         }
         else if(strncasecmp(strtext.c_str(), "Cache-Control:", 14) == 0)
@@ -339,7 +391,7 @@ bool http_client::parse(const char* text)
                     
                     m_cache_max_age = n_max_age < m_cache_max_age ? (n_max_age < 0 ? 0 : n_max_age) : m_cache_max_age;
                 
-                    if(m_cache_max_age > 0 && m_is_200_ok)
+                    if(m_cache_max_age > 0 && m_is_200_ok && !is_chunked())
                     {
                         m_use_cache = true;
                     }
@@ -360,7 +412,7 @@ bool http_client::parse(const char* text)
                     
                     m_cache_shared_max_age = n_shared_max_age < m_cache_shared_max_age ? (n_shared_max_age < 0 ? 0 : n_shared_max_age) : m_cache_shared_max_age;
                 
-                    if(m_cache_shared_max_age > 0 && m_is_200_ok)
+                    if(m_cache_shared_max_age > 0 && m_is_200_ok && !is_chunked())
                     {
                         m_use_cache = true;
                     }
@@ -411,7 +463,7 @@ bool http_client::parse(const char* text)
             
             m_cache_max_age = n_expire < m_cache_max_age ? (n_expire < 0 ? 0 : n_expire) : m_cache_max_age;
      
-            if(m_cache_max_age > 0 && m_is_200_ok)
+            if(m_cache_max_age > 0 && m_is_200_ok && !is_chunked())
             {
                 m_use_cache = true;
             }
@@ -466,8 +518,9 @@ bool http_client::parse(const char* text)
 	return true;
 }
 
-bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
+bool http_client::processing(const char* buf, int buf_len)
 {
+    //Concatenate the buffer
     if(m_buf_len - m_buf_used_len < buf_len)
     {
         char* new_buf = (char*)malloc(m_buf_used_len + buf_len + 1);
@@ -484,168 +537,119 @@ bool http_client::processing(const char* buf, int buf_len, int& next_recv_len)
     memcpy(m_buf + m_buf_used_len, buf, buf_len);
     m_buf_used_len += buf_len;     
     
-    int search_pos = 0;
-    while(m_buf_used_len >= 4 && search_pos <= m_buf_used_len - 4)
-    {
-        if(m_state == HTTP_Client_Parse_State_Header)
+    
+    if(m_state == HTTP_Client_Parse_State_Header)
+    {        
+        if(m_buf_used_len >= 4)
         {
-            next_recv_len = 1;
-            
-            if(m_buf_used_len >= 4)
+            for(int last_search_pos_2crlfs = 0; last_search_pos_2crlfs <= m_buf_used_len - 4; last_search_pos_2crlfs++)
             {
-                bool found_endle = false;
-                for(search_pos = 0; search_pos <= m_buf_used_len - 4; search_pos++)
-                {
-                    if(memcmp(m_buf + search_pos, "\r\n\r\n", 4) == 0)
-                    {                    
-                        if(!parse(m_buf))
-                            return false;
-                        
-                        if(!has_content_length() && !is_chunked())
-                        {
-                            close(m_client_sockfd);
-                            close(m_backend_sockfd);
-                            return false;
-                        }
-                        
-                        /*
-                            The header has been sent in parse(...) function
-                        */
-                        memmove(m_buf, m_buf + search_pos + 4, m_buf_used_len - search_pos - 4);
-                        m_buf_used_len = m_buf_used_len - search_pos - 4;
-
-                        m_state = HTTP_Client_Parse_State_Content;
-                        
-                        m_sent_content_length = 0;
-                        
-                        if(is_chunked())
-                        {
-                            if(!m_chunk)
-                                m_chunk = new http_chunk(m_client_sockfd, m_client_ssl, m_backend_sockfd);
-                            
-                            if(!m_chunk->processing(m_buf, m_buf_used_len, next_recv_len))
-                                return false;
-                        }
-                        else
-                        {
-                            if(has_content_length() && m_content_length == 0)
-                            {
-                                return false;
-                            }
-                            
-                            if(m_buf_used_len > 0)
-                            {
-                                if(m_use_cache && m_cache_buf)
-                                {
-                                    memcpy(m_cache_buf + m_cache_data_len, m_buf, m_buf_used_len);
-                                    m_cache_data_len += m_buf_used_len;
-                                }
-                                
-                                if(client_send( m_buf, m_buf_used_len) < 0)
-                                {
-                                    close(m_client_sockfd);
-                                    close(m_backend_sockfd);
-                                    return false;
-                                }
-                                m_sent_content_length += m_buf_used_len;
-                                
-                                m_buf_used_len = 0;
-                                
-                                if(has_content_length() && m_sent_content_length == m_content_length)
-                                {
-                                    if(m_buf_used_len == 0)
-                                    {
-                                        return false;
-                                    }
-                                    else
-                                    {
-                                        m_sent_content_length = 0;
-                                        m_content_length = 0;
-                                        m_state = HTTP_Client_Parse_State_Header;
-                                    }
-                                }
-                            }
-                            
-                            next_recv_len = m_content_length - m_sent_content_length;
-                            
-                        }
-                        found_endle = true;
-                        break;
+                if(memcmp(m_buf + last_search_pos_2crlfs, "\r\n\r\n", 4) == 0)
+                {                    
+                    if(!parse(m_buf))
+                        return false;
+                    
+                    if(!has_content_length() && !is_chunked())
+                    {
+                        close(m_client_sockfd);
+                        close(m_backend_sockfd);
+                        return false;
                     }
+                    
+                    /*
+                        The header has been sent in parse(...) function
+                    */
+                    memmove(m_buf, m_buf + last_search_pos_2crlfs + 4, m_buf_used_len - last_search_pos_2crlfs - 4);
+                    m_buf_used_len = m_buf_used_len - last_search_pos_2crlfs - 4;
+
+                    m_state = HTTP_Client_Parse_State_Content;
+                    
+                    m_sent_content_length = 0;
+                    
+                    if(is_chunked())
+                    {
+                        if(!m_chunk)
+                            m_chunk = new http_chunk(m_client_sockfd, m_client_ssl, m_backend_sockfd);
+                        
+                        return m_chunk->processing(m_buf, m_buf_used_len);
+                    }
+                    else
+                    {
+                        if(has_content_length() && m_content_length == 0)
+                        {
+                            return false;
+                        }
+                        
+                        if(m_buf_used_len > 0)
+                        {
+                            if(m_use_cache && m_cache_buf)
+                            {
+                                memcpy(m_cache_buf + m_cache_data_len, m_buf, m_buf_used_len);
+                                m_cache_data_len += m_buf_used_len;
+                            }
+                            
+                            if(client_send( m_buf, m_buf_used_len) < 0)
+                            {
+                                close(m_client_sockfd);
+                                close(m_backend_sockfd);
+                                return false;
+                            }
+                            m_sent_content_length += m_buf_used_len;
+                            
+                            m_buf_used_len = 0;
+                            
+                            if(has_content_length() && m_sent_content_length == m_content_length)
+                            {
+                                m_cache_completed = true;
+                                
+                                return false;
+                            }
+                        }
+                    }
+                    break;
                 }
             }
+        }
+        
+    }
+    else if(m_state == HTTP_Client_Parse_State_Content)
+    {
+        if(is_chunked())
+        {
+            if(!m_chunk)
+                m_chunk = new http_chunk(m_client_sockfd, m_client_ssl, m_backend_sockfd);
+            
+            return m_chunk->processing(m_buf, m_buf_used_len);
             
         }
-        else if(m_state == HTTP_Client_Parse_State_Content)
+        else
         {
-            if(is_chunked())
+            //Send the left data from the last send.
+            if(m_buf_used_len > 0)
             {
-                if(!m_chunk)
-                    m_chunk = new http_chunk(m_client_sockfd, m_client_ssl, m_backend_sockfd);
-                m_chunk->processing(m_buf, m_buf_used_len, next_recv_len);
-            }
-            else
-            {
-                //Send the left data from the last send.
-                if(m_buf_used_len > 0)
+                if(m_use_cache && m_cache_buf)
                 {
-                    if(m_use_cache && m_cache_buf)
-                    {
-                        memcpy(m_cache_buf + m_cache_data_len, m_buf, m_buf_used_len);
-                        m_cache_data_len += m_buf_used_len;
-                    }
+                    memcpy(m_cache_buf + m_cache_data_len, m_buf, m_buf_used_len);
+                    m_cache_data_len += m_buf_used_len;
+                }
+            
+                if(client_send( m_buf, m_buf_used_len) < 0)
+                {
+                    close(m_client_sockfd);
+                    close(m_backend_sockfd);
+                    return false;
+                }
+                m_sent_content_length += m_buf_used_len;
                 
-                    if(client_send( m_buf, m_buf_used_len) < 0)
-                    {
-                        close(m_client_sockfd);
-                        close(m_backend_sockfd);
-                        return false;
-                    }
-                    m_sent_content_length += m_buf_used_len;
-                    
-                    m_buf_used_len = 0;
-                    
-                    if(has_content_length() && m_sent_content_length == m_content_length)
-                    {
-                        if(m_buf_used_len == 0)
-                        {
-                            return false;
-                        }
-                        else
-                        {
-                            m_sent_content_length = 0;
-                            m_content_length = 0;
-                            m_state = HTTP_Client_Parse_State_Header;
-                        }
-                    }
-                    
-                }
-                else
+                m_buf_used_len = 0;
+                
+                if(has_content_length() && m_sent_content_length == m_content_length)
                 {
-                    int expected_send_len = has_content_length() ? (m_content_length - m_sent_content_length) : buf_len;
+                    m_cache_completed = true;
                     
-                    int should_send_len = buf_len < expected_send_len ? buf_len : expected_send_len;
-                    
-                    if(m_use_cache && m_cache_buf)
-                    {
-                        memcpy(m_cache_buf + m_cache_data_len, buf, should_send_len);
-                        m_cache_data_len += should_send_len;
-                    }
-                    
-                    if(client_send( buf, should_send_len) < 0)
-                    {
-                        close(m_client_sockfd);
-                        close(m_backend_sockfd);
-                        return false;
-                    }
-                    
-                    m_sent_content_length += should_send_len;
-                    
-                    if(has_content_length() && m_sent_content_length == m_content_length)
-                    {
-                        return false;
-                    }
+                    return false;
                 }
+                
             }
         }
     }

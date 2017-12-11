@@ -40,7 +40,7 @@ typedef struct
 class http_tunneling
 {
 public:
-    http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache, const CHttpResponseHdr* session_response_header);
+    http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache);
     virtual ~http_tunneling();
     int client_send(const char* buf, int len);
     
@@ -50,7 +50,7 @@ public:
         BOOL request_no_cache);
     
     bool send_request(const char* hbuf, int hlen, const char* dbuf, int dlen);
-    bool recv_relay_reply();
+    bool recv_relay_reply(CHttpResponseHdr* session_response_header);
     
     void relay_processing();
 protected:

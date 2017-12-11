@@ -7,7 +7,7 @@
 #include "http_client.h"
 #include "httpcomm.h"
 
-http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache, const CHttpResponseHdr* session_response_header)
+http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache)
 {
     m_address = "";
     m_port = 0;
@@ -18,8 +18,6 @@ http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling
     m_cache = cache;
     m_http_tunneling_url = "";
     m_tunneling_cache_instance = NULL;
-    
-    m_session_response_header = session_response_header;
 }
 
 http_tunneling::~http_tunneling()
@@ -48,9 +46,9 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
     BOOL request_no_cache)
 {
     //try 1st one cache
-	m_http_tunneling_url = http_url;
+	m_http_tunneling_url = http_url;    
 	
-    if(CHttpBase::m_enable_http_tunneling_cache && !request_no_cache)
+    if(CHttpBase::m_enable_http_tunneling_cache && !request_no_cache && m_http_tunneling_url != "")
     {
         m_cache->rdlock_tunneling_cache();
         m_cache->_find_tunneling_(m_http_tunneling_url.c_str(), &m_tunneling_cache_instance);
@@ -58,6 +56,8 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         
         if(m_tunneling_cache_instance)
         {
+            printf("@: [%s]\n", m_http_tunneling_url.c_str());
+            
             return true;
         }
         else
@@ -70,7 +70,6 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
             
             if(m_tunneling_cache_instance)
             {
-                
                 return true;
             }
             else
@@ -314,7 +313,7 @@ bool http_tunneling::send_request(const char* hbuf, int hlen, const char* dbuf, 
     return true;
 }
 
-bool http_tunneling::recv_relay_reply()
+bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
 {
     if(m_type == HTTP_Tunneling_Without_CONNECT)
     {
@@ -323,28 +322,28 @@ bool http_tunneling::recv_relay_reply()
             TUNNELING_CACHE_DATA* tunneling_cache_data = m_tunneling_cache_instance->tunneling_rdlock();
             if(tunneling_cache_data)
             {
-                CHttpResponseHdr header(*m_session_response_header);
-                header.SetStatusCode(SC200);
+                CHttpResponseHdr cache_header;
+                cache_header.SetStatusCode(SC200);
                 if(tunneling_cache_data->type != "")
-                    header.SetField("Content-Type", tunneling_cache_data->type.c_str());
+                    cache_header.SetField("Content-Type", tunneling_cache_data->type.c_str());
                 if(tunneling_cache_data->cache != "")
-                    header.SetField("Cache-Control", tunneling_cache_data->cache.c_str());                
+                    cache_header.SetField("Cache-Control", tunneling_cache_data->cache.c_str());                
                 if(tunneling_cache_data->allow != "")
-                    header.SetField("Allow", tunneling_cache_data->allow.c_str());
+                    cache_header.SetField("Allow", tunneling_cache_data->allow.c_str());
                 if(tunneling_cache_data->encoding != "")
-                    header.SetField("Content-Encoding", tunneling_cache_data->encoding.c_str());
+                    cache_header.SetField("Content-Encoding", tunneling_cache_data->encoding.c_str());
                 if(tunneling_cache_data->language != "")
-                    header.SetField("Content-Language", tunneling_cache_data->language.c_str());
+                    cache_header.SetField("Content-Language", tunneling_cache_data->language.c_str());
                 if(tunneling_cache_data->etag != "")
-                    header.SetField("ETag", tunneling_cache_data->etag.c_str());
+                    cache_header.SetField("ETag", tunneling_cache_data->etag.c_str());
                 if(tunneling_cache_data->len >= 0)
-                    header.SetField("Content-Length", tunneling_cache_data->len);
+                    cache_header.SetField("Content-Length", tunneling_cache_data->len);
                 if(tunneling_cache_data->expires != "")
-                    header.SetField("Expires", tunneling_cache_data->expires.c_str());
+                    cache_header.SetField("Expires", tunneling_cache_data->expires.c_str());
                 if(tunneling_cache_data->last_modified != "")
-                    header.SetField("Last-Modified", tunneling_cache_data->last_modified.c_str());
+                    cache_header.SetField("Last-Modified", tunneling_cache_data->last_modified.c_str());
                 
-                header.SetField("Connection", "Keep-Alive");
+                cache_header.SetField("Connection", "Keep-Alive");
                 
                 string strVia;
                 
@@ -362,9 +361,9 @@ bool http_tunneling::recv_relay_reply()
                     strVia += "(Heaphttpd/1.1)";
                 }
                 
-                header.SetField("Via", strVia.c_str());
+                cache_header.SetField("Via", strVia.c_str());
                 
-                if(client_send(header.Text(), header.Length()) < 0 || client_send( "\r\n", 2) < 0)
+                if(client_send(cache_header.Text(), cache_header.Length()) < 0 || client_send( "\r\n", 2) < 0)
                 {
                     m_tunneling_cache_instance->tunneling_unlock();
                     return false;
@@ -406,7 +405,7 @@ bool http_tunneling::recv_relay_reply()
                 break; // quit from the loop since error or timeout
             }
             
-            int len = recv(m_backend_sockfd, response_buf, next_recv_len > 4095 ? 4095 : next_recv_len, 0);
+            int len = recv(m_backend_sockfd, response_buf, 4095, 0);
              
             if(len == 0)
             {
@@ -426,7 +425,7 @@ bool http_tunneling::recv_relay_reply()
             }
             response_buf[len] = '\0';
             
-            if(!the_client.processing(response_buf, len, next_recv_len))
+            if(!the_client.processing(response_buf, len/*, next_recv_len*/))
             {
                 break;
             }

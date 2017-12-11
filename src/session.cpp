@@ -56,8 +56,6 @@ void Session::Process()
     
     while(httpConn != httpClose)
     {
-        
-        
         IHttp * pProtocol;
         try
         {
@@ -125,9 +123,6 @@ void Session::Process()
         {
             httpConn = httpClose;
         }
-        
     }
-    
-    //printf("out of session\n");
 }
 
