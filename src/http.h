@@ -156,7 +156,7 @@ public:
     
     void EnableKeepAlive(BOOL keep_alive) { m_enabled_keep_alive = keep_alive; }
     
-    unsigned int GetContentLength() { return m_content_length; }
+    long long GetContentLength() { return m_content_length; }
     
     void Http2PushPromise(const char * path);
     BOOL IsHttp2();
@@ -187,7 +187,7 @@ protected:
 	fbuffer* m_postdata_ex; /* huge size post data */
 	formdata* m_formdata; /* For upload files */
 	
-	unsigned int m_content_length;
+	long long m_content_length;
 
 	Post_Content_Type m_content_type;
 	string m_boundary;

@@ -204,7 +204,7 @@ http_client::http_client(int client_sockfd, SSL* client_ssl, int backend_sockfd,
     m_cache_max_age = 300;
     m_cache_shared_max_age = -1;
     
-    m_has_content_length = false;
+    m_has_content_length = true;
     m_is_chunked = false;
     
     m_out_of_cache_header_scope = false;
@@ -267,6 +267,15 @@ bool http_client::parse(const char* text)
 {
     string strtext;
     m_line_text += text;
+    
+    if(m_line_text.length() > 64*1024) // too long line
+    {
+        close(m_client_sockfd);
+        close(m_backend_sockfd);
+                
+        return false;
+    }
+    
     std::size_t new_line;
     while((new_line = m_line_text.find('\n')) != std::string::npos)
     {
@@ -274,6 +283,7 @@ bool http_client::parse(const char* text)
         m_line_text = m_line_text.substr(new_line + 1);
 
         strtrim(strtext);
+        
         //printf(">>>>> %s\r\n", strtext.c_str());
         
         //format the header line.
@@ -347,7 +357,7 @@ bool http_client::parse(const char* text)
             string strLen;
             strcut(strtext.c_str(), "Content-Length:", NULL, strLen);
             strtrim(strLen);	
-            m_content_length = atoi(strLen.c_str());
+            m_content_length = atoll(strLen.c_str());
             if(m_content_length >= 0)
             {
                 m_has_content_length = true;

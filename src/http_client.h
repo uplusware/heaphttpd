@@ -42,8 +42,8 @@ protected:
     int m_client_sockfd;
     SSL* m_client_ssl;
     int m_backend_sockfd;
-    int m_chunk_len;
-    int m_sent_chunk;
+    unsigned long long m_chunk_len;
+    unsigned long long m_sent_chunk;
     HTTP_Client_Parse_State m_state;
     
     string m_line_text;
@@ -60,7 +60,7 @@ public:
     
     bool processing(const char* buf, int buf_len);
     
-    int get_content_length() { return m_content_length; }
+    long long get_content_length() { return m_content_length; }
     
     bool is_chunked() { return m_is_chunked; }
     bool has_content_length() { return m_has_content_length; }
@@ -71,7 +71,7 @@ protected:
     
     string m_line_text;
     bool m_has_content_length;
-    int m_content_length;
+    long long m_content_length;
     bool m_is_200_ok;
     bool m_use_cache;
     bool m_cache_completed;
@@ -103,7 +103,7 @@ protected:
     SSL* m_client_ssl;
     int m_backend_sockfd;
     
-    int m_sent_content_length;
+    long long m_sent_content_length;
     
 
     http_chunk * m_chunk;

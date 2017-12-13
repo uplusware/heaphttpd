@@ -1263,7 +1263,7 @@ Http_Connection CHttp::LineParse(const char* text)
                 string strLen;
                 strcut(strtext.c_str(), "Content-Length:", NULL, strLen);
                 strtrim(strLen);	
-                m_content_length = atoi(strLen.c_str());
+                m_content_length = atoll(strLen.c_str());
             }
             else if(strncasecmp(strtext.c_str(),"Content-Type:", 13) == 0)
             {
