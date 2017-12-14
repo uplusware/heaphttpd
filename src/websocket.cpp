@@ -9,6 +9,7 @@
 #include <time.h>
 #include "websocket.h"
 #include "util/general.h"
+#include "base.h"
 
 int WebSocket_Buffer_Alloc(WebSocket_Buffer * data, int len, bool mask, int opcode)
 {
@@ -49,9 +50,9 @@ int WebSocket::Send(WebSocket_Buffer * data)
 	unsigned short hunit16 = htons(websocket_framing.base_hdr.h.huint16);
     
     if(m_ssl)
-        res = SSLWrite(m_sockfd, m_ssl, (char*)&hunit16, sizeof(unsigned short));
+        res = SSLWrite(m_sockfd, m_ssl, (char*)&hunit16, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
 	else
-        res = _Send_(m_sockfd, (char*)&hunit16, sizeof(unsigned short));
+        res = _Send_(m_sockfd, (char*)&hunit16, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
 	if(res == -1)
 	{
 		return -1;
@@ -62,9 +63,9 @@ int WebSocket::Send(WebSocket_Buffer * data)
 		unsigned short len16bit = data->len;
 		len16bit = htons(len16bit);
         if(m_ssl)
-            res = SSLWrite(m_sockfd, m_ssl, (char*)&len16bit, sizeof(unsigned short));
+            res = SSLWrite(m_sockfd, m_ssl, (char*)&len16bit, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
         else
-            res = _Send_(m_sockfd, (char*)&len16bit, sizeof(unsigned short));
+            res = _Send_(m_sockfd, (char*)&len16bit, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
 		if(res == -1)
 		{
 			return -1;
@@ -76,9 +77,9 @@ int WebSocket::Send(WebSocket_Buffer * data)
 		
 		len64bit = htobe64(len64bit);
         if(m_ssl)
-            res = SSLWrite(m_sockfd, m_ssl, (char*)&len64bit, sizeof(unsigned long long));
+            res = SSLWrite(m_sockfd, m_ssl, (char*)&len64bit, sizeof(unsigned long long), CHttpBase::m_connection_idle_timeout);
         else
-            res = _Send_(m_sockfd, (char*)&len64bit, sizeof(unsigned long long));
+            res = _Send_(m_sockfd, (char*)&len64bit, sizeof(unsigned long long), CHttpBase::m_connection_idle_timeout);
 		if(res == -1)
 		{
 			return -1;
@@ -101,9 +102,9 @@ int WebSocket::Send(WebSocket_Buffer * data)
 			websocket_framing.payload_buf[i] = data->buf[i]^websocket_framing.masking_key[i%4];
 		
         if(m_ssl)
-            res = SSLWrite(m_sockfd, m_ssl, (char*)websocket_framing.masking_key, 4);
+            res = SSLWrite(m_sockfd, m_ssl, (char*)websocket_framing.masking_key, 4, CHttpBase::m_connection_idle_timeout);
         else
-            res = _Send_(m_sockfd, (char*)websocket_framing.masking_key, 4);
+            res = _Send_(m_sockfd, (char*)websocket_framing.masking_key, 4, CHttpBase::m_connection_idle_timeout);
 		if(res == -1)
 		{
 			delete[] websocket_framing.payload_buf;
@@ -125,9 +126,9 @@ int WebSocket::Send(WebSocket_Buffer * data)
 		return 0;
 	}
 	if(m_ssl)
-        res = SSLWrite(m_sockfd, m_ssl, (char*)websocket_framing.payload_buf, websocket_framing.payload_len);
+        res = SSLWrite(m_sockfd, m_ssl, (char*)websocket_framing.payload_buf, websocket_framing.payload_len, CHttpBase::m_connection_idle_timeout);
     else
-        res = _Send_(m_sockfd, (char*)websocket_framing.payload_buf, websocket_framing.payload_len);
+        res = _Send_(m_sockfd, (char*)websocket_framing.payload_buf, websocket_framing.payload_len, CHttpBase::m_connection_idle_timeout);
 	
 	delete[] websocket_framing.payload_buf;
 	
@@ -139,9 +140,9 @@ int WebSocket::Recv(WebSocket_Buffer * data)
 	int res = -1;
 	WebSocket_Base_Framing websocket_framing;
     if(m_ssl)
-        res = SSLRead(m_sockfd, m_ssl, (char*)&websocket_framing.base_hdr, sizeof(WebSocket_Base_Header));
+        res = SSLRead(m_sockfd, m_ssl, (char*)&websocket_framing.base_hdr, sizeof(WebSocket_Base_Header), CHttpBase::m_connection_idle_timeout);
     else
-        res = _Recv_(m_sockfd, (char*)&websocket_framing.base_hdr, sizeof(WebSocket_Base_Header));
+        res = _Recv_(m_sockfd, (char*)&websocket_framing.base_hdr, sizeof(WebSocket_Base_Header), CHttpBase::m_connection_idle_timeout);
 	if(res == -1)
 		return -1;
 	
@@ -157,9 +158,9 @@ int WebSocket::Recv(WebSocket_Buffer * data)
 	{
 		unsigned short data_len;
         if(m_ssl)
-            res = SSLRead(m_sockfd, m_ssl, (char*)&data_len, sizeof(unsigned short));
+            res = SSLRead(m_sockfd, m_ssl, (char*)&data_len, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
         else
-            res = _Recv_(m_sockfd, (char*)&data_len, sizeof(unsigned short));
+            res = _Recv_(m_sockfd, (char*)&data_len, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
 		if(res == -1)
 			return -1;
 		websocket_framing.payload_len = ntohs(data_len); //16 bit	
@@ -168,9 +169,9 @@ int WebSocket::Recv(WebSocket_Buffer * data)
 	{
 		unsigned long long data_len;
         if(m_ssl)
-            res = SSLRead(m_sockfd, m_ssl, (char*)&data_len, sizeof(unsigned long long));
+            res = SSLRead(m_sockfd, m_ssl, (char*)&data_len, sizeof(unsigned long long), CHttpBase::m_connection_idle_timeout);
         else
-            res = _Recv_(m_sockfd, (char*)&data_len, sizeof(unsigned long long));
+            res = _Recv_(m_sockfd, (char*)&data_len, sizeof(unsigned long long), CHttpBase::m_connection_idle_timeout);
 		if(res == -1)
 			return -1;
 		websocket_framing.payload_len = be64toh(data_len); //64 bit
@@ -181,9 +182,9 @@ int WebSocket::Recv(WebSocket_Buffer * data)
 	if(websocket_framing.base_hdr.h.hstruct.mask == 1)
 	{
         if(m_ssl)
-            res = SSLRead(m_sockfd, m_ssl, (char*)websocket_framing.masking_key, 4);
+            res = SSLRead(m_sockfd, m_ssl, (char*)websocket_framing.masking_key, 4, CHttpBase::m_connection_idle_timeout);
         else
-            res = _Recv_(m_sockfd, (char*)websocket_framing.masking_key, 4);
+            res = _Recv_(m_sockfd, (char*)websocket_framing.masking_key, 4, CHttpBase::m_connection_idle_timeout);
 		if(res == -1)
 			return -1;
 		//printf("websocket_framing.masking_key = %02x%02x%02x%02x\n", websocket_framing.masking_key[0],  websocket_framing.masking_key[1],  websocket_framing.masking_key[2],  websocket_framing.masking_key[3]);
@@ -198,9 +199,9 @@ int WebSocket::Recv(WebSocket_Buffer * data)
         if(websocket_framing.payload_buf != NULL)
         {
             if(m_ssl)
-                res = SSLRead(m_sockfd, m_ssl, (char*)websocket_framing.payload_buf, websocket_framing.payload_len);
+                res = SSLRead(m_sockfd, m_ssl, (char*)websocket_framing.payload_buf, websocket_framing.payload_len, CHttpBase::m_connection_idle_timeout);
             else
-                res = _Recv_(m_sockfd, (char*)websocket_framing.payload_buf, websocket_framing.payload_len);
+                res = _Recv_(m_sockfd, (char*)websocket_framing.payload_buf, websocket_framing.payload_len, CHttpBase::m_connection_idle_timeout);
             if(res == -1)
             {
                 delete[] websocket_framing.payload_buf;
@@ -236,9 +237,9 @@ int WebSocket::Close()
 	unsigned short hunit16 = htons(websocket_framing.base_hdr.h.huint16);
     
     if(m_ssl)
-        res = SSLWrite(m_sockfd, m_ssl, (char*)&hunit16, sizeof(unsigned short));
+        res = SSLWrite(m_sockfd, m_ssl, (char*)&hunit16, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
 	else
-        res = _Send_(m_sockfd, (char*)&hunit16, sizeof(unsigned short));
+        res = _Send_(m_sockfd, (char*)&hunit16, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
     
 	return res;
 }
@@ -259,9 +260,9 @@ int WebSocket::Ping()
 	unsigned short hunit16 = htons(websocket_framing.base_hdr.h.huint16);
     
     if(m_ssl)
-        res = SSLWrite(m_sockfd, m_ssl, (char*)&hunit16, sizeof(unsigned short));
+        res = SSLWrite(m_sockfd, m_ssl, (char*)&hunit16, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
 	else
-        res = _Send_(m_sockfd, (char*)&hunit16, sizeof(unsigned short));
+        res = _Send_(m_sockfd, (char*)&hunit16, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
     
 	return res;
 }
@@ -282,9 +283,9 @@ int WebSocket::Pong()
 	unsigned short hunit16 = htons(websocket_framing.base_hdr.h.huint16);
     
     if(m_ssl)
-        res = SSLWrite(m_sockfd, m_ssl, (char*)&hunit16, sizeof(unsigned short));
+        res = SSLWrite(m_sockfd, m_ssl, (char*)&hunit16, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
 	else
-        res = _Send_(m_sockfd, (char*)&hunit16, sizeof(unsigned short));
+        res = _Send_(m_sockfd, (char*)&hunit16, sizeof(unsigned short), CHttpBase::m_connection_idle_timeout);
     
 	return res;
 }

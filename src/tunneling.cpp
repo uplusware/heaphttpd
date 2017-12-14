@@ -33,9 +33,9 @@ http_tunneling::~http_tunneling()
 int http_tunneling::client_send(const char* buf, int len)
 {
 	if(m_client_ssl)
-		return SSLWrite(m_client_sockfd, m_client_ssl, buf, len);
+		return SSLWrite(m_client_sockfd, m_client_ssl, buf, len, CHttpBase::m_connection_idle_timeout);
 	else
-		return _Send_( m_client_sockfd, buf, len);
+		return _Send_( m_client_sockfd, buf, len, CHttpBase::m_connection_idle_timeout);
 		
 }
 
@@ -240,7 +240,7 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
             fd_set mask_r, mask_w; 
             struct timeval timeout; 
         
-            timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
+            timeout.tv_sec = CHttpBase::m_connection_idle_timeout; 
             timeout.tv_usec = 0;
             
             int s = connect(m_backend_sockfd, rp->ai_addr, rp->ai_addrlen);
@@ -305,9 +305,9 @@ bool http_tunneling::send_request(const char* hbuf, int hlen, const char* dbuf, 
         }
         //skip since there's cache
     
-        if(hbuf && hlen > 0 && _Send_(m_backend_sockfd, hbuf, hlen) < 0)
+        if(hbuf && hlen > 0 && _Send_(m_backend_sockfd, hbuf, hlen, CHttpBase::m_connection_idle_timeout) < 0)
             return false;
-        if(dbuf && dlen > 0 && _Send_(m_backend_sockfd, dbuf, dlen) < 0)
+        if(dbuf && dlen > 0 && _Send_(m_backend_sockfd, dbuf, dlen, CHttpBase::m_connection_idle_timeout) < 0)
             return false;
     }
     return true;
@@ -395,7 +395,7 @@ bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
         FD_ZERO(&mask_r);
         while(1)
         {
-            timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
+            timeout.tv_sec = CHttpBase::m_connection_idle_timeout; 
             timeout.tv_usec = 0;
 
             FD_SET(m_backend_sockfd, &mask_r);
@@ -457,7 +457,7 @@ void http_tunneling::relay_processing()
     FD_ZERO(&mask_e);
     while(m_type == HTTP_Tunneling_With_CONNECT)
     {
-        timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
+        timeout.tv_sec = CHttpBase::m_connection_idle_timeout; 
         timeout.tv_usec = 0;
 
         FD_SET(m_backend_sockfd, &mask_r);

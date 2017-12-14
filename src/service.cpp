@@ -321,7 +321,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
                     fd_set mask;
                     struct timeval timeout;
             
-                    timeout.tv_sec = MAX_SOCKET_TIMEOUT;
+                    timeout.tv_sec = CHttpBase::m_connection_idle_timeout;
                     timeout.tv_usec = 0;
 
                     FD_ZERO(&mask);

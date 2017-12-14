@@ -38,8 +38,6 @@
 
 #define MAX_STORAGE_CONN	32
 
-#define MAX_SOCKET_TIMEOUT 90
-
 using namespace std;
 
 typedef unsigned int BOOL;
@@ -278,7 +276,7 @@ bool __inline__ _Recv_Available_(int sockfd)
     }
 }
 
-int __inline__ _Recv_(int sockfd, char* buf, unsigned int buf_len)
+int __inline__ _Recv_(int sockfd, char* buf, unsigned int buf_len, unsigned int idle_timeout)
 {
 	int taketime = 0;
 	int res;
@@ -290,7 +288,7 @@ int __inline__ _Recv_(int sockfd, char* buf, unsigned int buf_len)
 	FD_ZERO(&mask);
 	while(1)
 	{
-		timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
+		timeout.tv_sec = idle_timeout; 
 		timeout.tv_usec = 0;
 
 		FD_SET(sockfd, &mask);
@@ -326,7 +324,7 @@ int __inline__ _Recv_(int sockfd, char* buf, unsigned int buf_len)
 	return nRecv;
 }
 	
-int __inline__ _Send_(int sockfd, const char * buf, unsigned int buf_len)
+int __inline__ _Send_(int sockfd, const char * buf, unsigned int buf_len, unsigned int idle_timeout)
 {	
 	if(buf_len == 0)
 		return 0;
@@ -339,7 +337,7 @@ int __inline__ _Send_(int sockfd, const char * buf, unsigned int buf_len)
 	FD_ZERO(&mask);	
 	while(1)
 	{
-		timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
+		timeout.tv_sec = idle_timeout; 
 		timeout.tv_usec = 0;
 
 		FD_SET(sockfd, &mask);
@@ -374,7 +372,7 @@ int __inline__ _Send_(int sockfd, const char * buf, unsigned int buf_len)
 	return 0;
 }
 
-BOOL __inline__ connect_ssl(int sockfd,  const char* ca_crt_root, const char* ca_crt_client, const char* ca_password, const char* ca_key_client, SSL** pp_ssl, SSL_CTX** pp_ssl_ctx)
+BOOL __inline__ connect_ssl(int sockfd,  const char* ca_crt_root, const char* ca_crt_client, const char* ca_password, const char* ca_key_client, SSL** pp_ssl, SSL_CTX** pp_ssl_ctx, unsigned int idle_timeout)
 {
     SSL_METHOD* meth = NULL;
 #if OPENSSL_VERSION_NUMBER >= 0x010100000L
@@ -446,7 +444,7 @@ BOOL __inline__ connect_ssl(int sockfd,  const char* ca_crt_root, const char* ca
                 fd_set mask;
                 struct timeval timeout;
         
-                timeout.tv_sec = MAX_SOCKET_TIMEOUT;
+                timeout.tv_sec = idle_timeout;
                 timeout.tv_usec = 0;
 
                 FD_ZERO(&mask);
@@ -531,7 +529,7 @@ BOOL __inline__ close_ssl(SSL* p_ssl, SSL_CTX* p_ssl_ctx)
     }
 }
 
-int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
+int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len, unsigned int idle_timeout)
 {
 #if 0
 	int len, ret;
@@ -587,7 +585,7 @@ int __inline__ SSLRead(int sockfd, SSL* ssl, char * buf, unsigned int buf_len)
             ret = SSL_get_error(ssl, len);
             if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
             {
-                timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
+                timeout.tv_sec = idle_timeout; 
                 timeout.tv_usec = 0;
 
                 FD_SET(sockfd, &mask);
@@ -634,7 +632,7 @@ int __inline__ Write(int fd, const char * buf, unsigned int buf_len)
 	return 0;
 }
 
-int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf_len)
+int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf_len, unsigned int idle_timeout)
 {
 #if 0
 	if(buf_len == 0)
@@ -692,7 +690,7 @@ int __inline__ SSLWrite(int sockfd, SSL* ssl, const char * buf, unsigned int buf
             ret = SSL_get_error(ssl, len);
             if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
             {
-                timeout.tv_sec = MAX_SOCKET_TIMEOUT; 
+                timeout.tv_sec = idle_timeout; 
                 timeout.tv_usec = 0;
 
                 FD_SET(sockfd, &mask);

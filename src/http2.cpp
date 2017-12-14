@@ -444,9 +444,9 @@ uint_32  CHttp2::get_initial_local_window_size()
 int CHttp2::HttpSend(const char* buf, int len)
 {
     if(m_ssl)
-		return SSLWrite(m_sockfd, m_ssl, buf, len);
+		return SSLWrite(m_sockfd, m_ssl, buf, len, CHttpBase::m_connection_idle_timeout);
 	else
-		return _Send_( m_sockfd, buf, len);
+		return _Send_( m_sockfd, buf, len, CHttpBase::m_connection_idle_timeout);
 		
 }
 

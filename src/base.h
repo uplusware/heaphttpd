@@ -69,357 +69,6 @@ typedef struct
 	time_t expire;
 }stReject;
 
-class linesock
-{
-public:
-	linesock(int fd)
-	{
-		dbufsize = 0;
-		sockfd = fd;
-		dbuf = (char*)malloc(4096);
-		if(dbuf)
-		{
-			dbufsize = 4096;
-		}
-		dlen = 0;
-	}
-	
-	virtual ~linesock()
-	{
-		if(dbuf)
-			free(dbuf);
-	}
-
-	int drecv(char* pbuf, int blen)
-	{
-		int rlen = 0;
-		if(blen <= dlen)
-		{
-			memcpy(pbuf, dbuf, blen);
-
-			memmove(dbuf, dbuf + blen , dlen - blen);
-			dlen = dlen - blen;
-			
-			rlen = blen;
-		}
-		else
-		{
-			
-			memcpy(pbuf, dbuf, dlen);
-			rlen = dlen;
-			dlen = 0;
-			
-			int len = _Recv_(sockfd, pbuf + rlen, blen - rlen);
-			if(len > 0)
-			{
-				rlen = rlen + len;	
-			}
-		}
-
-		return rlen;
-	}
-	
-	int lrecv(char* pbuf, int blen, int alive_timeout)
-	{
-		int taketime = 0;
-		int res;
-		fd_set mask; 
-		struct timeval timeout; 
-		char* p = NULL;
-		int len;
-		unsigned int nRecv = 0;
-
-		int left;
-		int right;
-		p = dlen > 0 ? (char*)memchr(dbuf, '\n', dlen) : NULL;
-		if(p != NULL)
-		{
-			left = p - dbuf + 1;
-			right = dlen - left;
-		
-			if(blen >= left)
-			{
-				memcpy(pbuf, dbuf, left);
-				memmove(dbuf, p + 1, right);
-				dlen = right;
-				pbuf[left] = '\0';
-				return left;
-			}
-			else
-			{
-				memcpy(pbuf, dbuf, blen);
-				memmove(dbuf, dbuf + blen, dlen - blen);
-				dlen = dlen - blen;
-				return blen;
-			}
-		}
-		else
-		{
-			if(blen >= dlen)
-			{
-				memcpy(pbuf, dbuf, dlen);
-				nRecv = dlen;
-				dlen = 0;
-			}
-			else
-			{
-				memcpy(pbuf, dbuf, blen);
-				memmove(dbuf, dbuf + blen, dlen - blen);
-				dlen = dlen - blen;
-				return blen;
-			}
-		}
-
-		p = NULL;
-		FD_ZERO(&mask);		
-		while(1)
-		{
-			if(nRecv >= blen)
-				break;
-			
-			timeout.tv_sec = alive_timeout > 0 ? alive_timeout : MAX_SOCKET_TIMEOUT; 
-			timeout.tv_usec = 0;
-					
-			FD_SET(sockfd, &mask);
-			res = select(sockfd + 1, &mask, NULL, NULL, &timeout);
-			if( res == 1) 
-			{
-				taketime = 0;
-				len = recv(sockfd, pbuf + nRecv, blen - nRecv, 0);
-				if(len == 0)
-                {
-                    close(sockfd);
-                    return -1;
-                }
-				else if(len < 0)
-				{
-                    if( errno == EAGAIN)
-                        continue;
-					close(sockfd);
-					return -1;
-				}
-				nRecv = nRecv + len;
-				p = (char*)memchr(pbuf, '\n', nRecv);
-				if(p != NULL)
-				{
-					left = p - pbuf + 1;
-					right = nRecv - left;
-				
-					if(right > dbufsize)
-					{
-						if(dbuf)
-							free(dbuf);
-						dbuf = (char*)malloc(right);
-						dbufsize = right;
-					}
-					memcpy(dbuf, p + 1, right);
-					dlen = right;
-					nRecv = left;
-					pbuf[nRecv] = '\0';
-					break;
-				}
-			}
-			else
-			{
-                close(sockfd);
-				return -1;
-			}
-			
-		}
-		return nRecv;
-	}
-
-private:
-	int sockfd;
-public:
-	char* dbuf;
-	int dlen;
-	int dbufsize;
-};
-
-class linessl
-{
-public:
-	linessl(int fd, SSL* ssl)
-	{
-		dbufsize = 0;
-		sockfd = fd;
-		sslhd = ssl;
-		dbuf = (char*)malloc(4096);
-		if(dbuf)
-		{
-			dbufsize = 4096;
-		}
-		dlen = 0;
-	}
-	
-	virtual ~linessl()
-	{
-		if(dbuf)
-			free(dbuf);
-	}
-
-	int drecv(char* pbuf, int blen)
-	{
-		int rlen = 0;
-		
-		if(blen <= dlen)
-		{
-			memcpy(pbuf, dbuf, blen);
-
-			memmove(dbuf, dbuf + blen, dlen - blen);
-			dlen = dlen - blen;
-			
-			rlen = blen;
-		}
-		else
-		{
-			
-			memcpy(pbuf, dbuf, dlen);
-			rlen = dlen;
-			dlen = 0;
-			
-			int len = SSLRead(sockfd, sslhd, pbuf + rlen, blen - rlen);
-			if(len > 0)
-			{
-				rlen = rlen + len;	
-			}
-		}
-
-		return rlen;
-	}
-	
-	int lrecv(char* pbuf, int blen, int alive_timeout)
-	{
-		int taketime = 0;
-		int res;
-		fd_set mask;
-		struct timeval timeout;
-		char* p = NULL;
-		int len;
-		unsigned int nRecv = 0;
-		int ret;
-
-		int left;
-		int right;
-		p = dlen > 0 ? (char*)memchr(dbuf, '\n', dlen) : NULL;
-		if(p != NULL)
-		{
-			left = p - dbuf + 1;
-			right = dlen - left;
-
-			if(blen >= left)
-			{
-				memcpy(pbuf, dbuf, left);
-				memmove(dbuf, p + 1, right);
-				dlen = right;
-				pbuf[left] = '\0';
-				return left;
-			}
-			else
-			{
-				memcpy(pbuf, dbuf, blen);
-				memmove(dbuf, dbuf + blen, dlen - blen);
-				dlen = dlen - blen;
-				return blen;
-			}
-		}
-		else
-		{
-			if(blen >= dlen)
-			{
-				memcpy(pbuf, dbuf, dlen);
-				nRecv = dlen;
-				dlen = 0;
-			}
-			else
-			{
-				memcpy(pbuf, dbuf, blen);
-				memmove(dbuf, dbuf + blen, dlen - blen);
-				dlen = dlen - blen;
-				return blen;
-			}
-		}
-
-		p = NULL;
-        
-		while(1)
-		{
-			if(nRecv == blen)
-				break;
-            
-            len = SSL_read(sslhd, pbuf + nRecv, blen - nRecv);
-            if(len == 0)
-            {
-                close(sockfd);
-                return -1;
-            }
-            else if(len < 0)
-            {
-                ret = SSL_get_error(sslhd, len);
-                if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
-                {
-                    timeout.tv_sec = alive_timeout > 0 ? alive_timeout : MAX_SOCKET_TIMEOUT;
-                    timeout.tv_usec = 0;
-
-                    FD_ZERO(&mask);
-                    FD_SET(sockfd, &mask);
-                    
-                    res = select(sockfd + 1, ret == SSL_ERROR_WANT_READ ? &mask : NULL, ret == SSL_ERROR_WANT_WRITE ? &mask : NULL, NULL, &timeout);
-
-                    if( res == 1)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        close(sockfd);
-                        return -1;
-                    }
-                }
-                else
-                {
-                    close(sockfd);
-                    return -1;
-                }
-            }
-            else
-            {
-                nRecv = nRecv + len;
-                p = (char*)memchr(pbuf, '\n', nRecv);
-                if(p != NULL)
-                {
-                    left = p - pbuf + 1;
-                    right = nRecv - left;
-
-                    if(right > dbufsize)
-                    {
-                        if(dbuf)
-                            free(dbuf);
-                        dbuf = (char*)malloc(right);
-                        dbufsize = right;
-                    }
-                    memcpy(dbuf, p + 1, right);
-                    dlen = right;
-                    nRecv = left;
-                    pbuf[nRecv] = '\0';
-                    break;
-                }
-            }
-		}
-		return nRecv;
-	}
-
-private:
-	int sockfd;
-	SSL* sslhd;
-	
-public:
-	char* dbuf;
-	int dlen;
-	int dbufsize;
-};
-
 enum cgi_socket_t{
         inet_socket = 0,
         unix_socket,
@@ -524,6 +173,8 @@ public:
     static unsigned int m_single_localfile_cache_size;
     static unsigned int m_single_tunneling_cache_size;
 
+    static unsigned int	m_connection_idle_timeout;
+    
 #ifdef _WITH_MEMCACHED_
     static map<string, int> m_memcached_list;
 #endif /* _WITH_MEMCACHED_ */
@@ -552,5 +203,355 @@ private:
     static void _load_reverse_ext_();
 };
 
+class linesock
+{
+public:
+	linesock(int fd)
+	{
+		dbufsize = 0;
+		sockfd = fd;
+		dbuf = (char*)malloc(4096);
+		if(dbuf)
+		{
+			dbufsize = 4096;
+		}
+		dlen = 0;
+	}
+	
+	virtual ~linesock()
+	{
+		if(dbuf)
+			free(dbuf);
+	}
+
+	int drecv(char* pbuf, int blen)
+	{
+		int rlen = 0;
+		if(blen <= dlen)
+		{
+			memcpy(pbuf, dbuf, blen);
+
+			memmove(dbuf, dbuf + blen , dlen - blen);
+			dlen = dlen - blen;
+			
+			rlen = blen;
+		}
+		else
+		{
+			
+			memcpy(pbuf, dbuf, dlen);
+			rlen = dlen;
+			dlen = 0;
+			
+			int len = _Recv_(sockfd, pbuf + rlen, blen - rlen, CHttpBase::m_connection_idle_timeout);
+			if(len > 0)
+			{
+				rlen = rlen + len;	
+			}
+		}
+
+		return rlen;
+	}
+	
+	int lrecv(char* pbuf, int blen, int alive_timeout)
+	{
+		int taketime = 0;
+		int res;
+		fd_set mask; 
+		struct timeval timeout; 
+		char* p = NULL;
+		int len;
+		unsigned int nRecv = 0;
+
+		int left;
+		int right;
+		p = dlen > 0 ? (char*)memchr(dbuf, '\n', dlen) : NULL;
+		if(p != NULL)
+		{
+			left = p - dbuf + 1;
+			right = dlen - left;
+		
+			if(blen >= left)
+			{
+				memcpy(pbuf, dbuf, left);
+				memmove(dbuf, p + 1, right);
+				dlen = right;
+				pbuf[left] = '\0';
+				return left;
+			}
+			else
+			{
+				memcpy(pbuf, dbuf, blen);
+				memmove(dbuf, dbuf + blen, dlen - blen);
+				dlen = dlen - blen;
+				return blen;
+			}
+		}
+		else
+		{
+			if(blen >= dlen)
+			{
+				memcpy(pbuf, dbuf, dlen);
+				nRecv = dlen;
+				dlen = 0;
+			}
+			else
+			{
+				memcpy(pbuf, dbuf, blen);
+				memmove(dbuf, dbuf + blen, dlen - blen);
+				dlen = dlen - blen;
+				return blen;
+			}
+		}
+
+		p = NULL;
+		FD_ZERO(&mask);		
+		while(1)
+		{
+			if(nRecv >= blen)
+				break;
+			
+			timeout.tv_sec = alive_timeout > 0 ? alive_timeout : CHttpBase::m_connection_idle_timeout; 
+			timeout.tv_usec = 0;
+					
+			FD_SET(sockfd, &mask);
+			res = select(sockfd + 1, &mask, NULL, NULL, &timeout);
+			if( res == 1) 
+			{
+				taketime = 0;
+				len = recv(sockfd, pbuf + nRecv, blen - nRecv, 0);
+				if(len == 0)
+                {
+                    close(sockfd);
+                    return -1;
+                }
+				else if(len < 0)
+				{
+                    if( errno == EAGAIN)
+                        continue;
+					close(sockfd);
+					return -1;
+				}
+				nRecv = nRecv + len;
+				p = (char*)memchr(pbuf, '\n', nRecv);
+				if(p != NULL)
+				{
+					left = p - pbuf + 1;
+					right = nRecv - left;
+				
+					if(right > dbufsize)
+					{
+						if(dbuf)
+							free(dbuf);
+						dbuf = (char*)malloc(right);
+						dbufsize = right;
+					}
+					memcpy(dbuf, p + 1, right);
+					dlen = right;
+					nRecv = left;
+					pbuf[nRecv] = '\0';
+					break;
+				}
+			}
+			else
+			{
+                close(sockfd);
+				return -1;
+			}
+			
+		}
+		return nRecv;
+	}
+
+private:
+	int sockfd;
+public:
+	char* dbuf;
+	int dlen;
+	int dbufsize;
+};
+
+class linessl
+{
+public:
+	linessl(int fd, SSL* ssl)
+	{
+		dbufsize = 0;
+		sockfd = fd;
+		sslhd = ssl;
+		dbuf = (char*)malloc(4096);
+		if(dbuf)
+		{
+			dbufsize = 4096;
+		}
+		dlen = 0;
+	}
+	
+	virtual ~linessl()
+	{
+		if(dbuf)
+			free(dbuf);
+	}
+
+	int drecv(char* pbuf, int blen)
+	{
+		int rlen = 0;
+		
+		if(blen <= dlen)
+		{
+			memcpy(pbuf, dbuf, blen);
+
+			memmove(dbuf, dbuf + blen, dlen - blen);
+			dlen = dlen - blen;
+			
+			rlen = blen;
+		}
+		else
+		{
+			
+			memcpy(pbuf, dbuf, dlen);
+			rlen = dlen;
+			dlen = 0;
+			
+			int len = SSLRead(sockfd, sslhd, pbuf + rlen, blen - rlen, CHttpBase::m_connection_idle_timeout);
+			if(len > 0)
+			{
+				rlen = rlen + len;	
+			}
+		}
+
+		return rlen;
+	}
+	
+	int lrecv(char* pbuf, int blen, int alive_timeout)
+	{
+		int taketime = 0;
+		int res;
+		fd_set mask;
+		struct timeval timeout;
+		char* p = NULL;
+		int len;
+		unsigned int nRecv = 0;
+		int ret;
+
+		int left;
+		int right;
+		p = dlen > 0 ? (char*)memchr(dbuf, '\n', dlen) : NULL;
+		if(p != NULL)
+		{
+			left = p - dbuf + 1;
+			right = dlen - left;
+
+			if(blen >= left)
+			{
+				memcpy(pbuf, dbuf, left);
+				memmove(dbuf, p + 1, right);
+				dlen = right;
+				pbuf[left] = '\0';
+				return left;
+			}
+			else
+			{
+				memcpy(pbuf, dbuf, blen);
+				memmove(dbuf, dbuf + blen, dlen - blen);
+				dlen = dlen - blen;
+				return blen;
+			}
+		}
+		else
+		{
+			if(blen >= dlen)
+			{
+				memcpy(pbuf, dbuf, dlen);
+				nRecv = dlen;
+				dlen = 0;
+			}
+			else
+			{
+				memcpy(pbuf, dbuf, blen);
+				memmove(dbuf, dbuf + blen, dlen - blen);
+				dlen = dlen - blen;
+				return blen;
+			}
+		}
+
+		p = NULL;
+        
+		while(1)
+		{
+			if(nRecv == blen)
+				break;
+            
+            len = SSL_read(sslhd, pbuf + nRecv, blen - nRecv);
+            if(len == 0)
+            {
+                close(sockfd);
+                return -1;
+            }
+            else if(len < 0)
+            {
+                ret = SSL_get_error(sslhd, len);
+                if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+                {
+                    timeout.tv_sec = alive_timeout > 0 ? alive_timeout : CHttpBase::m_connection_idle_timeout;
+                    timeout.tv_usec = 0;
+
+                    FD_ZERO(&mask);
+                    FD_SET(sockfd, &mask);
+                    
+                    res = select(sockfd + 1, ret == SSL_ERROR_WANT_READ ? &mask : NULL, ret == SSL_ERROR_WANT_WRITE ? &mask : NULL, NULL, &timeout);
+
+                    if( res == 1)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        close(sockfd);
+                        return -1;
+                    }
+                }
+                else
+                {
+                    close(sockfd);
+                    return -1;
+                }
+            }
+            else
+            {
+                nRecv = nRecv + len;
+                p = (char*)memchr(pbuf, '\n', nRecv);
+                if(p != NULL)
+                {
+                    left = p - pbuf + 1;
+                    right = nRecv - left;
+
+                    if(right > dbufsize)
+                    {
+                        if(dbuf)
+                            free(dbuf);
+                        dbuf = (char*)malloc(right);
+                        dbufsize = right;
+                    }
+                    memcpy(dbuf, p + 1, right);
+                    dlen = right;
+                    nRecv = left;
+                    pbuf[nRecv] = '\0';
+                    break;
+                }
+            }
+		}
+		return nRecv;
+	}
+
+private:
+	int sockfd;
+	SSL* sslhd;
+	
+public:
+	char* dbuf;
+	int dlen;
+	int dbufsize;
+};
 #endif /* _MAILSYS_H_ */
 

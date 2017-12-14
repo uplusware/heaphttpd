@@ -24,9 +24,9 @@ http_chunk::~http_chunk()
 int http_chunk::client_send(const char* buf, int len)
 {
 	if(m_client_ssl)
-		return SSLWrite(m_client_sockfd, m_client_ssl, buf, len);
+		return SSLWrite(m_client_sockfd, m_client_ssl, buf, len, CHttpBase::m_connection_idle_timeout);
 	else
-		return _Send_( m_client_sockfd, buf, len);
+		return _Send_( m_client_sockfd, buf, len, CHttpBase::m_connection_idle_timeout);
 		
 }
 
@@ -257,9 +257,9 @@ http_client::~http_client()
 int http_client::client_send(const char* buf, int len)
 {
 	if(m_client_ssl)
-		return SSLWrite(m_client_sockfd, m_client_ssl, buf, len);
+		return SSLWrite(m_client_sockfd, m_client_ssl, buf, len, CHttpBase::m_connection_idle_timeout);
 	else
-		return _Send_( m_client_sockfd, buf, len);
+		return _Send_( m_client_sockfd, buf, len, CHttpBase::m_connection_idle_timeout);
 		
 }
 

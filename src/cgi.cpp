@@ -3,6 +3,7 @@
 	uplusware@gmail.com
 */
 #include "cgi.h"
+#include "base.h"
 
 cgi_base::cgi_base(const char* ipaddr, unsigned short port)
 {
@@ -163,12 +164,12 @@ int cgi_base::Connect()
 
 int cgi_base::Send(const char* buf, unsigned long long len)
 {
-	return m_sockfd >= 0 ? _Send_(m_sockfd, (char*)buf, len) : -1;
+	return m_sockfd >= 0 ? _Send_(m_sockfd, (char*)buf, len, CHttpBase::m_connection_idle_timeout) : -1;
 }
 
 int cgi_base::Recv(const char* buf, unsigned long long len)
 {
-	return m_sockfd >= 0 ? _Recv_(m_sockfd, (char*)buf, len) : -1;
+	return m_sockfd >= 0 ? _Recv_(m_sockfd, (char*)buf, len, CHttpBase::m_connection_idle_timeout) : -1;
 }
 
 // classic cgi mode
