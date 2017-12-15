@@ -239,7 +239,7 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
             fd_set mask_r, mask_w; 
             struct timeval timeout; 
         
-            timeout.tv_sec = CHttpBase::m_connection_idle_timeout; 
+            timeout.tv_sec = CHttpBase::m_connection_sync_timeout; 
             timeout.tv_usec = 0;
             
             int s = connect(m_backend_sockfd, rp->ai_addr, rp->ai_addrlen);

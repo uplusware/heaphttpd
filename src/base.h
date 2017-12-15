@@ -174,6 +174,7 @@ public:
     static unsigned int m_single_tunneling_cache_size;
 
     static unsigned int	m_connection_idle_timeout;
+    static unsigned int	m_connection_sync_timeout;
     
 #ifdef _WITH_MEMCACHED_
     static map<string, int> m_memcached_list;
