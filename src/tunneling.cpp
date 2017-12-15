@@ -2,7 +2,6 @@
 	Copyright (c) openheap, uplusware
 	uplusware@gmail.com
 */
-
 #include "tunneling.h"
 #include "http_client.h"
 #include "httpcomm.h"
@@ -388,8 +387,10 @@ bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
         http_client the_client(m_client_sockfd, m_client_ssl, m_backend_sockfd, m_cache, m_http_tunneling_url.c_str());
         string str_header;
         int received_len = 0;
-        char response_buf[4096];
-        int next_recv_len = 4095;
+        
+        auto_ptr<char> response_buf_obj(new char[4096]);
+        char* response_buf = response_buf_obj.get();
+        
         fd_set mask_r; 
         struct timeval timeout; 
         FD_ZERO(&mask_r);
@@ -406,12 +407,13 @@ bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
             }
             
             int len = recv(m_backend_sockfd, response_buf, 4095, 0);
-             
+            
             if(len == 0)
             {
 				close(m_client_sockfd);
                 close(m_backend_sockfd);
                 m_backend_sockfd = -1;
+                
                 return false; 
             }
             else if(len < 0)
@@ -421,17 +423,19 @@ bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
 				close(m_client_sockfd);
                 close(m_backend_sockfd);
                 m_backend_sockfd = -1;
+                
                 return false;
             }
             response_buf[len] = '\0';
             
-            if(!the_client.processing(response_buf, len/*, next_recv_len*/))
+            if(!the_client.processing(response_buf, len))
             {
                 break;
             }
         }
                     
     }
+    
     return true;
 }
 

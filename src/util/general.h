@@ -16,6 +16,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <memory>
 #include <sys/time.h>
 #include <iconv.h>
 #include <semaphore.h>
@@ -36,8 +37,6 @@
 #define MAX_MEMORY_THRESHOLD (1024*1024*2)
 #define MEMORY_BLOCK_SIZE (1024*64)
 
-#define MAX_STORAGE_CONN	32
-
 using namespace std;
 
 typedef unsigned int BOOL;
@@ -45,15 +44,10 @@ typedef unsigned int BOOL;
 #define FALSE   0
 #define TRUE    1
 
+typedef  unsigned long long int uint_64;
 typedef  unsigned int uint_32;
 typedef  unsigned short uint_16;
 typedef  unsigned char uint_8;
-
-typedef unsigned char BYTE;
-typedef unsigned short WORD;
-typedef unsigned int DWORD;
-
-typedef void* HANDLE;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define HICH(c) (( (c) >= 'a' )&&((c) <= 'z')) ? ((c)+'A'-'a'):(c)

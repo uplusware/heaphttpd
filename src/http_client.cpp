@@ -545,8 +545,7 @@ bool http_client::processing(const char* buf, int buf_len)
     }
     
     memcpy(m_buf + m_buf_used_len, buf, buf_len);
-    m_buf_used_len += buf_len;     
-    
+    m_buf_used_len += buf_len;
     
     if(m_state == HTTP_Client_Parse_State_Header)
     {        

@@ -65,6 +65,8 @@ public:
     bool is_chunked() { return m_is_chunked; }
     bool has_content_length() { return m_has_content_length; }
     
+    int get_buf_used_len() { return m_buf_used_len; }
+    
 protected:
     bool m_out_of_cache_header_scope;
     bool m_has_via;
