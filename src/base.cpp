@@ -115,6 +115,8 @@ unsigned int	CHttpBase::m_connection_keep_alive_max = 100;
 unsigned int    CHttpBase::m_connection_idle_timeout = 20;
 unsigned int    CHttpBase::m_connection_sync_timeout = 3;
 
+unsigned int	CHttpBase::m_thread_increase_step = 8;
+
 unsigned int CHttpBase::m_runtime = 0;
 string	CHttpBase::m_config_file = CONFIG_FILE_PATH;
 string	CHttpBase::m_permit_list_file = PERMIT_FILE_PATH;
@@ -262,6 +264,13 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, cache_size );
 				strtrim(cache_size);
 				m_total_localfile_cache_size = atoi(cache_size.c_str()) * 1024 * 1024;
+			}
+            else if(strncasecmp(strline.c_str(), "ThreadIncreaseStep", sizeof("ThreadIncreaseStep") - 1) == 0)
+			{
+				string thread_increase_step;
+				strcut(strline.c_str(), "=", NULL, thread_increase_step );
+				strtrim(thread_increase_step);
+				m_thread_increase_step = atoi(thread_increase_step.c_str());
 			}
             else if(strncasecmp(strline.c_str(), "TotalTunnelingCacheSize", sizeof("TotalTunnelingCacheSize") - 1) == 0)
 			{

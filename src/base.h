@@ -176,6 +176,8 @@ public:
     static unsigned int	m_connection_idle_timeout;
     static unsigned int	m_connection_sync_timeout;
     
+    static unsigned int	m_thread_increase_step;
+    
 #ifdef _WITH_MEMCACHED_
     static map<string, int> m_memcached_list;
 #endif /* _WITH_MEMCACHED_ */

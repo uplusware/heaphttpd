@@ -224,8 +224,8 @@ private:
     static volatile unsigned int m_STATIC_THREAD_POOL_SIZE;
     static pthread_mutex_t m_STATIC_THREAD_POOL_SIZE_MUTEX;
     
-    static pthread_rwlock_t m_STATIC_THREAD_WORKING_NUM_LOCK;
-    static volatile unsigned int m_STATIC_THREAD_WORKING_NUM;
+    static pthread_rwlock_t m_STATIC_THREAD_IDLE_NUM_LOCK;
+    static volatile unsigned int m_STATIC_THREAD_IDLE_NUM;
 };
 
 typedef struct {

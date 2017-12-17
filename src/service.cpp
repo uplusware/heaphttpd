@@ -218,8 +218,8 @@ sem_t Worker::m_STATIC_THREAD_POOL_SEM;
 volatile unsigned int Worker::m_STATIC_THREAD_POOL_SIZE = 0;
 pthread_mutex_t Worker::m_STATIC_THREAD_POOL_SIZE_MUTEX;
 
-pthread_rwlock_t Worker::m_STATIC_THREAD_WORKING_NUM_LOCK;
-volatile unsigned int Worker::m_STATIC_THREAD_WORKING_NUM;
+pthread_rwlock_t Worker::m_STATIC_THREAD_IDLE_NUM_LOCK;
+volatile unsigned int Worker::m_STATIC_THREAD_IDLE_NUM;
     
 void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 {    
@@ -421,14 +421,14 @@ void Worker::INIT_THREAD_POOL_HANDLER()
 {
 	m_STATIC_THREAD_POOL_EXIT = TRUE;
 	m_STATIC_THREAD_POOL_SIZE = 0;
-    m_STATIC_THREAD_WORKING_NUM = 0;
+    m_STATIC_THREAD_IDLE_NUM = 0;
 	while(!m_STATIC_THREAD_POOL_ARG_QUEUE.empty())
 	{
 		m_STATIC_THREAD_POOL_ARG_QUEUE.pop();
 	}
 	pthread_mutex_init(&m_STATIC_THREAD_POOL_MUTEX, NULL);
     pthread_mutex_init(&m_STATIC_THREAD_POOL_SIZE_MUTEX, NULL);
-    pthread_rwlock_init(&m_STATIC_THREAD_WORKING_NUM_LOCK, NULL);
+    pthread_rwlock_init(&m_STATIC_THREAD_IDLE_NUM_LOCK, NULL);
     
 	sem_init(&m_STATIC_THREAD_POOL_SEM, 0, 0);
 }
@@ -439,11 +439,13 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 	m_STATIC_THREAD_POOL_SIZE++;
     pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
     
+    m_STATIC_THREAD_POOL_EXIT = TRUE;
+    
 	struct timespec ts;
 	while(m_STATIC_THREAD_POOL_EXIT)
 	{
 		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_sec += 1;
+		ts.tv_sec += CHttpBase::m_connection_idle_timeout;
 		if(sem_timedwait(&m_STATIC_THREAD_POOL_SEM, &ts) == 0)
 		{
 			SESSION_PARAM* session_param = NULL;
@@ -457,19 +459,25 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 			pthread_mutex_unlock(&m_STATIC_THREAD_POOL_MUTEX);
 			if(session_param)
 			{
-                /*pthread_rwlock_wrlock(&m_STATIC_THREAD_WORKING_NUM_LOCK);
-                m_STATIC_THREAD_WORKING_NUM++;
-                pthread_rwlock_unlock(&m_STATIC_THREAD_WORKING_NUM_LOCK);*/
+                pthread_rwlock_wrlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+                m_STATIC_THREAD_IDLE_NUM--;
+                pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
                 
 				SESSION_HANDLING(session_param);
 				delete session_param;
                 
-                /*pthread_rwlock_wrlock(&m_STATIC_THREAD_WORKING_NUM_LOCK);
-                m_STATIC_THREAD_WORKING_NUM--;
-                pthread_rwlock_unlock(&m_STATIC_THREAD_WORKING_NUM_LOCK);*/
+                pthread_rwlock_wrlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+                m_STATIC_THREAD_IDLE_NUM++;
+                pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
                 
 			}
 		}
+        else
+        {
+            m_STATIC_THREAD_POOL_EXIT = FALSE;
+            
+            /* printf("exit from idle thread %llu\n", pthread_self()); */
+        }
 	}
     pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
 	m_STATIC_THREAD_POOL_SIZE--;
@@ -507,7 +515,7 @@ void Worker::LEAVE_THREAD_POOL_HANDLER()
     
     pthread_mutex_destroy(&m_STATIC_THREAD_POOL_MUTEX);
     pthread_mutex_destroy(&m_STATIC_THREAD_POOL_SIZE_MUTEX);    
-    pthread_rwlock_destroy(&m_STATIC_THREAD_WORKING_NUM_LOCK);
+    pthread_rwlock_destroy(&m_STATIC_THREAD_IDLE_NUM_LOCK);
 }
 
 void CLEAR_QUEUE(mqd_t qid)
@@ -558,8 +566,7 @@ Worker::~Worker()
 
 void Worker::Working(CUplusTrace& uTrace)
 {
-	ThreadPool WorkerPool(m_thread_num, 
-	    INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, LEAVE_THREAD_POOL_HANDLER);
+	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, 0, LEAVE_THREAD_POOL_HANDLER);
 	
 	bool bQuit = false;
 	while(!bQuit)
@@ -622,6 +629,25 @@ void Worker::Working(CUplusTrace& uTrace)
 			pthread_mutex_unlock(&m_STATIC_THREAD_POOL_MUTEX);
 
 			sem_post(&m_STATIC_THREAD_POOL_SEM);
+            
+            
+             bool more_thread = false;
+            pthread_rwlock_rdlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+            if(m_STATIC_THREAD_IDLE_NUM < 5)
+            {
+                more_thread = true;
+            }
+            pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+            
+            
+            pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+            int current_thread_pool_size = m_STATIC_THREAD_POOL_SIZE;
+            pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+    
+            if(more_thread && current_thread_pool_size < CHttpBase::m_max_instance_thread_num)
+            {
+                WorkerPool.More();
+            }
 		}
 	}
 }
