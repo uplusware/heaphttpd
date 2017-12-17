@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-ThreadPool::ThreadPool(unsigned int size, void(*init_pthread_handler)(), void*(*pthread_handler)(void*), void* arg, int arg_len, void(*exit_pthread_handler)())
+ThreadPool::ThreadPool(unsigned int size, void(*init_pthread_handler)(), void*(*pthread_handler)(void*), void* arg, int arg_len, void(*exit_pthread_handler)(), int pre_step)
 {
     m_init_pthread_handler = init_pthread_handler;
     m_pthread_handler = pthread_handler;
@@ -17,7 +17,7 @@ ThreadPool::ThreadPool(unsigned int size, void(*init_pthread_handler)(), void*(*
     
 	if(m_init_pthread_handler)
 		(*m_init_pthread_handler)();
-    
+		
 	m_size = size;
     
     if(arg && arg_len > 0)
@@ -29,28 +29,34 @@ ThreadPool::ThreadPool(unsigned int size, void(*init_pthread_handler)(), void*(*
     {
         m_arg = NULL;
     }
-}
-
-void ThreadPool::More()
-{
-    
-    for(int t = 0; t < CHttpBase::m_thread_increase_step; t++)
+	
+	for(int t = 0; t < pre_step; t++)
     {
         pthread_t pthread_instance;
-        pthread_attr_t pthread_instance_attr;
-    
+		
         PoolArg* pArg = new PoolArg;
         pArg->data = m_arg;
-        
-        pthread_attr_init(&pthread_instance_attr);
-        pthread_attr_setdetachstate (&pthread_instance_attr, PTHREAD_CREATE_DETACHED);
-        
-        if(pthread_create(&pthread_instance, &pthread_instance_attr, m_pthread_handler, pArg) != 0)
-        {
-            fprintf(stderr, "Fail to create thread worker: %d/%d\n", pthread_instance, m_size);
-        }
-        
-        pthread_attr_destroy (&pthread_instance_attr);
+
+        if(pthread_create(&pthread_instance, NULL, m_pthread_handler, pArg) == 0)
+		{
+			pthread_detach(pthread_instance);
+		}
+    }
+}
+
+void ThreadPool::More(int step)
+{
+	for(int t = 0; t < step; t++)
+    {
+        pthread_t pthread_instance;
+		
+        PoolArg* pArg = new PoolArg;
+        pArg->data = m_arg;
+
+        if(pthread_create(&pthread_instance, NULL, m_pthread_handler, pArg) == 0)
+		{
+			pthread_detach(pthread_instance);
+		}
     }
 }
 
@@ -58,7 +64,7 @@ ThreadPool::~ThreadPool()
 {
 	if(m_exit_pthread_handler)
 		(*m_exit_pthread_handler)();
-    
+	
     if(m_arg)
         free(m_arg);
 }

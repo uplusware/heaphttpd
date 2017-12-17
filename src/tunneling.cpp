@@ -652,7 +652,7 @@ void http_tunneling::relay_processing()
                 break;
             }
         }
-        else if(ret_val < 0)
+        else
         {
 			close(m_client_sockfd);
 			close(m_backend_sockfd);

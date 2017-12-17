@@ -110,9 +110,9 @@ unsigned int CHttpBase::m_max_instance_thread_num = 1024;
 BOOL CHttpBase::m_instance_prestart = FALSE;
 string CHttpBase::m_instance_balance_scheme = "R";
 
-unsigned int	CHttpBase::m_connection_keep_alive_timeout = 5;
-unsigned int	CHttpBase::m_connection_keep_alive_max = 100;
-unsigned int    CHttpBase::m_connection_idle_timeout = 20;
+unsigned int	CHttpBase::m_connection_keep_alive_timeout = 3600;
+unsigned int	CHttpBase::m_connection_keep_alive_max = 65535;
+unsigned int    CHttpBase::m_connection_idle_timeout = 5;
 unsigned int    CHttpBase::m_connection_sync_timeout = 3;
 
 unsigned int	CHttpBase::m_thread_increase_step = 8;
