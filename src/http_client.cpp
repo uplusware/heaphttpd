@@ -321,16 +321,14 @@ bool http_client::parse(const char* text)
                 strVia += CHttpBase::m_localhostname.c_str();
                 strVia += "(Heaphttpd/1.1)\r\n"; //append additional \r\n for ending header
                 
-                if(client_send( strVia.c_str(), strVia.length()) < 0)
-                {
-                    close(m_client_sockfd);
-                    close(m_backend_sockfd);
-                    return false;
-                }
+                m_header += strVia;
             }
             
-            //send the empty line
-            if(client_send( "\r\n", 2) < 0) // not x + 4 since need to append Via header fragment.
+            //The empty line
+            m_header += "\r\n";
+            
+            //Send all 
+            if(client_send( m_header.c_str(), m_header.length()) < 0)
             {
                 close(m_client_sockfd);
                 close(m_backend_sockfd);
@@ -511,18 +509,20 @@ bool http_client::parse(const char* text)
             m_out_of_cache_header_scope = true;
         }
         
-        //send each header line with \r\n
-        if(client_send( strtext.c_str(), strtext.length()) < 0) // not x + 4 since need to append Via header fragment.
+        //Each header line with \r\n
+        m_header += strtext;
+        m_header += "\r\n";
+        
+        //Send the header buffer if overflow/exceed the threshold
+        if(m_header.length() > 4096)
         {
-            close(m_client_sockfd);
-            close(m_backend_sockfd);
-            return false;
-        }
-        if(client_send( "\r\n", 2) < 0) // not x + 4 since need to append Via header fragment.
-        {
-            close(m_client_sockfd);
-            close(m_backend_sockfd);
-            return false;
+            if(client_send( m_header.c_str(), m_header.length()) < 0) // not x + 4 since need to append Via header fragment.
+            {
+                close(m_client_sockfd);
+                close(m_backend_sockfd);
+                return false;
+            }
+            m_header = "";
         }
     }
 	return true;

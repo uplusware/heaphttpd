@@ -114,5 +114,7 @@ protected:
     
     char* m_cache_buf;
     unsigned int m_cache_data_len;
+    
+    string m_header;
 };
 #endif /* _HTTP_CLIENT_H_ */

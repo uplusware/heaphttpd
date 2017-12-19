@@ -55,8 +55,6 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         
         if(m_tunneling_cache_instance)
         {
-            printf("@: [%s]\n", m_http_tunneling_url.c_str());
-            
             return true;
         }
         else
@@ -120,6 +118,7 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
             m_http_tunneling_url = http_url_backup2;
         }
         
+        time_t t1 = time(NULL);
         unsigned short backhost_port = m_port;
         
         /* Get the IP from the name */
@@ -173,7 +172,7 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         }     
 
         freeaddrinfo(servinfo);
-
+        
         if(found_ip == false)
         {
             fprintf(stderr, "couldn't find ip for %s\n", m_address.c_str());
@@ -362,7 +361,10 @@ bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
                 
                 cache_header.SetField("Via", strVia.c_str());
                 
-                if(client_send(cache_header.Text(), cache_header.Length()) < 0 || client_send( "\r\n", 2) < 0)
+                string str_header_crlf = cache_header.Text();
+                str_header_crlf += "\r\n";
+                
+                if(client_send(str_header_crlf.c_str(), str_header_crlf.length()) < 0)
                 {
                     m_tunneling_cache_instance->tunneling_unlock();
                     return false;
@@ -427,6 +429,7 @@ bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
                 return false;
             }
             response_buf[len] = '\0';
+            
             
             if(!the_client.processing(response_buf, len))
             {
