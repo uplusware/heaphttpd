@@ -31,6 +31,12 @@ enum Http_Connection
 	httpWebSocket
 };
 
+enum Http_State
+{
+    httpHeader = 0,
+    httpData
+};
+
 class IHttp
 {
 public:
@@ -61,6 +67,7 @@ public:
 	virtual ~CHttp();
 
 	Http_Connection LineParse(const char* text);
+    Http_Connection DataParse();
     
 	virtual int HttpSend(const char* buf, int len);
     virtual int HttpRecv(char* buf, int len);
@@ -256,6 +263,8 @@ protected:
     time_t m_connection_first_request_time;
     time_t m_connection_keep_alive_timeout;
     unsigned int m_connection_keep_alive_request_tickets;
+    
+    Http_State m_http_state;
 };
 
 #endif /* _HTTP_H_ */
