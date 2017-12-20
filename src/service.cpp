@@ -571,6 +571,8 @@ void Worker::Working(CUplusTrace& uTrace)
 	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, 0, LEAVE_THREAD_POOL_HANDLER,
 		CHttpBase::m_max_instance_thread_num);
 	
+    std::queue<SESSION_PARAM*> local_session_queue;
+    
 	bool bQuit = false;
 	while(!bQuit)
 	{
@@ -627,11 +629,25 @@ void Worker::Working(CUplusTrace& uTrace)
 		    session_param->ca_key_server = client_param.ca_key_server;
 		    session_param->client_cer_check = client_param.client_cer_check;
 
-			pthread_mutex_lock(&m_STATIC_THREAD_POOL_MUTEX);
-			m_STATIC_THREAD_POOL_ARG_QUEUE.push(session_param);
-			pthread_mutex_unlock(&m_STATIC_THREAD_POOL_MUTEX);
-
-			sem_post(&m_STATIC_THREAD_POOL_SEM);
+			if(pthread_mutex_trylock(&m_STATIC_THREAD_POOL_MUTEX) == 0)
+            {
+                while(!local_session_queue.empty())
+                {
+                    SESSION_PARAM* previous_session_param = local_session_queue.front();
+                    local_session_queue.pop();
+                    m_STATIC_THREAD_POOL_ARG_QUEUE.push(previous_session_param);
+                    sem_post(&m_STATIC_THREAD_POOL_SEM);
+                }
+            
+                m_STATIC_THREAD_POOL_ARG_QUEUE.push(session_param);
+                pthread_mutex_unlock(&m_STATIC_THREAD_POOL_MUTEX);
+                sem_post(&m_STATIC_THREAD_POOL_SEM);
+            }
+            else
+            {
+                local_session_queue.push(session_param);
+            }
+			
             
 			/*pthread_rwlock_rdlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
 			int current_idle_thread_num = m_STATIC_THREAD_IDLE_NUM;
