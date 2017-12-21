@@ -6,6 +6,6 @@
 #ifndef _VERSION_H_
 #define _VERSION_H_
 
-#define VERSION_STRING "Heaphttpd Web Server/1.1"
+#define VERSION_STRING "Heaphttpd/1.1"
 
 #endif /* _VERSION_H_ */

@@ -34,6 +34,10 @@ protected:
     ServiceObjMap * m_srvobj;
     X509* m_client_cert;
     http_tunneling* m_http_tunneling;
+    
+    AUTH_SCHEME m_wwwauth_scheme;
+    AUTH_SCHEME m_proxyauth_scheme;
+    
 public:
 	Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, BOOL https, BOOL http2, memory_cache* ch);
 	virtual ~Session();

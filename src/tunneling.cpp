@@ -5,6 +5,7 @@
 #include "tunneling.h"
 #include "http_client.h"
 #include "httpcomm.h"
+#include "version.h"
 
 http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache)
 {
@@ -349,14 +350,14 @@ bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
                 {
                     strVia = "HTTP/1.1 ";
                     strVia += CHttpBase::m_localhostname.c_str();
-                    strVia += "(Heaphttpd/1.1)";                    
+                    strVia += "("VERSION_STRING")";                    
                 }
                 else
                 {
                     strVia = tunneling_cache_data->via;
                     strVia += ", HTTP/1.1 ";
                     strVia += CHttpBase::m_localhostname.c_str();
-                    strVia += "(Heaphttpd/1.1)";
+                    strVia += "("VERSION_STRING")";
                 }
                 
                 cache_header.SetField("Via", strVia.c_str());

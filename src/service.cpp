@@ -579,9 +579,24 @@ void Worker::Working(CUplusTrace& uTrace)
 
 		int clt_sockfd;
 		CLIENT_PARAM client_param;
-        int res = RECV_FD(m_sockfd, &clt_sockfd, &client_param, CHttpBase::m_connection_keep_alive_timeout);
+        int res = RECV_FD(m_sockfd, &clt_sockfd, &client_param, 1);
         if( res < 0)
 		{
+            if(res == -2)
+            {
+                if(!local_session_queue.empty() && pthread_mutex_trylock(&m_STATIC_THREAD_POOL_MUTEX) == 0)
+                {
+                    while(!local_session_queue.empty())
+                    {
+                        SESSION_PARAM* previous_session_param = local_session_queue.front();
+                        local_session_queue.pop();
+                        m_STATIC_THREAD_POOL_ARG_QUEUE.push(previous_session_param);
+                        sem_post(&m_STATIC_THREAD_POOL_SEM);
+                    }
+                }
+                continue;
+            }
+                
             close(m_sockfd);
             m_sockfd = -1;
             bQuit = true;

@@ -4,6 +4,7 @@
 */
 
 #include "http_client.h"
+#include "version.h"
 
 //http_chunk
 http_chunk::http_chunk(int client_sockfd, SSL* client_ssl, int backend_sockfd)
@@ -319,7 +320,7 @@ bool http_client::parse(const char* text)
             {
                 string strVia = "Via: HTTP/1.1 ";
                 strVia += CHttpBase::m_localhostname.c_str();
-                strVia += "(Heaphttpd/1.1)\r\n"; //append additional \r\n for ending header
+                strVia += "("VERSION_STRING")\r\n"; //append additional \r\n for ending header
                 
                 m_header += strVia;
             }
@@ -495,7 +496,7 @@ bool http_client::parse(const char* text)
             // add the current via
             strtext += ", HTTP/1.1 ";
             strtext += CHttpBase::m_localhostname.c_str();
-            strtext += "(Heaphttpd/1.1)";
+            strtext += "("VERSION_STRING")";
             
         }
         else if(strncasecmp(strtext.c_str(), "Connection:", 11) == 0 

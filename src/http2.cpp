@@ -74,7 +74,7 @@
 
 #define PRE_MALLOC_SIZE 1024
 
-CHttp2::CHttp2(time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp2::CHttp2(time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -86,6 +86,8 @@ CHttp2::CHttp2(time_t connection_first_request_time, time_t connection_keep_aliv
     m_connection_first_request_time = connection_first_request_time;
     m_connection_keep_alive_timeout = connection_keep_alive_timeout;
     m_connection_keep_alive_request_tickets = connection_keep_alive_request_tickets;
+    
+    m_http_tunneling = tunneling;
     
     m_peer_window_size = 0;
     m_local_window_size = 65536; // hardcode per rfc7540
@@ -394,28 +396,36 @@ http2_stream* CHttp2::create_stream_instance(uint_32 stream_ind)
 {
     if(stream_ind > 0)
     {
-        return new http2_stream(stream_ind, m_initial_local_window_size, m_initial_peer_window_size, this, m_connection_first_request_time, m_connection_keep_alive_timeout, m_connection_keep_alive_request_tickets, m_srvobj,
-                                                m_sockfd,
-                                                m_servername.c_str(),
-                                                m_serverport,
-                                                m_clientip.c_str(),
-                                                m_client_cert,
-                                                m_ch,
-                                                m_work_path.c_str(),
-                                                m_default_webpages,
-                                                m_ext_list,
-                                                m_reverse_ext_list,
-                                                m_php_mode.c_str(),
-                                                m_fpm_socktype,
-                                                m_fpm_sockfile.c_str(),
-                                                m_fpm_addr.c_str(),
-                                                m_fpm_port,
-                                                m_phpcgi_path.c_str(),
-                                                m_cgi_list,
-                                                m_private_path.c_str(),
-                                                m_wwwauth_scheme,
-                                                m_proxyauth_scheme,
-                                                m_ssl);
+        return new http2_stream(stream_ind,
+                                    m_initial_local_window_size,
+                                    m_initial_peer_window_size,
+                                    this,
+                                    m_connection_first_request_time,
+                                    m_connection_keep_alive_timeout,
+                                    m_connection_keep_alive_request_tickets,
+                                    m_http_tunneling,
+                                    m_srvobj,
+                                    m_sockfd,
+                                    m_servername.c_str(),
+                                    m_serverport,
+                                    m_clientip.c_str(),
+                                    m_client_cert,
+                                    m_ch,
+                                    m_work_path.c_str(),
+                                    m_default_webpages,
+                                    m_ext_list,
+                                    m_reverse_ext_list,
+                                    m_php_mode.c_str(),
+                                    m_fpm_socktype,
+                                    m_fpm_sockfile.c_str(),
+                                    m_fpm_addr.c_str(),
+                                    m_fpm_port,
+                                    m_phpcgi_path.c_str(),
+                                    m_cgi_list,
+                                    m_private_path.c_str(),
+                                    m_wwwauth_scheme,
+                                    m_proxyauth_scheme,
+                                    m_ssl);
     }
     else
         return NULL;

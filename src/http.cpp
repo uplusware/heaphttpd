@@ -23,6 +23,7 @@
 #include "util/general.h"
 #include "heapapi.h"
 #include "serviceobjmap.h"
+#include "version.h"
 
 #define MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN (1024*1024*4)
 #define MAX_MULTIPART_FORM_DATA_LEN (1024*1024*4)
@@ -717,79 +718,76 @@ void CHttp::RecvPostData()
 
 void CHttp::Tunneling()
 {
-    if(!m_http2) //only available in http/1.1
+    //4rd extension hook
+    bool session_is_continuing = true;
+    for(int x = 0; x < m_ext_list->size(); x++)
     {
-        //4rd extension hook
-        bool session_is_continuing = true;
-        for(int x = 0; x < m_ext_list->size(); x++)
+        void* (*ext_tunneling)(CHttp*, const char*, const char*, const char*, const char*, unsigned short, http_ext_tunneling_continuing*);
+        ext_tunneling = (void*(*)(CHttp*, const char*, const char*, const char*, const char*, unsigned short, http_ext_tunneling_continuing*))dlsym((*m_ext_list)[x].handle, "ext_tunneling");
+        const char* errmsg;
+        if((errmsg = dlerror()) == NULL)
         {
-            void* (*ext_tunneling)(CHttp*, const char*, const char*, const char*, const char*, unsigned short, http_ext_tunneling_continuing*);
-            ext_tunneling = (void*(*)(CHttp*, const char*, const char*, const char*, const char*, unsigned short, http_ext_tunneling_continuing*))dlsym((*m_ext_list)[x].handle, "ext_tunneling");
-            const char* errmsg;
-            if((errmsg = dlerror()) == NULL)
-            {
-                http_ext_tunneling_continuing ext_is_continuing = http_ext_tunneling_continuing_yes;
-                ext_tunneling(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(),
-                    m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, &ext_is_continuing);
-                
-                if(ext_is_continuing == http_ext_tunneling_continuing_no)
-                {
-                    session_is_continuing = false;
-                }
-            }
-        }
-        
-        if(!session_is_continuing)
-        {
-            CHttpResponseHdr header(m_response_header.GetMap());
-            header.SetStatusCode(SC405);
-
-            header.SetField("Content-Type", "text/html");
-            header.SetField("Content-Length", header.GetDefaultHTMLLength());
-            SendHeader(header.Text(), header.Length());
-            SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            http_ext_tunneling_continuing ext_is_continuing = http_ext_tunneling_continuing_yes;
+            ext_tunneling(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(),
+                m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, &ext_is_continuing);
             
-            return;
-        }
-        
-        if(!m_http_tunneling)
-            m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache);
-        
-        if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
-            m_http_tunneling_backend_address_backup1.c_str(), m_http_tunneling_backend_port_backup1, m_http_tunneling_url_backup1.c_str(),
-            m_http_tunneling_backend_address_backup2.c_str(), m_http_tunneling_backend_port_backup2, m_http_tunneling_url_backup2.c_str(),
-            m_request_no_cache)) //connected
-        {
-            if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
+            if(ext_is_continuing == http_ext_tunneling_continuing_no)
             {
-                const char* connect_resp = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: Heaphttpd Web Server/1.1\r\n\r\n";
-                HttpSend(connect_resp, strlen(connect_resp));
-                
-                m_http_tunneling->relay_processing();
+                session_is_continuing = false;
             }
-            else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT)
+        }
+    }
+    
+    if(!session_is_continuing)
+    {
+        CHttpResponseHdr header(m_response_header.GetMap());
+        header.SetStatusCode(SC405);
+
+        header.SetField("Content-Type", "text/html");
+        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+        SendHeader(header.Text(), header.Length());
+        SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+        
+        return;
+    }
+    
+    if(!m_http_tunneling)
+        m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache);
+    
+    if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
+        m_http_tunneling_backend_address_backup1.c_str(), m_http_tunneling_backend_port_backup1, m_http_tunneling_url_backup1.c_str(),
+        m_http_tunneling_backend_address_backup2.c_str(), m_http_tunneling_backend_port_backup2, m_http_tunneling_url_backup2.c_str(),
+        m_request_no_cache)) //connected
+    {
+        if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
+        {
+            const char* connect_resp = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: "VERSION_STRING"\r\n\r\n";
+            HttpSend(connect_resp, strlen(connect_resp));
+            
+            m_http_tunneling->relay_processing();
+        }
+        else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT)
+        {
+            const char* pRequestHeader = m_header_content.c_str();
+            int nRequestHeaderLen = m_header_content.length();
+            
+            const char* pRequestData = NULL;
+            int nRequestDataLen = 0;
+            if(m_content_type == multipart_form_data && m_postdata_ex)
             {
-                const char* pRequestHeader = m_header_content.c_str();
-                int nRequestHeaderLen = m_header_content.length();
+                pRequestData = m_postdata_ex->c_buffer();
+                nRequestDataLen = m_postdata_ex->length();
+            }
+            else
+            {
+                pRequestData = m_postdata.c_str();
+                nRequestDataLen = m_postdata.length();
+            }
+            
+            if(m_http_tunneling->send_request(pRequestHeader, nRequestHeaderLen, pRequestData, nRequestDataLen))
+            {
+                m_http_tunneling->recv_relay_reply(&m_response_header);
                 
-                const char* pRequestData = NULL;
-                int nRequestDataLen = 0;
-                if(m_content_type == multipart_form_data && m_postdata_ex)
-                {
-                    pRequestData = m_postdata_ex->c_buffer();
-                    nRequestDataLen = m_postdata_ex->length();
-                }
-                else
-                {
-                    pRequestData = m_postdata.c_str();
-                    nRequestDataLen = m_postdata.length();
-                }
-                
-                if(m_http_tunneling->send_request(pRequestHeader, nRequestHeaderLen, pRequestData, nRequestDataLen))
-                {
-                    m_http_tunneling->recv_relay_reply(&m_response_header);
-                    
-                }
             }
         }
     }
