@@ -6,6 +6,7 @@
 #include "http_client.h"
 #include "httpcomm.h"
 #include "version.h"
+#include "util/security.h"
 
 http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache)
 {
@@ -18,10 +19,29 @@ http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling
     m_cache = cache;
     m_http_tunneling_url = "";
     m_tunneling_cache_instance = NULL;
+    
+    m_backend_ssl = NULL;
+    
+    m_client_send_buf = (char*)malloc(4095 + 1);
+    m_client_send_buf[4095] = '\0';
+    m_client_send_buf_len = 4095;
+    m_client_send_buf_used_len = 0;
+    
+    m_backend_send_buf = (char*)malloc(4095 + 1);
+    m_backend_send_buf[4095] = '\0';
+    m_backend_send_buf_len = 4095;
+    m_backend_send_buf_used_len = 0;
+    
 }
 
 http_tunneling::~http_tunneling()
 {
+    if(m_client_send_buf)
+        free(m_client_send_buf);
+    
+    if(m_backend_send_buf)
+        free(m_backend_send_buf);
+    
     if(m_backend_sockfd > 0)
 	{
         close(m_backend_sockfd);
@@ -30,15 +50,124 @@ http_tunneling::~http_tunneling()
     m_backend_sockfd = -1;
 }
 
-int http_tunneling::client_send(const char* buf, int len)
+void http_tunneling::tunneling_close()
 {
-	if(m_client_ssl)
-		return SSLWrite(m_client_sockfd, m_client_ssl, buf, len, CHttpBase::m_connection_idle_timeout);
-	else
-		return _Send_( m_client_sockfd, buf, len, CHttpBase::m_connection_idle_timeout);
-		
+    if(m_client_sockfd > 0)
+        close(m_client_sockfd);
+    if(m_backend_sockfd > 0)
+        close(m_backend_sockfd);
+    
+     m_client_sockfd = -1;
+     m_backend_sockfd = -1;
 }
 
+void http_tunneling::client_flush()
+{
+    if(m_client_send_buf_used_len > 0)
+    {
+        int sent_len = 0;
+        
+        if(m_client_ssl)
+            sent_len = SSLWrite(m_client_sockfd, m_client_ssl, m_client_send_buf, m_client_send_buf_used_len, CHttpBase::m_connection_idle_timeout); 
+        else
+            sent_len = _Send_( m_client_sockfd, m_client_send_buf, m_client_send_buf_used_len, CHttpBase::m_connection_idle_timeout);
+        
+        if(sent_len > 0)
+        {
+             memmove(m_client_send_buf, m_client_send_buf + sent_len, m_client_send_buf_used_len - sent_len);
+             m_client_send_buf_used_len -= sent_len;           
+        }
+    }
+}
+
+void http_tunneling::backend_flush()
+{
+    if(m_backend_send_buf_used_len > 0)
+    {
+        int sent_len = 0;
+        
+        if(m_backend_ssl)
+            sent_len = SSLWrite(m_backend_sockfd, m_backend_ssl, m_backend_send_buf, m_backend_send_buf_used_len, CHttpBase::m_connection_idle_timeout); 
+        else
+            sent_len = _Send_( m_backend_sockfd, m_backend_send_buf, m_backend_send_buf_used_len, CHttpBase::m_connection_idle_timeout);
+        
+        if(sent_len > 0)
+        {
+             memmove(m_backend_send_buf, m_backend_send_buf + sent_len, m_backend_send_buf_used_len - sent_len);
+             m_backend_send_buf_used_len -= sent_len;           
+        }
+    }
+}
+
+int http_tunneling::client_send(const char* buf, int len)
+{
+    //Concatenate the send buffer
+    if(m_client_send_buf_len - m_client_send_buf_used_len < len)
+    {
+        char* new_buf = (char*)malloc(m_client_send_buf_used_len + len + 1);
+        new_buf[m_client_send_buf_used_len + len] = '\0';
+        
+        memcpy(new_buf, m_client_send_buf, m_client_send_buf_used_len);
+        
+        free(m_client_send_buf);
+        
+        m_client_send_buf = new_buf;
+        m_client_send_buf_len = m_client_send_buf_used_len + len;
+    }
+    
+    int sent_len = 0;
+    
+    memcpy(m_client_send_buf + m_client_send_buf_used_len, buf, len);
+    m_client_send_buf_used_len += len;
+
+    if(m_client_ssl)
+        sent_len = SSL_write(m_client_ssl, m_client_send_buf, m_client_send_buf_used_len);
+    else
+        sent_len = send( m_client_sockfd, m_client_send_buf, m_client_send_buf_used_len, 0);
+    
+    if(sent_len > 0)
+    {
+         memmove(m_client_send_buf, m_client_send_buf + sent_len, m_client_send_buf_used_len - sent_len);
+         m_client_send_buf_used_len -= sent_len;        
+    }
+    
+    return sent_len;
+}
+
+int http_tunneling::backend_send(const char* buf, int len)
+{
+    //Concatenate the send buffer
+    if(m_backend_send_buf_len - m_backend_send_buf_used_len < len)
+    {
+        char* new_buf = (char*)malloc(m_backend_send_buf_used_len + len + 1);
+        new_buf[m_backend_send_buf_used_len + len] = '\0';
+        
+        memcpy(new_buf, m_backend_send_buf, m_backend_send_buf_used_len);
+        
+        free(m_backend_send_buf);
+        
+        m_backend_send_buf = new_buf;
+        m_backend_send_buf_len = m_backend_send_buf_used_len + len;
+    }
+    
+    int sent_len = 0;
+    
+    memcpy(m_backend_send_buf + m_backend_send_buf_used_len, buf, len);
+    m_backend_send_buf_used_len += len;
+
+    if(m_backend_ssl)
+        sent_len = SSL_write(m_backend_ssl, m_backend_send_buf, m_backend_send_buf_used_len);
+    else
+        sent_len = send( m_backend_sockfd, m_backend_send_buf, m_backend_send_buf_used_len, 0);
+    
+    if(sent_len > 0)
+    {
+         memmove(m_backend_send_buf, m_backend_send_buf + sent_len, m_backend_send_buf_used_len - sent_len);
+         m_backend_send_buf_used_len -= sent_len;        
+    }
+    
+    return sent_len;
+}
 
 bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, const char* http_url,
     const char* szAddrBackup1, unsigned short nPortBackup1, const char* http_url_backup1,
@@ -285,6 +414,72 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
             continue;
         }
         
+        if(connected && m_type == HTTP_Tunneling_Without_CONNECT_SSL)
+        {
+            string ca_crt_root;
+            ca_crt_root = CHttpBase::m_ca_client_base_dir;
+            ca_crt_root += "/";
+            ca_crt_root += m_address;
+            ca_crt_root += "/ca.crt";
+
+            string ca_crt_client;
+            ca_crt_client = CHttpBase::m_ca_client_base_dir;
+            ca_crt_client += "/";
+            ca_crt_client += m_address;
+            ca_crt_client += "/client.crt";
+
+            string ca_key_client;
+            ca_key_client = CHttpBase::m_ca_client_base_dir;
+            ca_key_client += "/";
+            ca_key_client += m_address;
+            ca_key_client += "/client.key";
+
+            string ca_password_file;
+            ca_password_file = CHttpBase::m_ca_client_base_dir;
+            ca_password_file += "/";
+            ca_password_file += m_address;
+            ca_password_file += "/client.pwd";
+
+            struct stat file_stat;
+            if(stat(ca_crt_root.c_str(), &file_stat) == 0
+                && stat(ca_crt_client.c_str(), &file_stat) == 0 && stat(ca_key_client.c_str(), &file_stat) == 0
+                && stat(ca_password_file.c_str(), &file_stat) == 0)
+            {
+                string ca_password;
+                string strPwdEncoded;
+                ifstream ca_password_fd(ca_password_file.c_str(), ios_base::binary);
+                if(ca_password_fd.is_open())
+                {
+                    getline(ca_password_fd, strPwdEncoded);
+                    ca_password_fd.close();
+                    strtrim(strPwdEncoded);
+                }
+                
+                Security::Decrypt(strPwdEncoded.c_str(), strPwdEncoded.length(), ca_password);
+
+                if(connect_ssl(m_backend_sockfd,
+                    ca_crt_root.c_str(),
+                    ca_crt_client.c_str(), ca_password.c_str(),
+                    ca_key_client.c_str(),
+                    &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout) == FALSE)
+                {
+                    if(m_backend_sockfd > 0)
+                        close(m_backend_sockfd);
+                    m_backend_sockfd = -1;
+                    continue;
+                }
+            }
+            else
+            {
+                if(connect_ssl(m_backend_sockfd, NULL, NULL, NULL, NULL, &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout) == FALSE)
+                {
+                    if(m_backend_sockfd > 0)
+                        close(m_backend_sockfd);
+                    m_backend_sockfd = -1;
+                    continue;
+                }
+            }
+        }
         //connected!
         return true;
     }
@@ -295,18 +490,17 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
 
 bool http_tunneling::send_request(const char* hbuf, int hlen, const char* dbuf, int dlen)
 {
-    
-    if(m_type == HTTP_Tunneling_Without_CONNECT)
+    if(m_type == HTTP_Tunneling_Without_CONNECT || m_type == HTTP_Tunneling_Without_CONNECT_SSL)
     {
         if(m_tunneling_cache_instance)
         {
             return true;
         }
+        
         //skip since there's cache
-    
-        if(hbuf && hlen > 0 && _Send_(m_backend_sockfd, hbuf, hlen, CHttpBase::m_connection_idle_timeout) < 0)
+        if(hbuf && hlen > 0 && backend_send(hbuf, hlen) < 0)
             return false;
-        if(dbuf && dlen > 0 && _Send_(m_backend_sockfd, dbuf, dlen, CHttpBase::m_connection_idle_timeout) < 0)
+        if(dbuf && dlen > 0 && backend_send(dbuf, dlen) < 0)
             return false;
     }
     return true;
@@ -314,7 +508,7 @@ bool http_tunneling::send_request(const char* hbuf, int hlen, const char* dbuf, 
 
 bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
 {
-    if(m_type == HTTP_Tunneling_Without_CONNECT)
+    if(m_type == HTTP_Tunneling_Without_CONNECT || m_type == HTTP_Tunneling_Without_CONNECT_SSL)
     {
         if(m_tunneling_cache_instance)
         {
@@ -387,7 +581,7 @@ bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
         int http_header_length = -1;
         int http_content_length = -1;
                     
-        http_client the_client(m_client_sockfd, m_client_ssl, m_backend_sockfd, m_cache, m_http_tunneling_url.c_str());
+        http_client the_client(m_cache, m_http_tunneling_url.c_str(), this);
         string str_header;
         int received_len = 0;
         
@@ -437,7 +631,6 @@ bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
                 break;
             }
         }
-                    
     }
     
     return true;

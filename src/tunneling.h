@@ -24,6 +24,7 @@ enum HTTPTunneling
 {
     HTTP_Tunneling_None = 0,
     HTTP_Tunneling_Without_CONNECT,
+    HTTP_Tunneling_Without_CONNECT_SSL,
     HTTP_Tunneling_With_CONNECT
 };
 
@@ -42,7 +43,12 @@ class http_tunneling
 public:
     http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache);
     virtual ~http_tunneling();
+    
     int client_send(const char* buf, int len);
+    void client_flush();
+    
+    int backend_send(const char* buf, int len);
+    void backend_flush();
     
     bool connect_backend(const char* szAddr, unsigned short nPort, const char* http_url,
         const char* szAddrBackup1, unsigned short nPortBackup1, const char* http_url_backup1,
@@ -51,8 +57,9 @@ public:
     
     bool send_request(const char* hbuf, int hlen, const char* dbuf, int dlen);
     bool recv_relay_reply(CHttpResponseHdr* session_response_header);
-    
     void relay_processing();
+    
+    void tunneling_close();
 protected:
     string m_address;
     unsigned short m_port;
@@ -71,5 +78,13 @@ protected:
     tunneling_cache* m_tunneling_cache_instance;
     
     const CHttpResponseHdr* m_session_response_header;
+    
+    char* m_client_send_buf;
+    int m_client_send_buf_len;
+    int m_client_send_buf_used_len;
+    
+    char* m_backend_send_buf;
+    int m_backend_send_buf_len;
+    int m_backend_send_buf_used_len;
 };
 #endif /* _TUNNELING_H_ */

@@ -95,6 +95,7 @@ string CHttpBase::m_ca_key_server = "/var/heaphttpd/cert/server.key";
 string CHttpBase::m_ca_crt_client = "/var/heaphttpd/cert/client.crt";
 string CHttpBase::m_ca_key_client = "/var/heaphttpd/cert/client.key";
 string CHttpBase::m_ca_password = "";
+string CHttpBase::m_ca_client_base_dir = "/var/heaphttpd/cert/client";
 
 string	CHttpBase::m_php_mode = "fpm";
 cgi_socket_t  CHttpBase::m_fpm_socktype = unix_socket;
@@ -454,6 +455,11 @@ BOOL CHttpBase::LoadConfig()
 				strtrim(strEncoded);
 
 				Security::Decrypt(strEncoded.c_str(), strEncoded.length(), m_ca_password);
+			}
+            else if(strncasecmp(strline.c_str(), "CAClientBaseDir", sizeof("CAClientBaseDir") - 1) == 0)
+			{
+				strcut(strline.c_str(), "=", NULL, m_ca_client_base_dir);
+				strtrim(m_ca_client_base_dir);
 			}
 			else if(strncasecmp(strline.c_str(), "PHPMode", sizeof("PHPMode") - 1) == 0)
 			{

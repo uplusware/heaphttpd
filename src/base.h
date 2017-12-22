@@ -138,6 +138,7 @@ public:
 	static string	m_ca_key_server;
 	static string	m_ca_crt_client;
 	static string	m_ca_key_client;
+    static string   m_ca_client_base_dir;
 
 	static string	m_ca_password;
 	

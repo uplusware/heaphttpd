@@ -30,32 +30,30 @@ enum HTTP_Client_Parse_State
     HTTP_Client_Parse_State_Chunk_Footer,
 };
 
+class http_tunneling;
+
 class http_chunk
 {
 public:
-    http_chunk(int client_sockfd, SSL* client_ssl, int backend_sockfd);
+    http_chunk(http_tunneling* tunneling);
     virtual ~http_chunk();
-    int client_send(const char* buf, int len);
     bool processing(char* & derived_buf, int& derived_buf_used_len);
 
 protected:
-    int m_client_sockfd;
-    SSL* m_client_ssl;
-    int m_backend_sockfd;
     unsigned long long m_chunk_len;
     unsigned long long m_sent_chunk;
     HTTP_Client_Parse_State m_state;
     
     string m_line_text;
     
+    http_tunneling* m_http_tunneling;
 };
 
 class http_client
 {
 public:
-    http_client(int client_sockfd, SSL* client_ssl, int backend_sockfd, memory_cache* cache, const char* http_url);
+    http_client(memory_cache* cache, const char* http_url, http_tunneling* tunneling);
     virtual ~http_client();
-    int client_send(const char* buf, int len);
     bool parse(const char* text);
     
     bool processing(const char* buf, int buf_len);
@@ -100,11 +98,7 @@ protected:
     char* m_buf;
     int m_buf_len;
     int m_buf_used_len;
-    
-    int m_client_sockfd;
-    SSL* m_client_ssl;
-    int m_backend_sockfd;
-    
+        
     long long m_sent_content_length;
     
 
@@ -116,5 +110,7 @@ protected:
     unsigned int m_cache_data_len;
     
     string m_header;
+    
+    http_tunneling* m_http_tunneling;
 };
 #endif /* _HTTP_CLIENT_H_ */

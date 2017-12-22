@@ -409,10 +409,13 @@ void CHttp::ParseMethod(string & strtext)
         }
             
         const char* p_temp = strtext.c_str() + strlen(sz_method);
-        if(strncasecmp(p_temp, "http://", 7) == 0)
+        if(strncasecmp(p_temp, "http://", 7) == 0 || strncasecmp(p_temp, "https://", 8) == 0)
         {
             bool isCached = FALSE;
-            m_http_tunneling_connection = HTTP_Tunneling_Without_CONNECT;
+            if(p_temp[4] == 's')
+                m_http_tunneling_connection = HTTP_Tunneling_Without_CONNECT_SSL;
+            else
+                m_http_tunneling_connection = HTTP_Tunneling_Without_CONNECT;
             
             if(CHttpBase::m_enable_http_reverse_proxy)
             {
@@ -514,7 +517,10 @@ void CHttp::ParseMethod(string & strtext)
                 char tmp_szport[32];
                 
                 sprintf(tmp_szport, "%d", m_http_tunneling_backend_port);
-                m_http_tunneling_url = "http://";
+                if(p_temp[4] == 's')
+                    m_http_tunneling_url = "https://";
+                else
+                    m_http_tunneling_url = "http://";
                 m_http_tunneling_url += m_http_tunneling_backend_address;
                 m_http_tunneling_url += ":";
                 m_http_tunneling_url += tmp_szport;
@@ -524,7 +530,10 @@ void CHttp::ParseMethod(string & strtext)
                 if(m_http_tunneling_backend_address_backup1 != "")
                 {
                     sprintf(tmp_szport, "%d", m_http_tunneling_backend_port_backup1);
-                    m_http_tunneling_url_backup1 = "http://";
+                    if(p_temp[4] == 's')
+                        m_http_tunneling_url_backup1 = "https://";
+                    else
+                        m_http_tunneling_url_backup1 = "http://";
                     m_http_tunneling_url_backup1 += m_http_tunneling_backend_address_backup1;
                     m_http_tunneling_url_backup1 += ":";
                     m_http_tunneling_url_backup1 += tmp_szport;
@@ -533,7 +542,10 @@ void CHttp::ParseMethod(string & strtext)
                 if(m_http_tunneling_backend_address_backup2 != "")
                 {
                     sprintf(tmp_szport, "%d", m_http_tunneling_backend_port_backup2);
-                    m_http_tunneling_url_backup2 = "http://";
+                    if(p_temp[4] == 's')
+                        m_http_tunneling_url_backup2 = "https://";
+                    else
+                        m_http_tunneling_url_backup2 = "http://";
                     m_http_tunneling_url_backup2 += m_http_tunneling_backend_address_backup2;
                     m_http_tunneling_url_backup2 += ":";
                     m_http_tunneling_url_backup2 += tmp_szport;
@@ -766,7 +778,7 @@ void CHttp::Tunneling()
             
             m_http_tunneling->relay_processing();
         }
-        else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT)
+        else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL)
         {
             const char* pRequestHeader = m_header_content.c_str();
             int nRequestHeaderLen = m_header_content.length();
@@ -786,8 +798,9 @@ void CHttp::Tunneling()
             
             if(m_http_tunneling->send_request(pRequestHeader, nRequestHeaderLen, pRequestData, nRequestDataLen))
             {
+                m_http_tunneling->backend_flush();
                 m_http_tunneling->recv_relay_reply(&m_response_header);
-                
+                m_http_tunneling->client_flush();
             }
         }
     }
@@ -1048,7 +1061,7 @@ Http_Connection CHttp::DataParse()
     }
     else
     {
-        if(!CHttpBase::m_enable_http_tunneling && m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT)
+        if(!CHttpBase::m_enable_http_tunneling && (m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL))
         {
             CHttpResponseHdr header(m_response_header.GetMap());
             header.SetStatusCode(SC404);
