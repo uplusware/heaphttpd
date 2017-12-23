@@ -488,7 +488,7 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
     return false;
 }
 
-bool http_tunneling::send_request(const char* hbuf, int hlen, const char* dbuf, int dlen)
+bool http_tunneling::send_request_to_backend(const char* hbuf, int hlen, const char* dbuf, int dlen)
 {
     if(m_type == HTTP_Tunneling_Without_CONNECT || m_type == HTTP_Tunneling_Without_CONNECT_SSL)
     {
@@ -506,7 +506,7 @@ bool http_tunneling::send_request(const char* hbuf, int hlen, const char* dbuf, 
     return true;
 }
 
-bool http_tunneling::recv_relay_reply(CHttpResponseHdr* session_response_header)
+bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr* session_response_header)
 {
     if(m_type == HTTP_Tunneling_Without_CONNECT || m_type == HTTP_Tunneling_Without_CONNECT_SSL)
     {

@@ -796,10 +796,10 @@ void CHttp::Tunneling()
                 nRequestDataLen = m_postdata.length();
             }
             
-            if(m_http_tunneling->send_request(pRequestHeader, nRequestHeaderLen, pRequestData, nRequestDataLen))
+            if(m_http_tunneling->send_request_to_backend(pRequestHeader, nRequestHeaderLen, pRequestData, nRequestDataLen))
             {
                 m_http_tunneling->backend_flush();
-                m_http_tunneling->recv_relay_reply(&m_response_header);
+                m_http_tunneling->recv_response_from_backend_relay_to_client(&m_response_header);
                 m_http_tunneling->client_flush();
             }
         }

@@ -55,8 +55,8 @@ public:
         const char* szAddrBackup2, unsigned short nPortBackup2, const char* http_url_backup2,
         BOOL request_no_cache);
     
-    bool send_request(const char* hbuf, int hlen, const char* dbuf, int dlen);
-    bool recv_relay_reply(CHttpResponseHdr* session_response_header);
+    bool send_request_to_backend(const char* hbuf, int hlen, const char* dbuf, int dlen);
+    bool recv_response_from_backend_relay_to_client(CHttpResponseHdr* session_response_header);
     void relay_processing();
     
     void tunneling_close();
