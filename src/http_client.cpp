@@ -12,6 +12,7 @@ http_chunk::http_chunk(http_tunneling* tunneling)
     m_chunk_len = -1;
     m_sent_chunk = 0;
     m_state = HTTP_Client_Parse_State_Chunk_Header;
+    m_http_tunneling = tunneling;
 }
 
 http_chunk::~http_chunk()

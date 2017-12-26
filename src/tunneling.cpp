@@ -68,14 +68,18 @@ void http_tunneling::client_flush()
         int sent_len = 0;
         
         if(m_client_ssl)
-            sent_len = SSLWrite(m_client_sockfd, m_client_ssl, m_client_send_buf, m_client_send_buf_used_len, CHttpBase::m_connection_idle_timeout); 
+            sent_len = SSL_write(m_client_ssl, m_client_send_buf, m_client_send_buf_used_len);
         else
-            sent_len = _Send_( m_client_sockfd, m_client_send_buf, m_client_send_buf_used_len, CHttpBase::m_connection_idle_timeout);
+            sent_len = send(m_client_sockfd, m_client_send_buf, m_client_send_buf_used_len, 0);
         
         if(sent_len > 0)
         {
              memmove(m_client_send_buf, m_client_send_buf + sent_len, m_client_send_buf_used_len - sent_len);
-             m_client_send_buf_used_len -= sent_len;           
+             m_client_send_buf_used_len -= sent_len;
+        }
+        else
+        {
+            m_client_send_buf_used_len = 0;
         }
     }
 }
@@ -87,14 +91,18 @@ void http_tunneling::backend_flush()
         int sent_len = 0;
         
         if(m_backend_ssl)
-            sent_len = SSLWrite(m_backend_sockfd, m_backend_ssl, m_backend_send_buf, m_backend_send_buf_used_len, CHttpBase::m_connection_idle_timeout); 
+            sent_len = SSL_write(m_backend_ssl, m_backend_send_buf, m_backend_send_buf_used_len);
         else
-            sent_len = _Send_( m_backend_sockfd, m_backend_send_buf, m_backend_send_buf_used_len, CHttpBase::m_connection_idle_timeout);
+            sent_len = send(m_backend_sockfd, m_backend_send_buf, m_backend_send_buf_used_len, 0);
         
         if(sent_len > 0)
         {
              memmove(m_backend_send_buf, m_backend_send_buf + sent_len, m_backend_send_buf_used_len - sent_len);
-             m_backend_send_buf_used_len -= sent_len;           
+             m_backend_send_buf_used_len -= sent_len;
+        }
+        else
+        {
+            m_backend_send_buf_used_len = 0;
         }
     }
 }
@@ -574,6 +582,45 @@ bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr
                 }
             }
             m_tunneling_cache_instance->tunneling_unlock();
+            
+            //flush the buffer
+            fd_set mask_w; 
+            fd_set mask_e; 
+            struct timeval timeout; 
+            while(m_client_send_buf_used_len > 0)
+            {
+                FD_ZERO(&mask_w);
+                FD_ZERO(&mask_e);
+                
+                timeout.tv_sec = CHttpBase::m_connection_idle_timeout; 
+                timeout.tv_usec = 0;
+                
+                if(m_client_send_buf_used_len > 0)
+                {
+                    FD_SET(m_client_sockfd, &mask_w);
+                }
+                
+                FD_SET(m_client_sockfd, &mask_e);
+                
+                int ret_val = select(m_client_send_buf_used_len + 1, NULL, &mask_w, &mask_e, &timeout);
+                
+                if( ret_val <= 0)
+                {
+                    break; // quit from the loop since error or timeout
+                }
+                
+                if(FD_ISSET(m_client_sockfd, &mask_w))
+                {
+                    client_flush();
+                }
+                
+                if(FD_ISSET(m_client_sockfd, &mask_e))
+                {
+                    m_client_send_buf_used_len = 0;
+                    close(m_client_sockfd);
+                    m_client_sockfd = -1;
+                }
+            }
             return true;
         }
         //skip since there's cache
@@ -589,46 +636,93 @@ bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr
         char* response_buf = response_buf_obj.get();
         
         fd_set mask_r; 
+        fd_set mask_w; 
+        fd_set mask_e; 
         struct timeval timeout; 
-        FD_ZERO(&mask_r);
-        while(1)
+        
+        BOOL tunneling_ongoing = TRUE;
+        
+        int tunneling_max_sockfd = m_backend_sockfd > m_client_sockfd ? m_backend_sockfd : m_client_sockfd;
+        
+        while(m_backend_send_buf_used_len > 0 || m_client_send_buf_used_len > 0 || tunneling_ongoing)
         {
+            FD_ZERO(&mask_r);
+            FD_ZERO(&mask_w);
+            FD_ZERO(&mask_e);
+            
             timeout.tv_sec = CHttpBase::m_connection_idle_timeout; 
             timeout.tv_usec = 0;
 
             FD_SET(m_backend_sockfd, &mask_r);
-            int ret_val = select(m_backend_sockfd + 1, &mask_r, NULL, NULL, &timeout);
+            
+            int write_fd_size = 0;
+            if(m_backend_send_buf_used_len > 0)
+            {
+                write_fd_size++;
+                FD_SET(m_backend_sockfd, &mask_w);
+            }
+            if(m_client_send_buf_used_len > 0)
+            {
+                write_fd_size++;
+                FD_SET(m_client_sockfd, &mask_w);
+            }
+            
+            FD_SET(m_client_sockfd, &mask_e);
+            FD_SET(m_backend_sockfd, &mask_e);
+            
+            int ret_val = select(tunneling_max_sockfd + 1, &mask_r, write_fd_size > 0 ? &mask_w : NULL, &mask_e, &timeout);
+            
             if( ret_val <= 0)
             {
                 break; // quit from the loop since error or timeout
             }
             
-            int len = recv(m_backend_sockfd, response_buf, 4095, 0);
-            
-            if(len == 0)
+            if(FD_ISSET(m_backend_sockfd, &mask_r))
             {
-				close(m_client_sockfd);
+                int len = recv(m_backend_sockfd, response_buf, 4095, 0);
+                
+                if(len > 0)
+                {
+                    response_buf[len] = '\0';
+                    
+                    if(!the_client.processing(response_buf, len))
+                    {
+                        tunneling_ongoing = FALSE;
+                    }
+                }
+                else if(len < 0)
+                {
+                    if( errno == EAGAIN)
+                        continue;
+                    
+                    tunneling_ongoing = FALSE;
+                }
+            }
+            
+            if(FD_ISSET(m_backend_sockfd, &mask_w))
+            {
+                backend_flush();
+            }
+            
+            if(FD_ISSET(m_client_sockfd, &mask_w))
+            {
+                client_flush();
+            }
+            
+            if(FD_ISSET(m_backend_sockfd, &mask_e))
+            {
+                m_backend_send_buf_used_len = 0;
                 close(m_backend_sockfd);
                 m_backend_sockfd = -1;
-                
-                return false; 
+                tunneling_ongoing = FALSE;
             }
-            else if(len < 0)
-            {
-                if( errno == EAGAIN)
-                    continue;
-				close(m_client_sockfd);
-                close(m_backend_sockfd);
-                m_backend_sockfd = -1;
-                
-                return false;
-            }
-            response_buf[len] = '\0';
             
-            
-            if(!the_client.processing(response_buf, len))
+            if(FD_ISSET(m_client_sockfd, &mask_e))
             {
-                break;
+                m_client_send_buf_used_len = 0;
+                close(m_client_sockfd);
+                m_client_sockfd = -1;
+                tunneling_ongoing = FALSE;
             }
         }
     }
