@@ -122,23 +122,33 @@ int http_tunneling::client_send(const char* buf, int len)
         m_client_send_buf = new_buf;
         m_client_send_buf_len = m_client_send_buf_used_len + len;
     }
-    
-    int sent_len = 0;
-    
     memcpy(m_client_send_buf + m_client_send_buf_used_len, buf, len);
     m_client_send_buf_used_len += len;
-
-    if(m_client_ssl)
-        sent_len = SSL_write(m_client_ssl, m_client_send_buf, m_client_send_buf_used_len);
-    else
-        sent_len = send( m_client_sockfd, m_client_send_buf, m_client_send_buf_used_len, 0);
-    
-    if(sent_len > 0)
-    {
-         memmove(m_client_send_buf, m_client_send_buf + sent_len, m_client_send_buf_used_len - sent_len);
-         m_client_send_buf_used_len -= sent_len;        
+	
+	int sent_len = 0;
+	
+	if(m_client_send_buf_used_len >= 4096)
+	{
+		if(m_client_ssl)
+			sent_len = SSLWrite(m_client_sockfd, m_client_ssl, m_client_send_buf, m_client_send_buf_used_len, CHttpBase::m_connection_idle_timeout);
+		else
+			sent_len = _Send_( m_client_sockfd, m_client_send_buf, m_client_send_buf_used_len, CHttpBase::m_connection_idle_timeout);
+		
+		m_client_send_buf_used_len = 0;
+	}
+	else
+	{
+		if(m_client_ssl)
+			sent_len = SSL_write(m_client_ssl, m_client_send_buf, m_client_send_buf_used_len);
+		else
+			sent_len = send( m_client_sockfd, m_client_send_buf, m_client_send_buf_used_len, 0);
+		
+		if(sent_len > 0)
+		{
+			 memmove(m_client_send_buf, m_client_send_buf + sent_len, m_client_send_buf_used_len - sent_len);
+			 m_client_send_buf_used_len -= sent_len;        
+		}
     }
-    
     return sent_len;
 }
 
@@ -157,23 +167,33 @@ int http_tunneling::backend_send(const char* buf, int len)
         m_backend_send_buf = new_buf;
         m_backend_send_buf_len = m_backend_send_buf_used_len + len;
     }
-    
-    int sent_len = 0;
-    
     memcpy(m_backend_send_buf + m_backend_send_buf_used_len, buf, len);
     m_backend_send_buf_used_len += len;
 
-    if(m_backend_ssl)
-        sent_len = SSL_write(m_backend_ssl, m_backend_send_buf, m_backend_send_buf_used_len);
-    else
-        sent_len = send( m_backend_sockfd, m_backend_send_buf, m_backend_send_buf_used_len, 0);
-    
-    if(sent_len > 0)
-    {
-         memmove(m_backend_send_buf, m_backend_send_buf + sent_len, m_backend_send_buf_used_len - sent_len);
-         m_backend_send_buf_used_len -= sent_len;        
+	int sent_len = 0;
+	
+	if(m_backend_send_buf_used_len >= 4096)
+	{
+		if(m_backend_ssl)
+			sent_len = SSLWrite(m_backend_sockfd, m_backend_ssl, m_backend_send_buf, m_backend_send_buf_used_len, CHttpBase::m_connection_idle_timeout);
+		else
+			sent_len = _Send_( m_backend_sockfd, m_backend_send_buf, m_backend_send_buf_used_len, CHttpBase::m_connection_idle_timeout);
+		
+		m_backend_send_buf_used_len = 0;
+	}
+	else
+	{
+		if(m_backend_ssl)
+			sent_len = SSL_write(m_backend_ssl, m_backend_send_buf, m_backend_send_buf_used_len);
+		else
+			sent_len = send( m_backend_sockfd, m_backend_send_buf, m_backend_send_buf_used_len, 0);
+		
+		if(sent_len > 0)
+		{
+			 memmove(m_backend_send_buf, m_backend_send_buf + sent_len, m_backend_send_buf_used_len - sent_len);
+			 m_backend_send_buf_used_len -= sent_len;        
+		}
     }
-    
     return sent_len;
 }
 
