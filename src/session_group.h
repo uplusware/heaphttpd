@@ -22,6 +22,7 @@ public:
 
     void Processing();
     
+    int GetSessionCount() { return m_session_list.size(); }
 private:
     map<int, Session*> m_session_list;
     

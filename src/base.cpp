@@ -116,6 +116,8 @@ unsigned int	CHttpBase::m_connection_keep_alive_max = 65535;
 unsigned int    CHttpBase::m_connection_idle_timeout = 5;
 unsigned int    CHttpBase::m_connection_sync_timeout = 3;
 
+unsigned int    CHttpBase::m_service_idle_timeout = 90;
+
 unsigned int	CHttpBase::m_thread_increase_step = 8;
 
 unsigned int CHttpBase::m_runtime = 0;
@@ -251,6 +253,13 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, connection_idle_timeout );
 				strtrim(connection_idle_timeout);
 				m_connection_idle_timeout = atoi(connection_idle_timeout.c_str());
+			}
+            else if(strncasecmp(strline.c_str(), "ServiceIdleTimeout", sizeof("ServiceIdleTimeout") - 1) == 0)
+			{
+				string service_idle_timeout;
+				strcut(strline.c_str(), "=", NULL, service_idle_timeout );
+				strtrim(service_idle_timeout);
+				m_service_idle_timeout = atoi(service_idle_timeout.c_str());
 			}
             else if(strncasecmp(strline.c_str(), "ConnectionSyncTimeout", sizeof("ConnectionSyncTimeout") - 1) == 0)
 			{

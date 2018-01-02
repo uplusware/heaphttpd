@@ -22,6 +22,8 @@
 #include "pool.h"
 #include "util/trace.h"
 
+#define HEAPHTTPD_DYNAMIC_WORKDERS 0
+
 int SEND_FD(int sfd, int fd_file, CLIENT_PARAM* param, int wait_timeout = 0) 
 {
     int res;
@@ -219,7 +221,7 @@ volatile unsigned int Worker::m_STATIC_THREAD_POOL_SIZE = 0;
 pthread_mutex_t Worker::m_STATIC_THREAD_POOL_SIZE_MUTEX;
 
 pthread_rwlock_t Worker::m_STATIC_THREAD_IDLE_NUM_LOCK;
-volatile unsigned int Worker::m_STATIC_THREAD_IDLE_NUM;
+volatile unsigned int Worker::m_STATIC_THREAD_IDLE_NUM = 0;
     
 void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 {    
@@ -436,11 +438,17 @@ void Worker::INIT_THREAD_POOL_HANDLER()
 void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 {
 	m_STATIC_THREAD_POOL_EXIT = TRUE;
-	
-    /*pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
-	m_STATIC_THREAD_POOL_SIZE++;
-    pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);*/
 
+#ifdef HEAPHTTPD_DYNAMIC_WORKDERS	
+    pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+	m_STATIC_THREAD_POOL_SIZE++;
+    pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+    
+    pthread_rwlock_wrlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+    m_STATIC_THREAD_IDLE_NUM++;
+    pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+                
+#endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 	struct timespec ts;
 	while(m_STATIC_THREAD_POOL_EXIT)
 	{
@@ -459,27 +467,40 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 			pthread_mutex_unlock(&m_STATIC_THREAD_POOL_MUTEX);
 			if(session_param)
 			{
-                /*pthread_rwlock_wrlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+#ifdef HEAPHTTPD_DYNAMIC_WORKDERS
+                pthread_rwlock_wrlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
                 m_STATIC_THREAD_IDLE_NUM--;
-                pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);*/
-                
+                pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+#endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 				SESSION_HANDLING(session_param);
 				delete session_param;
-				
-                /*pthread_rwlock_wrlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+
+#ifdef HEAPHTTPD_DYNAMIC_WORKDERS
+                pthread_rwlock_wrlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
                 m_STATIC_THREAD_IDLE_NUM++;
-                pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);*/
-                
+                pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+#endif /* HEAPHTTPD_DYNAMIC_WORKDERS */                
 			}
 		}
-		/*else
+#ifdef HEAPHTTPD_DYNAMIC_WORKDERS
+		else
 		{
 			m_STATIC_THREAD_POOL_EXIT = FALSE;
-		}*/
+		}
+#endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 	}
-    /*pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+
+#ifdef HEAPHTTPD_DYNAMIC_WORKDERS
+    pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
 	m_STATIC_THREAD_POOL_SIZE--;
-    pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);*/
+    pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+    
+    pthread_rwlock_wrlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+    m_STATIC_THREAD_IDLE_NUM--;
+    pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+    
+#endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
+
 	if(arg != NULL)
 		delete arg;
 	
@@ -488,7 +509,7 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 
 void Worker::LEAVE_THREAD_POOL_HANDLER()
 {
-	printf("LEAVE_THREAD_POOL_HANDLER\n");
+	printf("LEAVE_THREAD_POOL_HANDLER 1\n");
 	m_STATIC_THREAD_POOL_EXIT = FALSE;
 
 	sem_close(&m_STATIC_THREAD_POOL_SEM);
@@ -498,26 +519,33 @@ void Worker::LEAVE_THREAD_POOL_HANDLER()
 
     unlink(local_sockfile);
 
-    /*BOOL still_have_threads = TRUE;
-	while(still_have_threads)
+#ifdef HEAPHTTPD_DYNAMIC_WORKDERS
+    BOOL STILL_HAVE_THREADS = TRUE;
+    
+	while(STILL_HAVE_THREADS)
 	{
         pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
         if(m_STATIC_THREAD_POOL_SIZE <= 0)
         {
-            still_have_threads = FALSE;
+            STILL_HAVE_THREADS = FALSE;
         }
         pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
-        if(still_have_threads)
+        
+        if(STILL_HAVE_THREADS)
             usleep(1000*10);
-	}*/
-
+	}
+#endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 	
     
     pthread_mutex_destroy(&m_STATIC_THREAD_POOL_MUTEX);
     pthread_mutex_destroy(&m_STATIC_THREAD_POOL_SIZE_MUTEX);    
     pthread_rwlock_destroy(&m_STATIC_THREAD_IDLE_NUM_LOCK);
-	
+
+#ifndef HEAPHTTPD_DYNAMIC_WORKDERS
 	pthread_exit(0);
+#endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
+
+    printf("LEAVE_THREAD_POOL_HANDLER 2\n");
 }
 
 void CLEAR_QUEUE(mqd_t qid)
@@ -568,24 +596,32 @@ Worker::~Worker()
 
 void Worker::Working(CUplusTrace& uTrace)
 {
+#ifdef HEAPHTTPD_DYNAMIC_WORKDERS
+	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, 0, LEAVE_THREAD_POOL_HANDLER,
+		CHttpBase::m_thread_increase_step);
+#else
 	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, 0, LEAVE_THREAD_POOL_HANDLER,
 		CHttpBase::m_max_instance_thread_num);
-	
+#endif /* HEAPHTTPD_DYNAMIC_WORKDERS*/	
     std::queue<SESSION_PARAM*> local_session_queue;
     
 	bool bQuit = false;
+    
+    time_t last_service_idle_time = time(NULL);
+    
 	while(!bQuit)
 	{
-
 		int clt_sockfd;
 		CLIENT_PARAM client_param;
-        int res = RECV_FD(m_sockfd, &clt_sockfd, &client_param, 1);
+        int res = RECV_FD(m_sockfd, &clt_sockfd, &client_param, 1); // 1 second
         if( res < 0)
 		{
             if(res == -2)
             {
                 if(!local_session_queue.empty() && pthread_mutex_trylock(&m_STATIC_THREAD_POOL_MUTEX) == 0)
                 {
+                    last_service_idle_time = time(NULL);
+                    
                     while(!local_session_queue.empty())
                     {
                         SESSION_PARAM* previous_session_param = local_session_queue.front();
@@ -594,14 +630,36 @@ void Worker::Working(CUplusTrace& uTrace)
                         sem_post(&m_STATIC_THREAD_POOL_SEM);
                     }
                 }
-                continue;
-            }
+#ifdef HEAPHTTPD_DYNAMIC_WORKDERS
+                if((time(NULL) - last_service_idle_time) < CHttpBase::m_service_idle_timeout)
+                {
+                    continue;
+                }
                 
+                pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+                int current_thread_pool_size = m_STATIC_THREAD_POOL_SIZE;
+                pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
+                
+                pthread_rwlock_rdlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+                int current_idle_thread_num = m_STATIC_THREAD_IDLE_NUM;
+                pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+                
+                if(current_thread_pool_size !=  current_idle_thread_num)
+                    continue;
+#else
+                continue;
+#endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
+            }           
+            
             close(m_sockfd);
             m_sockfd = -1;
             bQuit = true;
 			break;
 		}
+        else
+        {
+            last_service_idle_time = time(NULL);
+        }
         
 		if(clt_sockfd < 0)
 		{
@@ -663,8 +721,8 @@ void Worker::Working(CUplusTrace& uTrace)
                 local_session_queue.push(session_param);
             }
 			
-            
-			/*pthread_rwlock_rdlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
+#ifdef HEAPHTTPD_DYNAMIC_WORKDERS
+			pthread_rwlock_rdlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
 			int current_idle_thread_num = m_STATIC_THREAD_IDLE_NUM;
             pthread_rwlock_unlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
 
@@ -675,7 +733,8 @@ void Worker::Working(CUplusTrace& uTrace)
             if(current_idle_thread_num < CHttpBase::m_thread_increase_step && current_thread_pool_size < CHttpBase::m_max_instance_thread_num)
             {
                 WorkerPool.More((CHttpBase::m_max_instance_thread_num - current_thread_pool_size) < CHttpBase::m_thread_increase_step ? (CHttpBase::m_max_instance_thread_num - current_thread_pool_size) : CHttpBase::m_thread_increase_step);
-            }*/
+            }
+#endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 		}
 	}
 }
@@ -1348,9 +1407,14 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 		int rc;
 		while(1)
 		{	
-            pid_t w = waitpid(-1, NULL, WNOHANG);
-            if(w > 0)
-                printf("pid %u exits\n", w);
+            while(1)
+            {
+                pid_t w = waitpid(-1, NULL, WNOHANG);
+                if(w > 0)
+                    printf("pid %u exits\n", w);
+                else
+                    break;
+            }
 
 			clock_gettime(CLOCK_REALTIME, &ts);
 

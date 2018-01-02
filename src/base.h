@@ -177,6 +177,8 @@ public:
     static unsigned int	m_connection_idle_timeout;
     static unsigned int	m_connection_sync_timeout;
     
+    static unsigned int	m_service_idle_timeout;
+    
     static unsigned int	m_thread_increase_step;
     
 #ifdef _WITH_MEMCACHED_
