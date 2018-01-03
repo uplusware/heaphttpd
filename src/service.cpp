@@ -453,7 +453,7 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 	while(m_STATIC_THREAD_POOL_EXIT)
 	{
 		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_sec += CHttpBase::m_connection_idle_timeout;
+		ts.tv_sec += CHttpBase::m_service_idle_timeout;
 		if(sem_timedwait(&m_STATIC_THREAD_POOL_SEM, &ts) == 0)
 		{
 			SESSION_PARAM* session_param = NULL;
@@ -485,7 +485,7 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 #ifdef HEAPHTTPD_DYNAMIC_WORKDERS
 		else
 		{
-			m_STATIC_THREAD_POOL_EXIT = FALSE;
+            break; //exit from the current thread
 		}
 #endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 	}
@@ -510,14 +510,8 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 void Worker::LEAVE_THREAD_POOL_HANDLER()
 {
 	printf("LEAVE_THREAD_POOL_HANDLER 1\n");
+    
 	m_STATIC_THREAD_POOL_EXIT = FALSE;
-
-	sem_close(&m_STATIC_THREAD_POOL_SEM);
-
-    char local_sockfile[256];
-    sprintf(local_sockfile, "/tmp/heaphttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
-
-    unlink(local_sockfile);
 
 #ifdef HEAPHTTPD_DYNAMIC_WORKDERS
     BOOL STILL_HAVE_THREADS = TRUE;
@@ -536,6 +530,12 @@ void Worker::LEAVE_THREAD_POOL_HANDLER()
 	}
 #endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 	
+    sem_close(&m_STATIC_THREAD_POOL_SEM);
+
+    char local_sockfile[256];
+    sprintf(local_sockfile, "/tmp/heaphttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
+
+    unlink(local_sockfile);
     
     pthread_mutex_destroy(&m_STATIC_THREAD_POOL_MUTEX);
     pthread_mutex_destroy(&m_STATIC_THREAD_POOL_SIZE_MUTEX);    

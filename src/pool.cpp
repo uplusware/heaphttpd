@@ -40,7 +40,6 @@ ThreadPool::ThreadPool(unsigned int size, void(*init_pthread_handler)(), void*(*
         if(pthread_create(&pthread_instance, NULL, m_pthread_handler, pArg) == 0)
 		{
 			pthread_detach(pthread_instance);
-            //printf("%llu\n", pthread_instance);
 		}
     }
 }
@@ -57,7 +56,6 @@ void ThreadPool::More(int step)
         if(pthread_create(&pthread_instance, NULL, m_pthread_handler, pArg) == 0)
 		{
 			pthread_detach(pthread_instance);
-            //printf("%llu\n", pthread_instance);
 		}
     }
 }

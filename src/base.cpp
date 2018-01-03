@@ -116,7 +116,7 @@ unsigned int	CHttpBase::m_connection_keep_alive_max = 65535;
 unsigned int    CHttpBase::m_connection_idle_timeout = 5;
 unsigned int    CHttpBase::m_connection_sync_timeout = 3;
 
-unsigned int    CHttpBase::m_service_idle_timeout = 90;
+unsigned int    CHttpBase::m_service_idle_timeout = 600;
 
 unsigned int	CHttpBase::m_thread_increase_step = 8;
 
