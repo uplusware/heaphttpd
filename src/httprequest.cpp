@@ -80,7 +80,13 @@ void http_request::set_service_obj(const char * name, IServiceObj* obj)
     m_session->SetServiceObject(name, obj);		
 }
 
-int http_request::get_multipart_formdata(const char* content_name, string& content_filename, string& content_filetype, const char* &content_valbuf, int& content_vallen)
+IServiceObj* http_request::get_service_obj(const char * name)
+{
+    m_session->GetServiceObject(name);
+}
+
+int http_request::get_multipart_formdata(const char* content_name,
+    string& content_filename, string& content_filetype, const char* &content_valbuf, int& content_vallen)
 {
     return m_session->parse_multipart_formdata(content_name, content_filename, content_filetype, content_valbuf, content_vallen);
 }

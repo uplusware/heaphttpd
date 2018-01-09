@@ -14,10 +14,10 @@
 #include "heapapi.h"
 #include "stgengine.h"
 
-class ApiMySQLDemo : public doc
+class ApiMySQLDemo : public web_api
 {
 public:
-	ApiMySQLDemo(CHttp* session, const char * html_path)  : doc(session, html_path)
+	ApiMySQLDemo(http_request* request, http_response *response) : web_api(request, response)
 	{}
 	
 	virtual ~ApiMySQLDemo() {}
@@ -25,6 +25,6 @@ public:
 	virtual void Response();	
 };
 
-extern "C" void* api_mysqldemo_response(CHttp* m_session, const char * html_path);
+extern "C" void* api_mysqldemo_response(http_request* request, http_response *response);
 
 #endif /* _API_LOGIN_H_ */

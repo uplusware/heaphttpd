@@ -30,6 +30,8 @@ public:
     
     void set_service_obj(const char * name, IServiceObj* obj);
     
+    IServiceObj* get_service_obj(const char * name);
+    
     int get_multipart_formdata(const char* content_name, string& content_filename, string& content_filetype, const char* &content_valbuf, int& content_vallen);
     
     Http_Method get_method();

@@ -13,11 +13,11 @@ void ApiMySQLDemo::Response()
 {
     string strObjName = MYSQL_SERVICE_OBJ_NAME;
     strObjName += "localhost";
-	StorageEngine* stg_engine = (StorageEngine*)m_session->GetServiceObject(strObjName.c_str());
+	StorageEngine* stg_engine = (StorageEngine*)m_request->get_service_obj(strObjName.c_str());
 	if(stg_engine == NULL)
 	{
 		stg_engine = new StorageEngine("localhost", "root", "123456", "", "/var/run/mysqld/mysqld.sock", 0, "UTF-8", "/var/heaphttpd/private");
-		m_session->SetServiceObject(strObjName.c_str(), stg_engine);		
+		m_request->set_service_obj(strObjName.c_str(), stg_engine);		
 	}
     
     
@@ -44,14 +44,14 @@ void ApiMySQLDemo::Response()
     
     stg_engine->Release();
     
-    m_session->SendHeader(header.Text(), header.Length());
-	m_session->SendContent(strDatabases.c_str(), strDatabases.length());
+    m_response->send_header(header.Text(), header.Length());
+	m_response->send_content(strDatabases.c_str(), strDatabases.length());
 
 }
 
-void* api_mysqldemo_response(CHttp* session, const char* html_path)
+void* api_mysqldemo_response(http_request* request, http_response *response)
 {
-	ApiMySQLDemo *pDoc = new ApiMySQLDemo(session, html_path);
-	pDoc->Response();
-	delete pDoc;
+	ApiMySQLDemo *api_inst = new ApiMySQLDemo(request, response);
+	api_inst->Response();
+	delete api_inst;
 }

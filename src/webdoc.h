@@ -9,37 +9,51 @@
 #include "http.h"
 #include "httpcomm.h"
 #include "heapapi.h"
+#include "httprequest.h"
+#include "httpresponse.h"
 
 class doc
 {
+public:
+    doc()
+    { 
+    }
+    
+    virtual ~doc()
+    {    
+    }
+    virtual void Response() = 0;
+};
+
+class web_api : public doc
+{
 protected:
-	CHttp * m_session;
-    string m_work_path;
+	http_request * m_request;
+    http_response * m_response;
 	
 public:
-	doc(CHttp* session, const char* work_path)
+	web_api(http_request* request, http_response *response)
 	{
-		m_session = session;
-        m_work_path = work_path;
+		m_request = request;
+        m_response = response;
 	}
-	virtual ~doc(){}
+	virtual ~web_api(){}
 
-	virtual void Response();
-	
+	virtual void Response() = 0;
 protected:
-    const char* encodeURI(const char* src, string& dst)
+    const char* encode_URI(const char* src, string& dst)
 	{
 		NIU_URLFORMAT_ENCODE((const unsigned char *) src, dst);
 		return dst.c_str();
 	}
 	
-	const char* decodeURI(const char* src, string& dst)
+	const char* decode_URI(const char* src, string& dst)
 	{
 		NIU_URLFORMAT_DECODE((const unsigned char *) src, dst);
 		return dst.c_str();
 	}
 	
-	const char* escapeHTML(const char* src, string& dst)
+	const char* escape_HTML(const char* src, string& dst)
 	{
 	    dst = src;
 		Replace(dst, "&", "&amp;");
@@ -55,6 +69,23 @@ protected:
 		Replace(dst, "\"", "&quot;");
 		return dst.c_str();
 	}
+};
+
+class web_doc : public doc
+{
+protected:
+	CHttp * m_session;
+    string m_work_path;
+	
+public:
+	web_doc(CHttp* session, const char* work_path)
+	{
+		m_session = session;
+        m_work_path = work_path;
+	}
+	virtual ~web_doc(){}
+
+	virtual void Response();
 };
 
 #endif /* _WEBAPI_H_ */

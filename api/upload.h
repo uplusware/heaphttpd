@@ -13,10 +13,10 @@
 #include "webdoc.h"
 #include "heapapi.h"
 
-class ApiUpload : public doc
+class ApiUpload : public web_api
 {
 public:
-	ApiUpload(CHttp* session, const char * html_path)  : doc(session, html_path)
+	ApiUpload(http_request* request, http_response *response) : web_api(request, response)
 	{}
 	
 	virtual ~ApiUpload() {}
@@ -24,6 +24,6 @@ public:
 	virtual void Response();	
 };
 
-extern "C" void* api_upload_response(CHttp* m_session, const char * html_path);
+extern "C" void* api_upload_response(http_request* request, http_response *response);
 
 #endif /* _SAMPLE_H_ */

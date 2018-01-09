@@ -18,6 +18,8 @@
 #include "htdoc.h"
 #include "httpcomm.h"
 #include "webdoc.h"
+#include "httprequest.h"
+#include "httpresponse.h"
 
 void Htdoc::Response()
 {
@@ -222,12 +224,16 @@ void Htdoc::Response()
             string strApiFunctionName = "api_";
             strApiFunctionName += strApiName;
             strApiFunctionName += "_response";
-			void* (*api_response)(CHttp*, const char*);
-			api_response = (void*(*)(CHttp*, const char*))dlsym(lhandle, strApiFunctionName.c_str());
+            
+            http_request request_inst(m_session);
+            http_response response_inst(m_session);
+    
+			void* (*api_response)(http_request*, http_response*);
+			api_response = (void*(*)(http_request*, http_response*))dlsym(lhandle, strApiFunctionName.c_str());
 			const char* errmsg;
 			if((errmsg = dlerror()) == NULL)
 			{
-				api_response(m_session, m_work_path.c_str());
+				api_response(&request_inst, &response_inst);
 			}
 			else
 			{
@@ -972,9 +978,9 @@ void Htdoc::Response()
             }
             else
             {
-                doc *pDoc = new doc(m_session, m_work_path.c_str());
-                pDoc->Response();
-                delete pDoc;
+                web_doc *doc_inst = new web_doc(m_session, m_work_path.c_str());
+                doc_inst->Response();
+                delete doc_inst;
             }
         }
     }

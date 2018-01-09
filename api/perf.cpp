@@ -19,14 +19,14 @@ void ApiPerf::Response()
     strResp = szTmp;
     header.SetField("Content-Length", strResp.length());
     
-    m_session->SendHeader(header.Text(), header.Length());
-	m_session->SendContent(strResp.c_str(), strResp.length());
+    m_response->send_header(header.Text(), header.Length());
+	m_response->send_content(strResp.c_str(), strResp.length());
 
 }
 
-void* api_perf_response(CHttp* session, const char* html_path)
+void* api_perf_response(http_request* request, http_response *response)
 {
-	ApiPerf *pDoc = new ApiPerf(session, html_path);
-	pDoc->Response();
-	delete pDoc;
+	ApiPerf *api_inst = new ApiPerf(request, response);
+	api_inst->Response();
+	delete api_inst;
 }

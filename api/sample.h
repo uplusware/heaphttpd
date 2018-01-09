@@ -13,17 +13,19 @@
 #include "webdoc.h"
 #include "heapapi.h"
 
-class ApiSample : public doc
+class ApiSample : public web_api
 {
 public:
-	ApiSample(CHttp* session, const char * html_path) : doc(session, html_path)
-	{}
+	ApiSample(http_request* request, http_response *response) : web_api(request, response)
+	{
+
+    }
 	
 	virtual ~ApiSample() {}
 	
 	virtual void Response();	
 };
 
-extern "C" void* api_sample_response(CHttp* m_session, const char * html_path);
+extern "C" void* api_sample_response(http_request* request, http_response *response);
 
 #endif /* _SAMPLE_H_ */

@@ -15,10 +15,10 @@
 #include "heapapi.h"
 #include "stgengine.h"
 
-class ApiMongoDemo : public doc
+class ApiMongoDemo : public web_api
 {
 public:
-	ApiMongoDemo(CHttp* session, const char * html_path)  : doc(session, html_path)
+	ApiMongoDemo(http_request* request, http_response *response) : web_api(request, response)
 	{}
 	
 	virtual ~ApiMongoDemo() {}
@@ -26,6 +26,6 @@ public:
 	virtual void Response();	
 };
 
-extern "C" void* api_mongodemo_response(CHttp* m_session, const char * html_path);
+extern "C" void* api_mongodemo_response(http_request* request, http_response *response);
 
 #endif /* _API_LOGIN_H_ */

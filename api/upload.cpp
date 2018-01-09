@@ -21,7 +21,7 @@ void ApiUpload::Response()
     const char* valbuf;
     int vallen;
     
-    if(m_session->parse_multipart_formdata("ATTACHFILEDESC", filename, filetype, valbuf, vallen) == 0)
+    if(m_request->get_multipart_formdata("ATTACHFILEDESC", filename, filetype, valbuf, vallen) == 0)
 	{
         char* desc = (char*)malloc(vallen + 1);
         memcpy(desc, valbuf, vallen);
@@ -31,7 +31,7 @@ void ApiUpload::Response()
         free(desc);
     }
     
-    if(m_session->parse_multipart_formdata("ATTACHFILEBODY1", filename, filetype, valbuf, vallen) == 0)
+    if(m_request->get_multipart_formdata("ATTACHFILEBODY1", filename, filetype, valbuf, vallen) == 0)
 	{
         string strFilePath;
         strFilePath = "/var/heaphttpd/html/upload/";
@@ -71,7 +71,7 @@ void ApiUpload::Response()
             delete attachfd;
     }
     
-    if(m_session->parse_multipart_formdata("ATTACHFILEBODY2", filename, filetype, valbuf, vallen) == 0)
+    if(m_request->get_multipart_formdata("ATTACHFILEBODY2", filename, filetype, valbuf, vallen) == 0)
 	{
         string strFilePath = "/var/heaphttpd/html/upload/";
         strFilePath += filename;
@@ -110,7 +110,7 @@ void ApiUpload::Response()
             delete attachfd;
     }
     
-    if(m_session->parse_multipart_formdata("ATTACHFILEBODY3", filename, filetype, valbuf, vallen) == 0)
+    if(m_request->get_multipart_formdata("ATTACHFILEBODY3", filename, filetype, valbuf, vallen) == 0)
 	{
         string strFilePath = "/var/heaphttpd/html/upload/";
         strFilePath += filename;
@@ -151,13 +151,13 @@ void ApiUpload::Response()
     strResp += "</body></html>";
     header.SetField("Content-Length", strResp.length());
             
-    m_session->SendHeader(header.Text(), header.Length());
-	m_session->SendContent(strResp.c_str(), strResp.length());
+    m_response->send_header(header.Text(), header.Length());
+	m_response->send_content(strResp.c_str(), strResp.length());
 }
 
-void* api_upload_response(CHttp* session, const char* html_path)
+void* api_upload_response(http_request* request, http_response *response)
 {
-	ApiUpload *pDoc = new ApiUpload(session, html_path);
-	pDoc->Response();
-	delete pDoc;
+	ApiUpload *api_inst = new ApiUpload(request, response);
+	api_inst->Response();
+	delete api_inst;
 }

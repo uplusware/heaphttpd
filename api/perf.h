@@ -13,10 +13,10 @@
 #include "webdoc.h"
 #include "heapapi.h"
 
-class ApiPerf : public doc
+class ApiPerf : public web_api
 {
 public:
-	ApiPerf(CHttp* session, const char * html_path)  : doc(session, html_path)
+	ApiPerf(http_request* request, http_response *response) : web_api(request, response)
 	{}
 	
 	virtual ~ApiPerf() {}
@@ -24,6 +24,6 @@ public:
 	virtual void Response();	
 };
 
-extern "C" void* api_perf_response(CHttp* m_session, const char * html_path);
+extern "C" void* api_perf_response(http_request* request, http_response *response);
 
 #endif /* _SAMPLE_H_ */

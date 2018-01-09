@@ -13,11 +13,12 @@ class http_response
 public:
     http_response(CHttp* session);
     virtual ~http_response();
-private:
-    CHttp* m_session;
     
     void send_header(const char* h, int l);
     void send_content(const char* c, int l);
+    
+private:
+    CHttp* m_session;
 };
 
 #endif /* _HTTP_RESPONSE_H_ */

@@ -71,7 +71,7 @@ bool get_file_length_lastmidifytime(const char* path, long long & length, time_t
     return true;
 }
 
-void doc::Response()
+void web_doc::Response()
 {
 	string strExtName;
 	string strResourceFullPath;
