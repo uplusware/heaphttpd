@@ -47,7 +47,6 @@ void ApiMongoDemo::Response()
     
     m_session->SendHeader(header.Text(), header.Length());
 	m_session->SendContent(strDatabases.c_str(), strDatabases.length());
-
 }
 
 void* api_mongodemo_response(CHttp* session, const char* html_path)

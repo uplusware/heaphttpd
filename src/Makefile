@@ -14,7 +14,7 @@ WSLIBOBJS = websocket.o
 HTTPLIB = libheaphttp.so
 HTTPLIBOBJS =   httpsessionvar.o httpservervar.o cookie.o   \
                 http.o httpcomm.o cache.o htdoc.o http2.o http2comm.o hpack.o http2stream.o tunneling.o http_client.o  \
-                fstring.o webdoc.o webcgi.o heapapi.o wwwauth.o cgi.o fastcgi.o scgi.o serviceobj.o	\
+                fstring.o webdoc.o webcgi.o heapapi.o wwwauth.o cgi.o fastcgi.o scgi.o serviceobj.o	httprequest.o httpresponse.o \
                 util/trace.o	            \
                 util/digcalc.o	            \
                 util/sha1.o                 \

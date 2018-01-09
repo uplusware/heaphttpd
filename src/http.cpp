@@ -289,6 +289,30 @@ void CHttp::SetServerVar(const char* szName, const char* szValue)
     m_cache->push_server_var(szName, strEncodedValue.c_str());
 }
 
+const char* CHttp::GetPostDataVar(const char* key)
+{
+    if(_POST_VARS_.find(key) != _POST_VARS_.end())
+        return _POST_VARS_[key].c_str();
+    else
+        return NULL;
+}
+
+const char* CHttp::GetQueryStringVar(const char* key)
+{
+    if(_GET_VARS_.find(key) != _GET_VARS_.end())
+        return _GET_VARS_[key].c_str();
+    else
+        return NULL;
+}
+
+const char* CHttp::GetCookieVar(const char* key)
+{
+    if(_COOKIE_VARS_.find(key) != _COOKIE_VARS_.end())
+        return _COOKIE_VARS_[key].c_str();
+    else
+        return NULL;
+}
+
 int CHttp::GetServerVar(const char* szName, string& strValue)
 {
     string strEncodedValue;

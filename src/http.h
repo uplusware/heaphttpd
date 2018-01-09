@@ -136,11 +136,11 @@ public:
         m_request_hdr.GetField(name, val);
     }
     
-    BOOL RequestNoCache() { return m_request_no_cache; }
+    const char* GetPostDataVar(const char* key);
+    const char* GetQueryStringVar(const char* key);    
+    const char* GetCookieVar(const char* key);
     
-    map<string, string> _POST_VARS_; /* var in post data */
-	map<string, string> _GET_VARS_; /* var in query string */
-    map<string, string> _COOKIE_VARS_; /* var in cookie */
+    BOOL RequestNoCache() { return m_request_no_cache; }
     
 	BOOL IsPassedWWWAuth() { return m_passed_wwwauth; }
     BOOL IsPassedProxyAuth() { return m_passed_proxyauth; }
@@ -173,6 +173,10 @@ public:
 private:
     void ParseMethod(string & strtext);
 protected:
+    map<string, string> _POST_VARS_; /* var in post data */
+	map<string, string> _GET_VARS_; /* var in query string */
+    map<string, string> _COOKIE_VARS_; /* var in cookie */
+    
 	SSL* m_ssl;
 	CHttp2 * m_http2;
     uint_32 m_http2_stream_ind;

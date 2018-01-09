@@ -16,7 +16,7 @@
 class ApiSample : public doc
 {
 public:
-	ApiSample(CHttp* session, const char * html_path)  : doc(session, html_path)
+	ApiSample(CHttp* session, const char * html_path) : doc(session, html_path)
 	{}
 	
 	virtual ~ApiSample() {}

@@ -12,8 +12,8 @@ void ApiSample::Response()
     CHttpResponseHdr header;
 	string strResp;
 	string abc, def;
-    abc = m_session->_POST_VARS_["abc"];
-    def = m_session->_POST_VARS_["def"];
+    abc = m_session->GetPostDataVar("abc") ? m_session->GetPostDataVar("abc") : "";
+    def = m_session->GetPostDataVar("def") ? m_session->GetPostDataVar("def") : "";
 	if( abc == "" || def == "" )
 	{
        
