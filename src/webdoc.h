@@ -11,17 +11,13 @@
 #include "heapapi.h"
 #include "httprequest.h"
 #include "httpresponse.h"
+#include "httputility.h"
 
 class doc
 {
 public:
-    doc()
-    { 
-    }
-    
-    virtual ~doc()
-    {    
-    }
+    doc() {}    
+    virtual ~doc() {}
     virtual void Response() = 0;
 };
 
@@ -37,38 +33,9 @@ public:
 		m_request = request;
         m_response = response;
 	}
-	virtual ~web_api(){}
+	virtual ~web_api() {}
 
 	virtual void Response() = 0;
-protected:
-    const char* encode_URI(const char* src, string& dst)
-	{
-		NIU_URLFORMAT_ENCODE((const unsigned char *) src, dst);
-		return dst.c_str();
-	}
-	
-	const char* decode_URI(const char* src, string& dst)
-	{
-		NIU_URLFORMAT_DECODE((const unsigned char *) src, dst);
-		return dst.c_str();
-	}
-	
-	const char* escape_HTML(const char* src, string& dst)
-	{
-	    dst = src;
-		Replace(dst, "&", "&amp;");
-		
-		Replace(dst, "\r", "");
-		Replace(dst, "\n", "<BR>");
-		Replace(dst, " ", "&nbsp;");
-		Replace(dst, "\t", "&nbsp;&nbsp;&nbsp;&nbsp;");
-		
-		Replace(dst, "<", "&lt;");
-		Replace(dst, ">", "&gt;");
-		Replace(dst, "'", "&apos;");
-		Replace(dst, "\"", "&quot;");
-		return dst.c_str();
-	}
 };
 
 class web_doc : public doc
@@ -83,7 +50,7 @@ public:
 		m_session = session;
         m_work_path = work_path;
 	}
-	virtual ~web_doc(){}
+	virtual ~web_doc() {}
 
 	virtual void Response();
 };

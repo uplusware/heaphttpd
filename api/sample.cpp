@@ -63,13 +63,13 @@ void ApiSample::Response()
         
         string strEscapedValue1, strEscapedValue2, strEscapedValue3;
         string strEscapedServerValue1, strEscapedServerValue2, strEscapedServerValue3;
-        escape_HTML(strValue1.c_str(), strEscapedValue1);
-        escape_HTML(strValue2.c_str(), strEscapedValue2);
-        escape_HTML(strValue3.c_str(), strEscapedValue3);
+        http_utility::escape_HTML(strValue1.c_str(), strEscapedValue1);
+        http_utility::escape_HTML(strValue2.c_str(), strEscapedValue2);
+        http_utility::escape_HTML(strValue3.c_str(), strEscapedValue3);
         
-        escape_HTML(strServerValue1.c_str(), strEscapedServerValue1);
-        escape_HTML(strServerValue2.c_str(), strEscapedServerValue2);
-        escape_HTML(strServerValue3.c_str(), strEscapedServerValue3);
+        http_utility::escape_HTML(strServerValue1.c_str(), strEscapedServerValue1);
+        http_utility::escape_HTML(strServerValue2.c_str(), strEscapedServerValue2);
+        http_utility::escape_HTML(strServerValue3.c_str(), strEscapedServerValue3);
         
 		strResp = "<html></head><title>API Sample</title></head><body><h1>"VERSION_STRING"</h1>API Sample: ";
 		strResp += abc;

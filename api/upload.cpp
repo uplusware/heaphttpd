@@ -48,11 +48,11 @@ void ApiUpload::Response()
             attachfd->close();
 
             string strEscapedFilename, strEscapedFiletype;
-            escapeHTML(filename.c_str(), strEscapedFilename);
-            escapeHTML(filetype.c_str(), strEscapedFiletype);
+            http_utility::escape_HTML(filename.c_str(), strEscapedFilename);
+            http_utility::escape_HTML(filetype.c_str(), strEscapedFiletype);
             
             string strURIFilename;
-            encodeURI(filename.c_str(), strURIFilename);
+            http_utility::encode_URI(filename.c_str(), strURIFilename);
             strResp += "<p><b>Path:</b> /var/heaphttpd/html/upload/";
             strResp += strEscapedFilename;
             strResp += "<br><b>Type:</b> ";
@@ -86,11 +86,11 @@ void ApiUpload::Response()
             attachfd->close();
 
             string strEscapedFilename, strEscapedFiletype;
-            escapeHTML(filename.c_str(), strEscapedFilename);
-            escapeHTML(filetype.c_str(), strEscapedFiletype);
+            http_utility::escape_HTML(filename.c_str(), strEscapedFilename);
+            http_utility::escape_HTML(filetype.c_str(), strEscapedFiletype);
             
             string strURIFilename;
-            encodeURI(filename.c_str(), strURIFilename);
+            http_utility::encode_URI(filename.c_str(), strURIFilename);
             
             strResp += "<p><b>Path:</b> /var/heaphttpd/html/upload/";
             strResp += strEscapedFilename;
@@ -125,11 +125,11 @@ void ApiUpload::Response()
             attachfd->close();
 
             string strEscapedFilename, strEscapedFiletype;
-            escapeHTML(filename.c_str(), strEscapedFilename);
-            escapeHTML(filetype.c_str(), strEscapedFiletype);
+            http_utility::escape_HTML(filename.c_str(), strEscapedFilename);
+            http_utility::escape_HTML(filetype.c_str(), strEscapedFiletype);
             
             string strURIFilename;
-            encodeURI(filename.c_str(), strURIFilename);
+            http_utility::encode_URI(filename.c_str(), strURIFilename);
             
             strResp += "<p><b>Path:</b> /var/heaphttpd/html/upload/";
             strResp += strEscapedFilename;
