@@ -36,6 +36,16 @@ public:
     
     Http_Method get_method();
     
+    void get_header_field(const char* name, int & val);
+    
+    const char* get_header_field(const char* name);
+    
+    const char* get_resource();
+    const char* get_username();
+    const char* get_password();
+    
+    long long get_content_length();
+
 private:
     CHttp* m_session;
 };
