@@ -184,228 +184,232 @@ BOOL CHttpBase::LoadConfig()
 			
 		if(strncasecmp(strline.c_str(), "#", sizeof("#") - 1) != 0)
 		{	
-			if(strncasecmp(strline.c_str(), "CloseStderr", sizeof("CloseStderr") - 1) == 0)
+            string strKey;
+            strcut(strline.c_str(), NULL, "=", strKey);
+            strtrim(strKey);
+            
+			if(strcasecmp(strKey.c_str(), "CloseStderr") == 0)
 			{
 				string close_stderr;
 				strcut(strline.c_str(), "=", NULL, close_stderr );
 				strtrim(close_stderr);
 				m_close_stderr = (strcasecmp(close_stderr.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
-            else if(strncasecmp(strline.c_str(), "PrivatePath", sizeof("PrivatePath") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "PrivatePath") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_private_path);
 				strtrim(m_private_path);
 			}
-			else if(strncasecmp(strline.c_str(), "WorkPath", sizeof("WorkPath") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "WorkPath") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_work_path);
 				strtrim(m_work_path);
 			}
-			else if(strncasecmp(strline.c_str(), "ExtensionListFile", sizeof("ExtensionListFile") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "ExtensionListFile") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ext_list_file);
 				strtrim(m_ext_list_file);
 			}
-            else if(strncasecmp(strline.c_str(), "UsersListFile", sizeof("UsersListFile") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "UsersListFile") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_users_list_file);
 				strtrim(m_users_list_file);
 			}
-			else if(strncasecmp(strline.c_str(), "HTTPReverseProxyDeliveryList", sizeof("HTTPReverseProxyDeliveryList") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "HTTPReverseProxyDeliveryList") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_reverse_ext_list_file);
 				strtrim(m_reverse_ext_list_file);
 			}
-			else if(strncasecmp(strline.c_str(), "LocalHostName", sizeof("LocalHostName") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "LocalHostName") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_localhostname );
 				strtrim(m_localhostname);
 			}
-			else if(strncasecmp(strline.c_str(), "HostIP", sizeof("HostIP") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "HostIP") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_hostip );
 				strtrim(m_hostip);
 			}
-			else if(strncasecmp(strline.c_str(), "InstanceNum", sizeof("InstanceNum") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "InstanceNum") == 0)
 			{
 				string inst_num;
 				strcut(strline.c_str(), "=", NULL, inst_num );
 				strtrim(inst_num);
 				m_max_instance_num = atoi(inst_num.c_str());
 			}
-            else if(strncasecmp(strline.c_str(), "HTTPKeepAliveTimeout", sizeof("HTTPKeepAliveTimeout") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "HTTPKeepAliveTimeout") == 0)
 			{
 				string connection_keep_alive_timeout;
 				strcut(strline.c_str(), "=", NULL, connection_keep_alive_timeout );
 				strtrim(connection_keep_alive_timeout);
 				m_connection_keep_alive_timeout = atoi(connection_keep_alive_timeout.c_str());
 			}
-            else if(strncasecmp(strline.c_str(), "HTTPKeepAliveMax", sizeof("HTTPKeepAliveMax") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "HTTPKeepAliveMax") == 0)
 			{
 				string keep_alive_max;
 				strcut(strline.c_str(), "=", NULL, keep_alive_max );
 				strtrim(keep_alive_max);
 				m_connection_keep_alive_max = atoi(keep_alive_max.c_str());
 			}
-            else if(strncasecmp(strline.c_str(), "ConnectionIdleTimeout", sizeof("ConnectionIdleTimeout") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "ConnectionIdleTimeout") == 0)
 			{
 				string connection_idle_timeout;
 				strcut(strline.c_str(), "=", NULL, connection_idle_timeout );
 				strtrim(connection_idle_timeout);
 				m_connection_idle_timeout = atoi(connection_idle_timeout.c_str());
 			}
-            else if(strncasecmp(strline.c_str(), "ServiceIdleTimeout", sizeof("ServiceIdleTimeout") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "ServiceIdleTimeout") == 0)
 			{
 				string service_idle_timeout;
 				strcut(strline.c_str(), "=", NULL, service_idle_timeout );
 				strtrim(service_idle_timeout);
 				m_service_idle_timeout = atoi(service_idle_timeout.c_str());
 			}
-            else if(strncasecmp(strline.c_str(), "ConnectionSyncTimeout", sizeof("ConnectionSyncTimeout") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "ConnectionSyncTimeout") == 0)
 			{
 				string connection_sync_timeout;
 				strcut(strline.c_str(), "=", NULL, connection_sync_timeout );
 				strtrim(connection_sync_timeout);
 				m_connection_sync_timeout = atoi(connection_sync_timeout.c_str());
 			}
-            else if(strncasecmp(strline.c_str(), "TotalLocalFileCacheSize", sizeof("TotalLocalFileCacheSize") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "TotalLocalFileCacheSize") == 0)
 			{
 				string cache_size;
 				strcut(strline.c_str(), "=", NULL, cache_size );
 				strtrim(cache_size);
 				m_total_localfile_cache_size = atoi(cache_size.c_str()) * 1024 * 1024;
 			}
-            else if(strncasecmp(strline.c_str(), "ThreadIncreaseStep", sizeof("ThreadIncreaseStep") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "ThreadIncreaseStep") == 0)
 			{
 				string thread_increase_step;
 				strcut(strline.c_str(), "=", NULL, thread_increase_step );
 				strtrim(thread_increase_step);
 				m_thread_increase_step = atoi(thread_increase_step.c_str());
 			}
-            else if(strncasecmp(strline.c_str(), "TotalTunnelingCacheSize", sizeof("TotalTunnelingCacheSize") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "TotalTunnelingCacheSize") == 0)
 			{
 				string cache_size;
 				strcut(strline.c_str(), "=", NULL, cache_size );
 				strtrim(cache_size);
 				m_total_tunneling_cache_size = atoi(cache_size.c_str()) * 1024 * 1024;
 			}
-            else if(strncasecmp(strline.c_str(), "SingleLocalFileCacheSize", sizeof("SingleLocalFileCacheSize") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "SingleLocalFileCacheSize") == 0)
 			{
 				string cache_size;
 				strcut(strline.c_str(), "=", NULL, cache_size );
 				strtrim(cache_size);
 				m_single_localfile_cache_size = atoi(cache_size.c_str()) * 1024;
 			}
-            else if(strncasecmp(strline.c_str(), "SingleTunnelingCacheSize", sizeof("SingleTunnelingCacheSize") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "SingleTunnelingCacheSize") == 0)
 			{
 				string cache_size;
 				strcut(strline.c_str(), "=", NULL, cache_size );
 				strtrim(cache_size);
 				m_single_tunneling_cache_size = atoi(cache_size.c_str()) * 1024;
 			}            
-			else if(strncasecmp(strline.c_str(), "InstanceThreadNum", sizeof("InstanceThreadNum") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "InstanceThreadNum") == 0)
 			{
 				string inst_thread_num;
 				strcut(strline.c_str(), "=", NULL, inst_thread_num);
 				strtrim(inst_thread_num);
 				m_max_instance_thread_num = atoi(inst_thread_num.c_str());
 			}
-            else if(strncasecmp(strline.c_str(), "InstancePrestart", sizeof("InstancePrestart") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "InstancePrestart") == 0)
 			{
 				string instance_prestart;
 				strcut(strline.c_str(), "=", NULL, instance_prestart );
 				strtrim(instance_prestart);
 				m_instance_prestart = (strcasecmp(instance_prestart.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
-            else if(strncasecmp(strline.c_str(), "InstanceBalanceScheme", sizeof("InstanceBalanceScheme") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "InstanceBalanceScheme") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_instance_balance_scheme );
 				strtrim(m_instance_balance_scheme);
 			}
-			else if(strncasecmp(strline.c_str(), "HTTPTunnelingEnable", sizeof("HTTPTunnelingEnable") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "HTTPTunnelingEnable") == 0)
 			{
 				string HTTPTunnelingEnable;
 				strcut(strline.c_str(), "=", NULL, HTTPTunnelingEnable );
 				strtrim(HTTPTunnelingEnable);
 				m_enable_http_tunneling = (strcasecmp(HTTPTunnelingEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
-            else if(strncasecmp(strline.c_str(), "HTTPTunnelingCacheEnable", sizeof("HTTPTunnelingCacheEnable") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "HTTPTunnelingCacheEnable") == 0)
 			{
 				string HTTPTunnelingCacheEnable;
 				strcut(strline.c_str(), "=", NULL, HTTPTunnelingCacheEnable );
 				strtrim(HTTPTunnelingCacheEnable);
 				m_enable_http_tunneling_cache = (strcasecmp(HTTPTunnelingCacheEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
-			else if(strncasecmp(strline.c_str(), "HTTPReverseProxyEnable", sizeof("HTTPReverseProxyEnable") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "HTTPReverseProxyEnable") == 0)
 			{
 				string HTTPReverseProxyEnable;
 				strcut(strline.c_str(), "=", NULL, HTTPReverseProxyEnable );
 				strtrim(HTTPReverseProxyEnable);
 				m_enable_http_reverse_proxy = (strcasecmp(HTTPReverseProxyEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
-            else if(strncasecmp(strline.c_str(), "HTTPEnable", sizeof("HTTPEnable") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "HTTPEnable") == 0)
 			{
 				string HTTPEnable;
 				strcut(strline.c_str(), "=", NULL, HTTPEnable );
 				strtrim(HTTPEnable);
 				m_enablehttps= (strcasecmp(HTTPEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
-			else if(strncasecmp(strline.c_str(), "HTTPPort", sizeof("HTTPPort") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "HTTPPort") == 0)
 			{
 				string httpport;
 				strcut(strline.c_str(), "=", NULL, httpport );
 				strtrim(httpport);
 				m_httpport = atoi(httpport.c_str());
 			}
-			else if(strncasecmp(strline.c_str(), "HTTPSEnable", sizeof("HTTPSEnable") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "HTTPSEnable") == 0)
 			{
 				string HTTPSEnable;
 				strcut(strline.c_str(), "=", NULL, HTTPSEnable );
 				strtrim(HTTPSEnable);
 				m_enablehttps= (strcasecmp(HTTPSEnable.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
-			else if(strncasecmp(strline.c_str(), "HTTPSPort", sizeof("HTTPSPort") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "HTTPSPort") == 0)
 			{
 				string httpsport;
 				strcut(strline.c_str(), "=", NULL, httpsport );
 				strtrim(httpsport);
 				m_httpsport = atoi(httpsport.c_str());
 			}
-            else if(strncasecmp(strline.c_str(), "HTTPSCipher", sizeof("HTTPSCipher") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "HTTPSCipher") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_https_cipher);
 				strtrim(m_https_cipher);
 			}
-			else if(strncasecmp(strline.c_str(), "HTTP2Enable", sizeof("HTTP2Enable") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "HTTP2Enable") == 0)
 			{
 				string HTTP2Enable;
 				strcut(strline.c_str(), "=", NULL, HTTP2Enable );
 				strtrim(HTTP2Enable);
 				m_enablehttp2= (strcasecmp(HTTP2Enable.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
-            else if(strncasecmp(strline.c_str(), "HTTP2TLSCipher", sizeof("HTTP2TLSCipher") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "HTTP2TLSCipher") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_http2_tls_cipher);
 				strtrim(m_http2_tls_cipher);
 			}
-			else if(strncasecmp(strline.c_str(), "WWWAuthenticate", sizeof("WWWAuthenticate") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "WWWAuthenticate") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_www_authenticate );
 				strtrim(m_www_authenticate);
 			}
-            else if(strncasecmp(strline.c_str(), "ProxyAuthenticate", sizeof("ProxyAuthenticate") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "ProxyAuthenticate") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_proxy_authenticate );
 				strtrim(m_proxy_authenticate);
 			}
-            else if(strncasecmp(strline.c_str(), "IntegrateLocalUsers", sizeof("IntegrateLocalUsers") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "IntegrateLocalUsers") == 0)
 			{
 				string IntegrateLocalUsers;
 				strcut(strline.c_str(), "=", NULL, IntegrateLocalUsers );
 				strtrim(IntegrateLocalUsers);
 				m_integrate_local_users = (strcasecmp(IntegrateLocalUsers.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
-            else if(strncasecmp(strline.c_str(), "DefaultWebPages", sizeof("DefaultWebPages") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "DefaultWebPages") == 0)
             {
                 string default_webpages;
 				strcut(strline.c_str(), "=", NULL, default_webpages );
@@ -423,39 +427,39 @@ BOOL CHttpBase::LoadConfig()
                     }
                 }
             }
-			else if(strncasecmp(strline.c_str(), "CACheckClient", sizeof("CACheckClient") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "CACheckClient") == 0)
 			{
 				string CACheckClient;
 				strcut(strline.c_str(), "=", NULL, CACheckClient );
 				strtrim(CACheckClient);
 				m_client_cer_check = (strcasecmp(CACheckClient.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
-			else if(strncasecmp(strline.c_str(), "CARootCrt", sizeof("CARootCrt") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "CARootCrt") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_crt_root);
 				strtrim(m_ca_crt_root);
 			}
-			else if(strncasecmp(strline.c_str(), "CAServerCrt", sizeof("CAServerCrt") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "CAServerCrt") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_crt_server);
 				strtrim(m_ca_crt_server);
 			}
-			else if(strncasecmp(strline.c_str(), "CAServerKey", sizeof("CAServerKey") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "CAServerKey") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_key_server);
 				strtrim(m_ca_key_server);
 			}
-			else if(strncasecmp(strline.c_str(), "CAClientCrt", sizeof("CAClientCrt") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "CAClientCrt") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_crt_client);
 				strtrim(m_ca_crt_client);
 			}
-			else if(strncasecmp(strline.c_str(), "CAClientKey", sizeof("CAClientKey") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "CAClientKey") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_key_client);
 				strtrim(m_ca_key_client);
 			}
-			else if(strncasecmp(strline.c_str(), "CAPassword", sizeof("CAPassword") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "CAPassword") == 0)
 			{
 				m_ca_password = "";
 				
@@ -465,17 +469,17 @@ BOOL CHttpBase::LoadConfig()
 
 				Security::Decrypt(strEncoded.c_str(), strEncoded.length(), m_ca_password);
 			}
-            else if(strncasecmp(strline.c_str(), "CAClientBaseDir", sizeof("CAClientBaseDir") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "CAClientBaseDir") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_ca_client_base_dir);
 				strtrim(m_ca_client_base_dir);
 			}
-			else if(strncasecmp(strline.c_str(), "PHPMode", sizeof("PHPMode") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "PHPMode") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_php_mode);
 				strtrim(m_php_mode);
 			}
-            else if(strncasecmp(strline.c_str(), "FPMSockType", sizeof("FPMSockType") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "FPMSockType") == 0)
 			{               
                 string fpm_socktype;
 				strcut(strline.c_str(), "=", NULL, fpm_socktype);
@@ -488,37 +492,37 @@ BOOL CHttpBase::LoadConfig()
                     m_fpm_socktype = unknow_socket;
                 
 			}
-			else if(strncasecmp(strline.c_str(), "FPMIPAddr", sizeof("FPMIPAddr") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "FPMIPAddr") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_fpm_addr);
 				strtrim(m_fpm_addr);
 			}
-			else if(strncasecmp(strline.c_str(), "FPMPort", sizeof("FPMPort") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "FPMPort") == 0)
 			{
 				string fpm_port;
 				strcut(strline.c_str(), "=", NULL, fpm_port);
 				strtrim(fpm_port);
 				m_fpm_port = atoi(fpm_port.c_str());
 			}
-            else if(strncasecmp(strline.c_str(), "FPMSockFile", sizeof("FPMSockFile") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "FPMSockFile") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_fpm_sockfile);
 				strtrim(m_fpm_sockfile);
 			}
-            else if(strncasecmp(strline.c_str(), "PHPCGIPath", sizeof("PHPCGIPath") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "PHPCGIPath") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, m_phpcgi_path);
 				strtrim(m_phpcgi_path);
 			}
 			/* Fast-CGI/S-CGI/uWSGI */
-            else if(strncasecmp(strline.c_str(), "CGIName", sizeof("CGIName") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "CGIName") == 0)
 			{
 				strcut(strline.c_str(), "=", NULL, current_cgi_name);
 				strtrim(current_cgi_name);
                 if(current_cgi_name != "")
                     m_cgi_list[current_cgi_name].cgi_name = current_cgi_name;
 			}
-            else if(strncasecmp(strline.c_str(), "CGIType", sizeof("CGIType") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "CGIType") == 0)
 			{
                 string cgi_type;
 				strcut(strline.c_str(), "=", NULL, cgi_type);
@@ -534,7 +538,7 @@ BOOL CHttpBase::LoadConfig()
                         m_cgi_list[current_cgi_name].cgi_type = none_e;
                 }
 			}
-			else if(strncasecmp(strline.c_str(), "CGIPgm", sizeof("CGIPgm") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "CGIPgm") == 0)
 			{
                 string cgi_pgm;
 				strcut(strline.c_str(), "=", NULL, cgi_pgm);
@@ -544,7 +548,7 @@ BOOL CHttpBase::LoadConfig()
                     m_cgi_list[current_cgi_name].cgi_pgm = cgi_pgm;
                 }
 			}
-			else if(strncasecmp(strline.c_str(), "CGISockType", sizeof("CGISockType") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "CGISockType") == 0)
 			{
                 string cgi_socktype;
 				strcut(strline.c_str(), "=", NULL, cgi_socktype);
@@ -559,7 +563,7 @@ BOOL CHttpBase::LoadConfig()
                         m_cgi_list[current_cgi_name].cgi_socktype = unknow_socket;
                 }
 			}
-			else if(strncasecmp(strline.c_str(), "Fast", sizeof("CGIIPAddr") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "Fast") == 0)
 			{
                 string cgi_addr;
 				strcut(strline.c_str(), "=", NULL, cgi_addr);
@@ -569,7 +573,7 @@ BOOL CHttpBase::LoadConfig()
                     m_cgi_list[current_cgi_name].cgi_addr = cgi_addr;
                 }
 			}
-			else if(strncasecmp(strline.c_str(), "CGIPort", sizeof("CGIPort") - 1) == 0)
+			else if(strcasecmp(strKey.c_str(), "CGIPort") == 0)
 			{
 				string fastcgi_port;
 				strcut(strline.c_str(), "=", NULL, fastcgi_port);
@@ -579,7 +583,7 @@ BOOL CHttpBase::LoadConfig()
                     m_cgi_list[current_cgi_name].cgi_port = atoi(fastcgi_port.c_str());
                 }
 			}
-            else if(strncasecmp(strline.c_str(), "CGISockFile", sizeof("CGISockFile") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "CGISockFile") == 0)
 			{
                 string cgi_sockfile;
 				strcut(strline.c_str(), "=", NULL, cgi_sockfile);
@@ -590,7 +594,7 @@ BOOL CHttpBase::LoadConfig()
                 }
 			}
 #ifdef _WITH_MEMCACHED_
-            else if(strncasecmp(strline.c_str(), "MEMCACHEDList", sizeof("MEMCACHEDList") - 1) == 0)
+            else if(strcasecmp(strKey.c_str(), "MEMCACHEDList") == 0)
 			{
 				string memc_list;
 				strcut(strline.c_str(), "=", NULL, memc_list );
