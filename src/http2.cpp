@@ -488,6 +488,20 @@ int CHttp2::AsyncSend()
             event.events = m_async_send_data_len == 0 ? (EPOLLIN | EPOLLHUP | EPOLLERR) : EPOLLIN | EPOLLOUT| EPOLLHUP | EPOLLERR;
             epoll_ctl (m_epoll_fd, EPOLL_CTL_MOD, m_sockfd, &event);
         }
+        else
+        {
+            if(m_ssl)
+            {
+                int ret = SSL_get_error(m_ssl, len);
+                if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+                    len = 0;
+            }
+            else
+            {
+                if( errno == EAGAIN)
+                    len = 0;
+            }
+        }
     }
     
     return len;
@@ -513,6 +527,20 @@ int CHttp2::AsyncRecv()
         memcpy(new_buf + m_async_recv_data_len, buf, len);
         m_async_recv_data_len += len;
         m_async_recv_buf = new_buf;
+    }
+    else
+    {
+        if(m_ssl)
+        {
+            int ret = SSL_get_error(m_ssl, len);
+            if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+                len = 0;
+        }
+        else
+        {
+            if( errno == EAGAIN)
+                len = 0;
+        }
     }
     
     return len;

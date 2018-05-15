@@ -160,9 +160,10 @@ static bool check_pid_file(const char* pflag)
 	return true;   
 } 
 
+class Worker;
+
 typedef struct
 {
-    
 	int sockfd;
 	string client_ip;
 	BOOL https;
@@ -174,6 +175,7 @@ typedef struct
     BOOL client_cer_check;
 	memory_cache* cache;
 	ServiceObjMap* srvobjmap;
+    Worker* worker;
 } SESSION_PARAM;
 
 enum CLIENT_PARAM_CTRL{
@@ -203,6 +205,8 @@ public:
 	virtual ~Worker();
 
 	void Working(CUplusTrace& uTrace);
+    
+    Session_Group* GetSessionGroup() { return m_session_group; }
 private:
 	memory_cache* m_cache;
 	ServiceObjMap m_srvobjmap;
@@ -211,6 +215,8 @@ private:
 	int m_thread_num;
 	int m_process_seq;
 	string m_service_name;
+    
+    Session_Group* m_session_group;
 //static methods
     static void SESSION_HANDLING(SESSION_PARAM* session_param);
     static void INIT_THREAD_POOL_HANDLER();
@@ -261,8 +267,6 @@ protected:
 	list<pid_t> m_child_list;
 	vector<WORK_PROCESS_INFO> m_work_processes;
 	unsigned int m_next_process;
-    
-    Session_Group* m_session_group;
 };
 
 #endif /* _SERVICE_H_ */

@@ -51,6 +51,22 @@ public:
     
     Http_Connection AsyncProcessing(int epoll_fd);
     
+    int AsyncRecv()
+    {
+        if(m_http_protocol_instance)
+            return m_http_protocol_instance->AsyncRecv();
+        else
+            return -1;
+    }
+    
+    int AsyncSend()
+    {
+        if(m_http_protocol_instance)
+            return m_http_protocol_instance->AsyncSend();
+        else
+            return -1;
+    }
+    
 	memory_cache* m_cache;
 };
 #endif /* _SESSION_H_*/

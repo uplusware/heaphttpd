@@ -8,7 +8,7 @@ Session_Group::Session_Group()
         fprintf(stderr, "%s %u# epoll_create1: %s\n", __FILE__, __LINE__, strerror(errno));
         return;  
     }
-    m_epoll_events = new struct epoll_event[65536]; 
+    m_epoll_events = new struct epoll_event[1024]; 
 }
 
 Session_Group::~Session_Group()
@@ -48,7 +48,7 @@ void Session_Group::Append(int fd, Session* s)
     
     struct epoll_event event; 
     event.data.fd = fd;  
-	event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR; 
+	event.events = EPOLLIN | EPOLLHUP | EPOLLERR; 
     epoll_ctl (m_epoll_fd, EPOLL_CTL_ADD, fd, &event);
     
 }
@@ -76,9 +76,11 @@ void Session_Group::Remove(int fd)
 void Session_Group::Processing()
 {
     int n, i;  
-  
-    n = epoll_wait (m_epoll_fd, m_epoll_events, 65536, 10);
+	fprintf(stderr, "Processing1 %d \n", n);
+    n = epoll_wait (m_epoll_fd, m_epoll_events, 1024, 1000);
     
+	fprintf(stderr, "Processing2 %d \n", n);
+	
     for (i = 0; i < n; i++)  
     {
         if (m_epoll_events[i].events & EPOLLIN)
@@ -86,7 +88,7 @@ void Session_Group::Processing()
             map<int, Session*>::iterator iter = m_session_list.find(m_epoll_events[i].data.fd);
             if(iter != m_session_list.end() && iter->second)
             {
-                if(iter->second->AsyncProcessing(m_epoll_fd) == httpClose)
+                if(iter->second->AsyncRecv() < 0 || iter->second->AsyncProcessing(m_epoll_fd) == httpClose)
                 {
                     Remove(m_epoll_events[i].data.fd);
                 }
@@ -95,11 +97,10 @@ void Session_Group::Processing()
         }
         else if (m_epoll_events[i].events & EPOLLOUT)
         {
-            
             map<int, Session*>::iterator iter = m_session_list.find(m_epoll_events[i].data.fd);
             if(iter != m_session_list.end() && iter->second)
             {
-                if(iter->second->AsyncProcessing(m_epoll_fd) == httpClose)
+                if(iter->second->AsyncSend() < 0 || iter->second->AsyncProcessing(m_epoll_fd) == httpClose)
                 {
                     Remove(m_epoll_events[i].data.fd);
                 }

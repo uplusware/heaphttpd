@@ -224,7 +224,8 @@ pthread_rwlock_t Worker::m_STATIC_THREAD_IDLE_NUM_LOCK;
 volatile unsigned int Worker::m_STATIC_THREAD_IDLE_NUM = 0;
     
 void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
-{    
+{   
+    Worker * p_worker = session_param->worker;
 	BOOL isHttp2 = FALSE;
 	Session* pSession = NULL;
     SSL* ssl = NULL;
@@ -385,7 +386,15 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 			}
 		}
 	}
-	
+#ifdef _WITH_ASYNC_
+    pSession = new Session(p_worker->GetSessionGroup()->Get_epoll_fd(), session_param->srvobjmap, session_param->sockfd, ssl,
+        session_param->client_ip.c_str(), client_cert, session_param->https, isHttp2, session_param->cache);
+	if(pSession != NULL)
+	{
+		p_worker->GetSessionGroup()->Append(session_param->sockfd, pSession);
+	}
+
+#else
 	pSession = new Session(-1, session_param->srvobjmap, session_param->sockfd, ssl,
         session_param->client_ip.c_str(), client_cert, session_param->https, isHttp2, session_param->cache);
 	if(pSession != NULL)
@@ -394,7 +403,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 		delete pSession;
         pSession = NULL;
 	}
-	
+#endif /* _WITH_ASYNC_ */
 FAIL_CLEAN_SSL_1:
     if(client_cert)
         X509_free (client_cert);
@@ -437,6 +446,7 @@ void Worker::INIT_THREAD_POOL_HANDLER()
 
 void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 {
+    Worker* p_worker = (Worker*)arg;
 	m_STATIC_THREAD_POOL_EXIT = TRUE;
 
 #ifdef HEAPHTTPD_DYNAMIC_WORKDERS	
@@ -453,7 +463,9 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 	while(m_STATIC_THREAD_POOL_EXIT)
 	{
 		clock_gettime(CLOCK_REALTIME, &ts);
+#ifndef _WITH_ASYNC_
 		ts.tv_sec += CHttpBase::m_service_idle_timeout;
+#endif /* _WITH_ASYNC_ */
 		if(sem_timedwait(&m_STATIC_THREAD_POOL_SEM, &ts) == 0)
 		{
 			SESSION_PARAM* session_param = NULL;
@@ -485,7 +497,15 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 #ifdef HEAPHTTPD_DYNAMIC_WORKDERS
 		else
 		{
-            break; //exit from the current thread
+			
+            if(errno == EINTR || errno == ETIMEDOUT)
+            {
+                p_worker->GetSessionGroup()->Processing();
+            }
+            else
+            {
+                break; //exit from the current thread
+            }
 		}
 #endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 	}
@@ -582,7 +602,9 @@ Worker::Worker(const char* service_name, int process_seq, int thread_num, int so
 	m_cache->load();
     
     int flags = fcntl(m_sockfd, F_GETFL, 0); 
-	fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK); 
+	fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK);
+    
+    m_session_group = new Session_Group();
 }
 
 Worker::~Worker()
@@ -592,15 +614,19 @@ Worker::~Worker()
 	m_srvobjmap.ReleaseAll();
     if(m_sockfd > 0)
         close(m_sockfd);
+    
+    if(m_session_group)
+        delete m_session_group;
+    m_session_group = NULL;
 }
 
 void Worker::Working(CUplusTrace& uTrace)
 {
 #ifdef HEAPHTTPD_DYNAMIC_WORKDERS
-	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, 0, LEAVE_THREAD_POOL_HANDLER,
+	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, this, 0, LEAVE_THREAD_POOL_HANDLER,
 		CHttpBase::m_thread_increase_step);
 #else
-	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, NULL, 0, LEAVE_THREAD_POOL_HANDLER,
+	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, this, 0, LEAVE_THREAD_POOL_HANDLER,
 		CHttpBase::m_max_instance_thread_num);
 #endif /* HEAPHTTPD_DYNAMIC_WORKDERS*/	
     std::queue<SESSION_PARAM*> local_session_queue;
@@ -701,7 +727,7 @@ void Worker::Working(CUplusTrace& uTrace)
 		    session_param->ca_password = client_param.ca_password;
 		    session_param->ca_key_server = client_param.ca_key_server;
 		    session_param->client_cer_check = client_param.client_cer_check;
-
+            session_param->worker = this;
 			if(pthread_mutex_trylock(&m_STATIC_THREAD_POOL_MUTEX) == 0)
             {
                 while(!local_session_queue.empty())
@@ -746,15 +772,11 @@ Service::Service(Service_Type st)
     m_sockfd_ssl = -1;
 	m_st = st;
 	m_service_name = SVR_NAME_TBL[m_st];
-    
-    m_session_group = new Session_Group();
 }
 
 Service::~Service()
 {
-    if(m_session_group)
-        delete m_session_group;
-    m_session_group = NULL;
+
 }
 
 void Service::Stop()

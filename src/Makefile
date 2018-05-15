@@ -48,6 +48,12 @@ else
     MEMCACHED_DEF = _WITHOUT_MEMCACHED_
 endif
 
+ifdef ASYNC
+    ASYNC_DEF = _WITH_ASYNC_
+else
+    ASYNC_DEF = _WITHOUT_ASYNC_
+endif
+
 LDLIST_SVR = ../$(OPENSSL_DIR)/libssl.a ../$(OPENSSL_DIR)/libcrypto.a -lstdc++ -lrt -ldl -lpthread -lheaphttp -lheapauth -lheapwebsocket
 LDLIST_TOOL = -lstdc++
 LDLIST_AUTH = -lstdc++
@@ -80,7 +86,7 @@ $(WSLIB): $(WSLIBOBJS)
 	$(CC) -shared -W -fPIC -o $@ $(WSLIBOBJS) $(LDDIRS) $(LDLIST_WS)
     
 %.o : %.cpp
-	$(CC) -D$(MDEF) -D$(MEMCACHED_DEF) $(INCDIR) $(FLAGS) -c $< -o $@
+	$(CC) -D$(MDEF) -D$(MEMCACHED_DEF) -D$(ASYNC_DEF) $(INCDIR) $(FLAGS) -c $< -o $@
 
 clean:
 	-rm -f  $(HTTPSRV) $(HTTPLIB) $(WSLIB) $(AUTHLIB) $(NIUTOOL) $(WSLIBOBJS) $(HTTPSRVOBJS) $(NIUTOOLOBJS) $(HTTPLIBOBJS) $(AUTHLIBOBJS) *.elf *.gdb *.o *.a *.so
