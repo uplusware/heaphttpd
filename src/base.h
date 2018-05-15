@@ -214,42 +214,113 @@ class linesock
 public:
 	linesock(int fd)
 	{
-		dbufsize = 0;
+		recv_buf_size = 0;
 		sockfd = fd;
-		dbuf = (char*)malloc(4096);
-		if(dbuf)
+		recv_buf = (char*)malloc(4096);
+		if(recv_buf)
 		{
-			dbufsize = 4096;
+			recv_buf_size = 4096;
 		}
-		dlen = 0;
+		recv_data_len = 0;
+        
+        send_buf = NULL;
+        send_data_len = 0;
+        send_buf_size = 0;
 	}
 	
 	virtual ~linesock()
 	{
-		if(dbuf)
-			free(dbuf);
+		if(recv_buf)
+			free(recv_buf);
 	}
-
+    
+    int async_send(const char* pbuf, int blen)
+    {
+        int new_mem_len = send_data_len + blen;
+        char* new_buf = (char*)malloc(new_mem_len);
+        if(send_buf)
+        {
+            memcpy(new_buf, send_buf, send_data_len);
+            free(send_buf);
+        }
+        memcpy(new_buf + send_data_len, pbuf, blen);
+        
+        send_buf_size = new_mem_len;
+        send_buf = new_buf;
+        send_data_len += blen;
+        
+        
+        int len = send(sockfd, send_buf, send_data_len, 0);
+        if(len > 0)
+        {
+            memmove(send_buf, send_buf + len, send_data_len - len);
+            send_data_len -= len;
+        }
+        
+        return blen;
+    }
+    
+    int async_flush()
+    {
+        int len = send(sockfd, send_buf, send_data_len, 0);
+        if(len > 0)
+        {
+            memmove(send_buf, send_buf + len, send_data_len - len);
+            send_data_len -= len;
+        }
+        
+        return send_data_len;
+    }
+    
 	int drecv(char* pbuf, int blen)
 	{
 		int rlen = 0;
-		if(blen <= dlen)
+		if(blen <= recv_data_len)
 		{
-			memcpy(pbuf, dbuf, blen);
+			memcpy(pbuf, recv_buf, blen);
 
-			memmove(dbuf, dbuf + blen , dlen - blen);
-			dlen = dlen - blen;
+			memmove(recv_buf, recv_buf + blen , recv_data_len - blen);
+			recv_data_len = recv_data_len - blen;
 			
 			rlen = blen;
 		}
 		else
 		{
 			
-			memcpy(pbuf, dbuf, dlen);
-			rlen = dlen;
-			dlen = 0;
+			memcpy(pbuf, recv_buf, recv_data_len);
+			rlen = recv_data_len;
+			recv_data_len = 0;
 			
 			int len = _Recv_(sockfd, pbuf + rlen, blen - rlen, CHttpBase::m_connection_idle_timeout);
+			if(len > 0)
+			{
+				rlen = rlen + len;	
+			}
+		}
+
+		return rlen;
+	}
+    
+    int async_drecv(char* pbuf, int blen)
+	{
+		int rlen = 0;
+		if(blen <= recv_data_len)
+		{
+			memcpy(pbuf, recv_buf, blen);
+
+			memmove(recv_buf, recv_buf + blen , recv_data_len - blen);
+			recv_data_len = recv_data_len - blen;
+			
+			rlen = blen;
+		}
+		else
+		{
+			
+			memcpy(pbuf, recv_buf, recv_data_len);
+			rlen = recv_data_len;
+			recv_data_len = 0;
+			
+			int len = recv(sockfd, pbuf + rlen, blen - rlen, 0);
 			if(len > 0)
 			{
 				rlen = rlen + len;	
@@ -271,41 +342,41 @@ public:
 
 		int left;
 		int right;
-		p = dlen > 0 ? (char*)memchr(dbuf, '\n', dlen) : NULL;
+		p = recv_data_len > 0 ? (char*)memchr(recv_buf, '\n', recv_data_len) : NULL;
 		if(p != NULL)
 		{
-			left = p - dbuf + 1;
-			right = dlen - left;
+			left = p - recv_buf + 1;
+			right = recv_data_len - left;
 		
 			if(blen >= left)
 			{
-				memcpy(pbuf, dbuf, left);
-				memmove(dbuf, p + 1, right);
-				dlen = right;
+				memcpy(pbuf, recv_buf, left);
+				memmove(recv_buf, p + 1, right);
+				recv_data_len = right;
 				pbuf[left] = '\0';
 				return left;
 			}
 			else
 			{
-				memcpy(pbuf, dbuf, blen);
-				memmove(dbuf, dbuf + blen, dlen - blen);
-				dlen = dlen - blen;
+				memcpy(pbuf, recv_buf, blen);
+				memmove(recv_buf, recv_buf + blen, recv_data_len - blen);
+				recv_data_len = recv_data_len - blen;
 				return blen;
 			}
 		}
 		else
 		{
-			if(blen >= dlen)
+			if(blen >= recv_data_len)
 			{
-				memcpy(pbuf, dbuf, dlen);
-				nRecv = dlen;
-				dlen = 0;
+				memcpy(pbuf, recv_buf, recv_data_len);
+				nRecv = recv_data_len;
+				recv_data_len = 0;
 			}
 			else
 			{
-				memcpy(pbuf, dbuf, blen);
-				memmove(dbuf, dbuf + blen, dlen - blen);
-				dlen = dlen - blen;
+				memcpy(pbuf, recv_buf, blen);
+				memmove(recv_buf, recv_buf + blen, recv_data_len - blen);
+				recv_data_len = recv_data_len - blen;
 				return blen;
 			}
 		}
@@ -345,15 +416,15 @@ public:
 					left = p - pbuf + 1;
 					right = nRecv - left;
 				
-					if(right > dbufsize)
+					if(right > recv_buf_size)
 					{
-						if(dbuf)
-							free(dbuf);
-						dbuf = (char*)malloc(right);
-						dbufsize = right;
+						if(recv_buf)
+							free(recv_buf);
+						recv_buf = (char*)malloc(right);
+						recv_buf_size = right;
 					}
-					memcpy(dbuf, p + 1, right);
-					dlen = right;
+					memcpy(recv_buf, p + 1, right);
+					recv_data_len = right;
 					nRecv = left;
 					pbuf[nRecv] = '\0';
 					break;
@@ -368,13 +439,113 @@ public:
 		}
 		return nRecv;
 	}
+    
+    
+    int async_lrecv(char* pbuf, int blen)
+	{
+		int taketime = 0;
+		int res;
+		fd_set mask; 
+		struct timeval timeout; 
+		char* p = NULL;
+		int len;
+		unsigned int nRecv = 0;
 
+		int left;
+		int right;
+		p = recv_data_len > 0 ? (char*)memchr(recv_buf, '\n', recv_data_len) : NULL;
+		if(p != NULL)
+		{
+			left = p - recv_buf + 1;
+			right = recv_data_len - left;
+		
+			if(blen >= left)
+			{
+				memcpy(pbuf, recv_buf, left);
+				memmove(recv_buf, p + 1, right);
+				recv_data_len = right;
+				pbuf[left] = '\0';
+				return left;
+			}
+			else
+			{
+				memcpy(pbuf, recv_buf, blen);
+				memmove(recv_buf, recv_buf + blen, recv_data_len - blen);
+				recv_data_len = recv_data_len - blen;
+				return blen;
+			}
+		}
+		else
+		{
+			if(blen >= recv_data_len)
+			{
+				memcpy(pbuf, recv_buf, recv_data_len);
+				nRecv = recv_data_len;
+				recv_data_len = 0;
+			}
+			else
+			{
+				memcpy(pbuf, recv_buf, blen);
+				memmove(recv_buf, recv_buf + blen, recv_data_len - blen);
+				recv_data_len = recv_data_len - blen;
+				return blen;
+			}
+		}
+
+		p = NULL;
+        
+		if(nRecv < blen)
+        {
+            len = recv(sockfd, pbuf + nRecv, blen - nRecv, 0);
+            if(len == 0)
+            {
+                close(sockfd);
+                return -1;
+            }
+            else if(len < 0)
+            {
+                if( errno == EAGAIN)
+                {
+                    return nRecv;
+                }
+                else
+                {
+                    close(sockfd);
+                    return -1;
+                }
+            }
+            nRecv = nRecv + len;
+            p = (char*)memchr(pbuf, '\n', nRecv);
+            if(p != NULL)
+            {
+                left = p - pbuf + 1;
+                right = nRecv - left;
+            
+                if(right > recv_buf_size)
+                {
+                    if(recv_buf)
+                        free(recv_buf);
+                    recv_buf = (char*)malloc(right);
+                    recv_buf_size = right;
+                }
+                memcpy(recv_buf, p + 1, right);
+                recv_data_len = right;
+                nRecv = left;
+                pbuf[nRecv] = '\0';
+            }
+        }
+		return nRecv;
+	}
 private:
 	int sockfd;
 public:
-	char* dbuf;
-	int dlen;
-	int dbufsize;
+	char* recv_buf;
+	int recv_data_len;
+	int recv_buf_size;
+    
+    char* send_buf;
+	int send_data_len;
+	int send_buf_size;
 };
 
 class linessl
@@ -382,42 +553,84 @@ class linessl
 public:
 	linessl(int fd, SSL* ssl)
 	{
-		dbufsize = 0;
+		recv_buf_size = 0;
 		sockfd = fd;
 		sslhd = ssl;
-		dbuf = (char*)malloc(4096);
-		if(dbuf)
+		recv_buf = (char*)malloc(4096);
+		if(recv_buf)
 		{
-			dbufsize = 4096;
+			recv_buf_size = 4096;
 		}
-		dlen = 0;
+		recv_data_len = 0;
+        
+        send_buf = NULL;
+        send_data_len = 0;
+        send_buf_size = 0;
 	}
 	
 	virtual ~linessl()
 	{
-		if(dbuf)
-			free(dbuf);
+		if(recv_buf)
+			free(recv_buf);
 	}
-
+    
+    int async_send(const char* pbuf, int blen)
+    {
+        int new_mem_len = send_data_len + blen;
+        char* new_buf = (char*)malloc(new_mem_len);
+        if(send_buf)
+        {
+            memcpy(new_buf, send_buf, send_data_len);
+            free(send_buf);
+        }
+        memcpy(new_buf + send_data_len, pbuf, blen);
+        
+        send_buf_size = new_mem_len;
+        send_buf = new_buf;
+        send_data_len += blen;
+        
+        
+        int len = SSL_write(sslhd, send_buf, send_data_len);
+        if(len > 0)
+        {
+            memmove(send_buf, send_buf + len, send_data_len - len);
+            send_data_len -= len;
+        }
+        
+        return blen;
+    }
+    
+    int async_flush()
+    {
+        int len = SSL_write(sslhd, send_buf, send_data_len);
+        if(len > 0)
+        {
+            memmove(send_buf, send_buf + len, send_data_len - len);
+            send_data_len -= len;
+        }
+        
+        return send_data_len;
+    }
+    
 	int drecv(char* pbuf, int blen)
 	{
 		int rlen = 0;
 		
-		if(blen <= dlen)
+		if(blen <= recv_data_len)
 		{
-			memcpy(pbuf, dbuf, blen);
+			memcpy(pbuf, recv_buf, blen);
 
-			memmove(dbuf, dbuf + blen, dlen - blen);
-			dlen = dlen - blen;
+			memmove(recv_buf, recv_buf + blen, recv_data_len - blen);
+			recv_data_len = recv_data_len - blen;
 			
 			rlen = blen;
 		}
 		else
 		{
 			
-			memcpy(pbuf, dbuf, dlen);
-			rlen = dlen;
-			dlen = 0;
+			memcpy(pbuf, recv_buf, recv_data_len);
+			rlen = recv_data_len;
+			recv_data_len = 0;
 			
 			int len = SSLRead(sockfd, sslhd, pbuf + rlen, blen - rlen, CHttpBase::m_connection_idle_timeout);
 			if(len > 0)
@@ -429,6 +642,37 @@ public:
 		return rlen;
 	}
 	
+    
+    int async_drecv(char* pbuf, int blen)
+	{
+		int rlen = 0;
+		
+		if(blen <= recv_data_len)
+		{
+			memcpy(pbuf, recv_buf, blen);
+
+			memmove(recv_buf, recv_buf + blen, recv_data_len - blen);
+			recv_data_len = recv_data_len - blen;
+			
+			rlen = blen;
+		}
+		else
+		{
+			
+			memcpy(pbuf, recv_buf, recv_data_len);
+			rlen = recv_data_len;
+			recv_data_len = 0;
+			
+			int len = SSL_read(sslhd, pbuf + rlen, blen - rlen);
+			if(len > 0)
+			{
+				rlen = rlen + len;	
+			}
+		}
+
+		return rlen;
+	}
+    
 	int lrecv(char* pbuf, int blen, int alive_timeout)
 	{
 		int taketime = 0;
@@ -442,41 +686,41 @@ public:
 
 		int left;
 		int right;
-		p = dlen > 0 ? (char*)memchr(dbuf, '\n', dlen) : NULL;
+		p = recv_data_len > 0 ? (char*)memchr(recv_buf, '\n', recv_data_len) : NULL;
 		if(p != NULL)
 		{
-			left = p - dbuf + 1;
-			right = dlen - left;
+			left = p - recv_buf + 1;
+			right = recv_data_len - left;
 
 			if(blen >= left)
 			{
-				memcpy(pbuf, dbuf, left);
-				memmove(dbuf, p + 1, right);
-				dlen = right;
+				memcpy(pbuf, recv_buf, left);
+				memmove(recv_buf, p + 1, right);
+				recv_data_len = right;
 				pbuf[left] = '\0';
 				return left;
 			}
 			else
 			{
-				memcpy(pbuf, dbuf, blen);
-				memmove(dbuf, dbuf + blen, dlen - blen);
-				dlen = dlen - blen;
+				memcpy(pbuf, recv_buf, blen);
+				memmove(recv_buf, recv_buf + blen, recv_data_len - blen);
+				recv_data_len = recv_data_len - blen;
 				return blen;
 			}
 		}
 		else
 		{
-			if(blen >= dlen)
+			if(blen >= recv_data_len)
 			{
-				memcpy(pbuf, dbuf, dlen);
-				nRecv = dlen;
-				dlen = 0;
+				memcpy(pbuf, recv_buf, recv_data_len);
+				nRecv = recv_data_len;
+				recv_data_len = 0;
 			}
 			else
 			{
-				memcpy(pbuf, dbuf, blen);
-				memmove(dbuf, dbuf + blen, dlen - blen);
-				dlen = dlen - blen;
+				memcpy(pbuf, recv_buf, blen);
+				memmove(recv_buf, recv_buf + blen, recv_data_len - blen);
+				recv_data_len = recv_data_len - blen;
 				return blen;
 			}
 		}
@@ -532,15 +776,15 @@ public:
                     left = p - pbuf + 1;
                     right = nRecv - left;
 
-                    if(right > dbufsize)
+                    if(right > recv_buf_size)
                     {
-                        if(dbuf)
-                            free(dbuf);
-                        dbuf = (char*)malloc(right);
-                        dbufsize = right;
+                        if(recv_buf)
+                            free(recv_buf);
+                        recv_buf = (char*)malloc(right);
+                        recv_buf_size = right;
                     }
-                    memcpy(dbuf, p + 1, right);
-                    dlen = right;
+                    memcpy(recv_buf, p + 1, right);
+                    recv_data_len = right;
                     nRecv = left;
                     pbuf[nRecv] = '\0';
                     break;
@@ -549,15 +793,121 @@ public:
 		}
 		return nRecv;
 	}
+    
+    
+    int async_lrecv(char* pbuf, int blen)
+	{
+		int taketime = 0;
+		int res;
+		fd_set mask;
+		struct timeval timeout;
+		char* p = NULL;
+		int len;
+		unsigned int nRecv = 0;
+		int ret;
 
+		int left;
+		int right;
+		p = recv_data_len > 0 ? (char*)memchr(recv_buf, '\n', recv_data_len) : NULL;
+		if(p != NULL)
+		{
+			left = p - recv_buf + 1;
+			right = recv_data_len - left;
+
+			if(blen >= left)
+			{
+				memcpy(pbuf, recv_buf, left);
+				memmove(recv_buf, p + 1, right);
+				recv_data_len = right;
+				pbuf[left] = '\0';
+				return left;
+			}
+			else
+			{
+				memcpy(pbuf, recv_buf, blen);
+				memmove(recv_buf, recv_buf + blen, recv_data_len - blen);
+				recv_data_len = recv_data_len - blen;
+				return blen;
+			}
+		}
+		else
+		{
+			if(blen >= recv_data_len)
+			{
+				memcpy(pbuf, recv_buf, recv_data_len);
+				nRecv = recv_data_len;
+				recv_data_len = 0;
+			}
+			else
+			{
+				memcpy(pbuf, recv_buf, blen);
+				memmove(recv_buf, recv_buf + blen, recv_data_len - blen);
+				recv_data_len = recv_data_len - blen;
+				return blen;
+			}
+		}
+
+		p = NULL;
+        
+		if(nRecv < blen)
+		{            
+            len = SSL_read(sslhd, pbuf + nRecv, blen - nRecv);
+            if(len == 0)
+            {
+                close(sockfd);
+                return -1;
+            }
+            else if(len < 0)
+            {
+                ret = SSL_get_error(sslhd, len);
+                if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+                {
+                    return nRecv;
+                }
+                else
+                {
+                    close(sockfd);
+                    return -1;
+                }
+            }
+            else
+            {
+                nRecv = nRecv + len;
+                p = (char*)memchr(pbuf, '\n', nRecv);
+                if(p != NULL)
+                {
+                    left = p - pbuf + 1;
+                    right = nRecv - left;
+
+                    if(right > recv_buf_size)
+                    {
+                        if(recv_buf)
+                            free(recv_buf);
+                        recv_buf = (char*)malloc(right);
+                        recv_buf_size = right;
+                    }
+                    memcpy(recv_buf, p + 1, right);
+                    recv_data_len = right;
+                    nRecv = left;
+                    pbuf[nRecv] = '\0';
+                }
+            }
+		}
+		return nRecv;
+	}
+    
 private:
 	int sockfd;
 	SSL* sslhd;
 	
 public:
-	char* dbuf;
-	int dlen;
-	int dbufsize;
+	char* recv_buf;
+	int recv_data_len;
+	int recv_buf_size;
+    
+    char* send_buf;
+	int send_data_len;
+	int send_buf_size;
 };
 #endif /* _MAILSYS_H_ */
 

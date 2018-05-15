@@ -1,6 +1,6 @@
 CC = gcc
 HTTPSRV = heaphttpd
-HTTPSRVOBJS = mainsrv.o service.o session.o pool.o base.o
+HTTPSRVOBJS = mainsrv.o service.o session.o session_group.o pool.o base.o
 
 NIUTOOL = heaptool
 NIUTOOLOBJS = heaptool.o util/DES.o

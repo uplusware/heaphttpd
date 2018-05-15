@@ -27,6 +27,7 @@ class Session
 {
 protected:
 	int m_sockfd;
+    int m_epoll_fd;
     SSL * m_ssl;
 	string m_clientip;
 	BOOL m_https;
@@ -38,12 +39,18 @@ protected:
     AUTH_SCHEME m_wwwauth_scheme;
     AUTH_SCHEME m_proxyauth_scheme;
     
+    IHttp * m_http_protocol_instance;
+    unsigned int m_connection_keep_alive_tickets;
+    time_t m_first_connection_request_time;
+    
 public:
-	Session(ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, BOOL https, BOOL http2, memory_cache* ch);
+	Session(int epoll_fd, ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, BOOL https, BOOL http2, memory_cache* ch);
 	virtual ~Session();
 	
-	void Process();
-
+	void Processing();
+    
+    Http_Connection AsyncProcessing(int epoll_fd);
+    
 	memory_cache* m_cache;
 };
 #endif /* _SESSION_H_*/

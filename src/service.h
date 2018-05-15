@@ -20,6 +20,7 @@
 #include "util/trace.h"
 #include "base.h"
 #include "session.h"
+#include "session_group.h"
 #include <mqueue.h>
 #include <semaphore.h>
 #include "cache.h"
@@ -260,6 +261,8 @@ protected:
 	list<pid_t> m_child_list;
 	vector<WORK_PROCESS_INFO> m_work_processes;
 	unsigned int m_next_process;
+    
+    Session_Group* m_session_group;
 };
 
 #endif /* _SERVICE_H_ */

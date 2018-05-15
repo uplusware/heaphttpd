@@ -23,6 +23,8 @@ public:
     void Processing();
     
     int GetSessionCount() { return m_session_list.size(); }
+    
+    int Get_epoll_fd() { return m_epoll_fd; }
 private:
     map<int, Session*> m_session_list;
     

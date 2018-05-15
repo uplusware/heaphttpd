@@ -102,7 +102,7 @@ class http2_stream;
 class CHttp2 : public IHttp
 {
 public:
-	CHttp2(time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	CHttp2(int epoll_fd, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -115,9 +115,13 @@ public:
 	
 	int ProtRecv();
     virtual Http_Connection Processing();
+    virtual Http_Connection AsyncProcessing();
     virtual int HttpSend(const char* buf, int len);
     virtual int HttpRecv(char* buf, int len);
-    
+    virtual int AsyncHttpSend(const char* buf, int len);
+    virtual int AsyncHttpRecv(char* buf, int len);
+    virtual int AsyncSend();
+    virtual int AsyncRecv();
     virtual http_tunneling* GetHttpTunneling() { return m_http_tunneling; }
     
     void PushPromise(uint_32 stream_ind, const char * path);
@@ -147,6 +151,7 @@ public:
 private:
     ServiceObjMap * m_srvobj;
     int m_sockfd;
+    int m_epoll_fd;
     string m_servername;
     unsigned short m_serverport;
     string m_clientip;

@@ -33,20 +33,58 @@ enum Http_Connection
 
 enum Http_State
 {
-    httpHeader = 0,
-    httpData
+    httpReqHeader = 0,
+    httpReqData,
+    httpResponse,
 };
 
 class IHttp
 {
 public:
-    IHttp() {}
-    virtual ~IHttp() {} //Must be have, otherwise there will be memory leak for CHttp and CHttp2
+    IHttp()
+    {
+        m_async_send_buf = NULL;
+        m_async_send_data_len = 0;
+        m_async_send_buf_size = 0;
+        
+        m_async_recv_buf = NULL;
+        m_async_recv_data_len = 0;
+        m_async_recv_buf_size = 0;
+    
+    }
+    virtual ~IHttp()
+    {
+        if(m_async_send_buf)
+            free(m_async_send_buf);
+        m_async_send_buf = NULL;
+        m_async_send_data_len = 0;
+        m_async_send_buf_size = 0;
+        
+         if(m_async_recv_buf)
+            free(m_async_recv_buf);
+        m_async_recv_buf = NULL;
+        m_async_recv_data_len = 0;
+        m_async_recv_buf_size = 0;
+    } //Must be have, otherwise there will be memory leak for CHttp and CHttp2
     
     virtual Http_Connection Processing() = 0;
+    virtual Http_Connection AsyncProcessing() = 0;
     virtual int HttpSend(const char* buf, int len) = 0;
     virtual int HttpRecv(char* buf, int len) = 0;
+    virtual int AsyncHttpSend(const char* buf, int len) = 0;
+    virtual int AsyncHttpRecv(char* buf, int len) = 0;
+    virtual int AsyncSend() = 0;
+    virtual int AsyncRecv() = 0;
     virtual http_tunneling* GetHttpTunneling() = 0;
+protected:
+    char* m_async_send_buf;
+    int m_async_send_data_len;
+    int m_async_send_buf_size;
+    
+    char* m_async_recv_buf;
+    int m_async_recv_data_len;
+    int m_async_recv_buf_size;
+    
 };
 
 #include "http2.h"
@@ -55,7 +93,7 @@ class CHttp : public IHttp
 {
 public:
     friend class CHttp2;
-	CHttp(time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	CHttp(int epoll_fd, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -71,11 +109,19 @@ public:
     
 	virtual int HttpSend(const char* buf, int len);
     virtual int HttpRecv(char* buf, int len);
+    virtual int AsyncHttpSend(const char* buf, int len);
+    virtual int AsyncHttpRecv(char* buf, int len);
+    virtual int AsyncSend();
+    virtual int AsyncRecv();
 	virtual Http_Connection Processing();
+    virtual Http_Connection AsyncProcessing();
     
     int ProtRecv(char* buf, int len, int alive_timeout);
+    int AsyncProtRecv(char* buf, int len);
+    
     void PushPostData(const char* buf, int len);
     void RecvPostData();
+    void AsyncRecvPostData();
     void Response();
     void Tunneling();
     
@@ -181,6 +227,7 @@ protected:
 	CHttp2 * m_http2;
     uint_32 m_http2_stream_ind;
 	int m_sockfd;
+    int m_epoll_fd;
 	linesock* m_lsockfd;
 	linessl * m_lssl;
 	string m_line_text;

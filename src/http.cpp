@@ -30,7 +30,7 @@
 
 const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" };
 
-CHttp::CHttp(time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp::CHttp(int epoll_fd, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
 	const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
     cgi_socket_t fpm_socktype, const char* fpm_sockfile,
@@ -39,6 +39,7 @@ CHttp::CHttp(time_t connection_first_request_time, time_t connection_keep_alive_
 	const char* private_path, AUTH_SCHEME wwwauth_scheme, AUTH_SCHEME proxyauth_scheme, 
 	SSL* ssl, CHttp2* phttp2, uint_32 http2_stream_ind)
 {	
+    m_epoll_fd = epoll_fd;
     m_srvobj = srvobj;
     m_protocol_upgrade = FALSE;
     m_upgrade_protocol = "";
@@ -142,7 +143,7 @@ CHttp::CHttp(time_t connection_first_request_time, time_t connection_keep_alive_
     
     m_request_no_cache = FALSE;
     
-    m_http_state = httpHeader;
+    m_http_state = httpReqHeader;
 }
 
 CHttp::~CHttp()
@@ -188,12 +189,106 @@ int CHttp::HttpRecv(char* buf, int len)
 		return m_lsockfd->drecv(buf, len);	
 }
 
+int CHttp::AsyncHttpSend(const char* buf, int len)
+{
+	if(len > 0)
+    {
+        m_async_send_buf_size = m_async_send_data_len + len;
+        char* new_buf = (char*)malloc(m_async_send_buf_size);
+        
+        if(m_async_send_buf)
+        {
+            memcpy(new_buf, m_async_send_buf, m_async_send_data_len);
+            free(m_async_send_buf);
+        }
+        memcpy(new_buf + m_async_send_data_len, buf, len);
+        m_async_send_data_len += len;
+        m_async_send_buf = new_buf;
+    }
+    
+    return len;
+		
+}
+
+int CHttp::AsyncHttpRecv(char* buf, int len)
+{
+    int min_len = 0;
+	if(m_async_recv_buf && m_async_recv_data_len > 0)
+    {
+        min_len = len < m_async_recv_data_len ? len : m_async_recv_data_len;
+        memcpy(buf, m_async_recv_buf, min_len);
+        if(min_len > 0)
+        {
+            memmove(m_async_recv_buf, m_async_recv_buf + min_len, m_async_recv_data_len - min_len);
+            m_async_recv_data_len -= min_len;
+        }
+    }
+    
+    return min_len;
+}
+
+int CHttp::AsyncSend()
+{
+    int len = 0;
+    if(m_async_send_buf && m_async_send_data_len > 0)
+    {
+        len = m_ssl ? SSL_write(m_ssl, m_async_send_buf, m_async_send_data_len) : send(m_sockfd, m_async_send_buf, m_async_send_data_len, 0);
+        
+        if(len > 0)
+        {
+            memmove(m_async_send_buf, m_async_send_buf + len, m_async_send_data_len - len);
+            m_async_send_data_len -= len;
+            
+            struct epoll_event event; 
+            event.data.fd = m_sockfd;  
+            event.events = m_async_send_data_len == 0 ? (EPOLLIN | EPOLLHUP | EPOLLERR) : EPOLLIN | EPOLLOUT| EPOLLHUP | EPOLLERR;
+            epoll_ctl (m_epoll_fd, EPOLL_CTL_MOD, m_sockfd, &event);
+        }
+    }
+    
+    return len;
+		
+}
+
+int CHttp::AsyncRecv()
+{
+    char buf[1024];
+
+    int len = len = m_ssl ? SSL_read(m_ssl, buf, 1024) : recv(m_sockfd, buf, 1024, 0);;
+    
+    if(len > 0)
+    {
+        m_async_recv_buf_size = m_async_recv_data_len + len;
+        char* new_buf = (char*)malloc(m_async_recv_buf_size);
+        
+        if(m_async_recv_buf)
+        {
+            memcpy(new_buf, m_async_recv_buf, m_async_recv_data_len);
+            free(m_async_recv_buf);
+        }
+        memcpy(new_buf + m_async_recv_data_len, buf, len);
+        m_async_recv_data_len += len;
+        m_async_recv_buf = new_buf;
+    }
+    
+    return len;
+}
+
 int CHttp::ProtRecv(char* buf, int len, int alive_timeout)
 {
     if(m_ssl)
         return m_lssl->lrecv(buf, len, alive_timeout);
     else
         return m_lsockfd->lrecv(buf, len, alive_timeout);
+}
+
+
+int CHttp::AsyncProtRecv(char* buf, int len)
+{
+    if(m_ssl)
+        return m_lssl->async_lrecv(buf, len);
+    else
+        return m_lsockfd->async_lrecv(buf, len);
 }
 
 Http_Connection CHttp::Processing()
@@ -218,6 +313,30 @@ Http_Connection CHttp::Processing()
         }
     }
     
+    return httpConn;
+}
+
+Http_Connection CHttp::AsyncProcessing()
+{
+    Http_Connection httpConn = httpKeepAlive;
+    if(m_http_state == httpReqHeader)
+    {
+        char sz_http_data[4096];
+        int result = ProtRecv(sz_http_data, 4095, CHttpBase::m_connection_keep_alive_timeout);
+        if(result <= 0)
+        {
+            httpConn = httpClose; // socket is broken. close the keep-alive connection
+        }
+        else
+        {
+            sz_http_data[result] = '\0';
+            httpConn = LineParse((const char*)sz_http_data);
+        }
+    }
+    else if(m_http_state == httpReqData || m_http_state == httpResponse)
+    {
+        httpConn = DataParse();
+    }
     return httpConn;
 }
 
@@ -675,26 +794,9 @@ void CHttp::PushPostData(const char* buf, int len)
 
 void CHttp::RecvPostData()
 {
-    if(m_content_type == application_x_www_form_urlencoded)
+    if(m_content_length > 0)
     {
-        if(m_content_length == 0)
-        {
-            while(1)
-            {
-                if(m_postdata.length() > MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN)
-                    break;
-                char rbuf[1449];
-                int rlen = HttpRecv(rbuf, 1448);
-                if(rlen > 0)
-                {
-                    rbuf[rlen] = '\0';
-                    m_postdata += rbuf;
-                }
-                else
-                    break;
-            }
-        }
-        else
+        if(m_content_type == application_x_www_form_urlencoded)
         {
             if(m_content_length < MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN)
             {
@@ -708,29 +810,11 @@ void CHttp::RecvPostData()
                 free(post_data);
             }
         }
-    }
-    else if(m_content_type == multipart_form_data)
-    {
-        if(!m_postdata_ex)
-            m_postdata_ex = new fbuffer(m_private_path.c_str());
-        if(m_content_length == 0)
+        else if(m_content_type == multipart_form_data)
         {
-            while(1)
-            {
-                char rbuf[1449];
-                int rlen = HttpRecv(rbuf, 1448);
-                if(rlen > 0)
-                {
-                    m_postdata_ex->bufcat(rbuf, rlen);
-                }
-                else
-                {
-                    break;
-                }
-            }
-        }
-        else
-        {
+            if(!m_postdata_ex)
+                m_postdata_ex = new fbuffer(m_private_path.c_str());
+        
             int nRecv = 0;
             while(1)
             {
@@ -749,7 +833,59 @@ void CHttp::RecvPostData()
                 }
             }
         }
-    }	   
+    }
+    m_http_state = httpResponse;
+}
+
+void CHttp::AsyncRecvPostData()
+{
+    if(m_content_length > 0)
+    {
+        if(m_content_type == application_x_www_form_urlencoded)
+        {
+            if(m_content_length < MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN)
+            {
+                char* post_data = (char*)malloc(m_content_length + 1);
+                int nlen = AsyncHttpRecv(post_data, m_content_length - m_postdata.length());
+                if( nlen > 0)
+                {
+                    post_data[nlen] = '\0';
+                    m_postdata += post_data;
+                }
+                free(post_data);
+                
+                if(m_postdata.length() == m_content_length)
+                {
+                    m_http_state = httpResponse;
+                }
+            }
+        }
+        else if(m_content_type == multipart_form_data)
+        {
+            if(!m_postdata_ex)
+                m_postdata_ex = new fbuffer(m_private_path.c_str());
+            
+            char rbuf[1449];
+                int rlen = AsyncHttpRecv(rbuf, (m_content_length - m_postdata_ex->length()) > 1448 ? 1448 : ( m_content_length - m_postdata_ex->length()));
+            if(rlen > 0)
+            {
+                m_postdata_ex->bufcat(rbuf, rlen);
+            }
+            else
+            {
+                 m_http_state = httpResponse;
+            }
+            
+            if(m_postdata_ex->length() == m_content_length)
+            {
+                m_http_state = httpResponse;
+            }
+        }
+    }
+    else if(m_content_length == 0)
+    {
+        m_http_state = httpResponse;
+    }
 }
 
 void CHttp::Tunneling()
@@ -927,188 +1063,209 @@ void CHttp::Response()
 
 Http_Connection CHttp::DataParse()
 {
-    m_http_state = httpData;
-            
-    //store the header content
-    m_header_content += "\r\n";
-    if(m_http_method == hmPost)
+    if(m_http_state == httpReqHeader)
     {
-        RecvPostData();
+        m_http_state = httpReqData;
+        //store the header content
+        m_header_content += "\r\n";
     }
+    
+    if(m_http_state == httpReqData)
+    {
+        if(m_content_length < 0)
+        {
+            CHttpResponseHdr header(m_response_header.GetMap());
+            header.SetStatusCode(SC411);
 
-    //Authentication
-    if(m_http_tunneling_connection == HTTP_Tunneling_None)
-    {
-        if((GetWWWAuthScheme() == asBasic || GetWWWAuthScheme() == asDigest)
-            && !IsPassedWWWAuth())
-        {
-            CHttpResponseHdr header(m_response_header.GetMap());
-            string strRealm = "User or Administrator";
-            header.SetStatusCode(SC401);
-            
-            unsigned char md5key[17];
-            sprintf((char*)md5key, "%016lx", pthread_self());
-            
-            unsigned char szMD5Realm[16];
-            char szHexMD5Realm[33];
-            HMAC_MD5((unsigned char*)strRealm.c_str(), strRealm.length(), md5key, 16, szMD5Realm);
-            sprintf(szHexMD5Realm, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", 
-                szMD5Realm[0], szMD5Realm[1], szMD5Realm[2], szMD5Realm[3],
-                szMD5Realm[4], szMD5Realm[5], szMD5Realm[6], szMD5Realm[7],
-                szMD5Realm[8], szMD5Realm[9], szMD5Realm[10], szMD5Realm[11],
-                szMD5Realm[12], szMD5Realm[13], szMD5Realm[14], szMD5Realm[15]);
-                    
-            string strVal;
-            if(GetWWWAuthScheme() == asBasic)
-            {
-                strVal = "Basic realm=\"";
-                strVal += strRealm;
-                strVal += "\"";
-            }
-            else if(GetWWWAuthScheme() == asDigest)
-            {
-                struct timeval tval;
-                struct timezone tzone;
-                gettimeofday(&tval, &tzone);
-                char szNonce[35];
-                srandom(time(NULL));
-                unsigned long long thisp64 = (unsigned long long)this;
-                thisp64 <<= 32;
-                thisp64 >>= 32;
-                unsigned long thisp32 = (unsigned long)thisp64;
-                
-                sprintf(szNonce, "%08x%016lx%08x%02x", tval.tv_sec, tval.tv_usec + 0x01B21DD213814000ULL, thisp32, random()%255);
-                
-                strVal = "Digest realm=\"";
-                strVal += strRealm;
-                strVal += "\", qop=\"auth,auth-int\", nonce=\"";
-                strVal += szNonce;
-                strVal += "\", opaque=\"";
-                strVal += szHexMD5Realm;
-                strVal += "\"";
-                
-            }
-            //printf("%s\n", strVal.c_str());
-            header.SetField("WWW-Authenticate", strVal.c_str());
-            
             header.SetField("Content-Type", "text/html");
             header.SetField("Content-Length", header.GetDefaultHTMLLength());
-            
             SendHeader(header.Text(), header.Length());
             SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-            return httpContinue;
+            
+            return httpClose;
         }
-    }
-    else
-    {
-        if((GetProxyAuthScheme() == asBasic || GetProxyAuthScheme() == asDigest)
-            && !IsPassedProxyAuth())
+        
+        if(m_content_length >= 0)
         {
-            CHttpResponseHdr header(m_response_header.GetMap());
-            header.SetStatusCode(SC407);
-            string strRealm = "Proxy User or Administrator";
-            
-            unsigned char md5key[17];
-            sprintf((char*)md5key, "%016lx", pthread_self());
-            
-            unsigned char szMD5Realm[16];
-            char szHexMD5Realm[33];
-            HMAC_MD5((unsigned char*)strRealm.c_str(), strRealm.length(), md5key, 16, szMD5Realm);
-            sprintf(szHexMD5Realm, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", 
-                szMD5Realm[0], szMD5Realm[1], szMD5Realm[2], szMD5Realm[3],
-                szMD5Realm[4], szMD5Realm[5], szMD5Realm[6], szMD5Realm[7],
-                szMD5Realm[8], szMD5Realm[9], szMD5Realm[10], szMD5Realm[11],
-                szMD5Realm[12], szMD5Realm[13], szMD5Realm[14], szMD5Realm[15]);
-                    
-            string strVal;
-            if(GetProxyAuthScheme() == asBasic)
-            {
-                strVal = "Basic realm=\"";
-                strVal += strRealm;
-                strVal += "\"";
-            }
-            else if(GetProxyAuthScheme() == asDigest)
-            {
-                
-                struct timeval tval;
-                struct timezone tzone;
-                gettimeofday(&tval, &tzone);
-                char szNonce[35];
-                srandom(time(NULL));
-                unsigned long long thisp64 = (unsigned long long)this;
-                thisp64 <<= 32;
-                thisp64 >>= 32;
-                unsigned long thisp32 = (unsigned long)thisp64;
-                
-                sprintf(szNonce, "%08x%016lx%08x%02x", tval.tv_sec, tval.tv_usec + 0x01B21DD213814000ULL, thisp32, random()%255);
-                
-                strVal = "Digest realm=\"";
-                strVal += strRealm;
-                strVal += "\", qop=\"auth,auth-int\", nonce=\"";
-                strVal += szNonce;
-                strVal += "\", opaque=\"";
-                strVal += szHexMD5Realm;
-                strVal += "\"";
-                
-            }
-            //printf("%s\n", strVal.c_str());
-            header.SetField("Proxy-Authenticate", strVal.c_str());
-            
-            header.SetField("Content-Type", "text/html");
-            header.SetField("Content-Length", header.GetDefaultHTMLLength());
-            
-            SendHeader(header.Text(), header.Length());
-            SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-            return httpContinue;
+            RecvPostData();  
         }
     }
     
-    //go ahead after authentication
-    if(m_http_tunneling_connection == HTTP_Tunneling_None)
+    if(m_http_state == httpResponse)
     {
-        if(m_http_method == hmPut || m_http_method == hmDelete)
+        //Authentication
+        if(m_http_tunneling_connection == HTTP_Tunneling_None)
         {
-            CHttpResponseHdr header(m_response_header.GetMap());
-            header.SetStatusCode(SC405);
-
-            header.SetField("Content-Type", "text/html");
-            header.SetField("Content-Length", header.GetDefaultHTMLLength());
-            SendHeader(header.Text(), header.Length());
-            SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            if((GetWWWAuthScheme() == asBasic || GetWWWAuthScheme() == asDigest)
+                && !IsPassedWWWAuth())
+            {
+                CHttpResponseHdr header(m_response_header.GetMap());
+                string strRealm = "User or Administrator";
+                header.SetStatusCode(SC401);
+                
+                unsigned char md5key[17];
+                sprintf((char*)md5key, "%016lx", pthread_self());
+                
+                unsigned char szMD5Realm[16];
+                char szHexMD5Realm[33];
+                HMAC_MD5((unsigned char*)strRealm.c_str(), strRealm.length(), md5key, 16, szMD5Realm);
+                sprintf(szHexMD5Realm, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", 
+                    szMD5Realm[0], szMD5Realm[1], szMD5Realm[2], szMD5Realm[3],
+                    szMD5Realm[4], szMD5Realm[5], szMD5Realm[6], szMD5Realm[7],
+                    szMD5Realm[8], szMD5Realm[9], szMD5Realm[10], szMD5Realm[11],
+                    szMD5Realm[12], szMD5Realm[13], szMD5Realm[14], szMD5Realm[15]);
+                        
+                string strVal;
+                if(GetWWWAuthScheme() == asBasic)
+                {
+                    strVal = "Basic realm=\"";
+                    strVal += strRealm;
+                    strVal += "\"";
+                }
+                else if(GetWWWAuthScheme() == asDigest)
+                {
+                    struct timeval tval;
+                    struct timezone tzone;
+                    gettimeofday(&tval, &tzone);
+                    char szNonce[35];
+                    srandom(time(NULL));
+                    unsigned long long thisp64 = (unsigned long long)this;
+                    thisp64 <<= 32;
+                    thisp64 >>= 32;
+                    unsigned long thisp32 = (unsigned long)thisp64;
+                    
+                    sprintf(szNonce, "%08x%016lx%08x%02x", tval.tv_sec, tval.tv_usec + 0x01B21DD213814000ULL, thisp32, random()%255);
+                    
+                    strVal = "Digest realm=\"";
+                    strVal += strRealm;
+                    strVal += "\", qop=\"auth,auth-int\", nonce=\"";
+                    strVal += szNonce;
+                    strVal += "\", opaque=\"";
+                    strVal += szHexMD5Realm;
+                    strVal += "\"";
+                    
+                }
+                //printf("%s\n", strVal.c_str());
+                header.SetField("WWW-Authenticate", strVal.c_str());
+                
+                header.SetField("Content-Type", "text/html");
+                header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                
+                SendHeader(header.Text(), header.Length());
+                SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                return httpContinue;
+            }
         }
         else
         {
-            Response();
+            if((GetProxyAuthScheme() == asBasic || GetProxyAuthScheme() == asDigest)
+                && !IsPassedProxyAuth())
+            {
+                CHttpResponseHdr header(m_response_header.GetMap());
+                header.SetStatusCode(SC407);
+                string strRealm = "Proxy User or Administrator";
+                
+                unsigned char md5key[17];
+                sprintf((char*)md5key, "%016lx", pthread_self());
+                
+                unsigned char szMD5Realm[16];
+                char szHexMD5Realm[33];
+                HMAC_MD5((unsigned char*)strRealm.c_str(), strRealm.length(), md5key, 16, szMD5Realm);
+                sprintf(szHexMD5Realm, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", 
+                    szMD5Realm[0], szMD5Realm[1], szMD5Realm[2], szMD5Realm[3],
+                    szMD5Realm[4], szMD5Realm[5], szMD5Realm[6], szMD5Realm[7],
+                    szMD5Realm[8], szMD5Realm[9], szMD5Realm[10], szMD5Realm[11],
+                    szMD5Realm[12], szMD5Realm[13], szMD5Realm[14], szMD5Realm[15]);
+                        
+                string strVal;
+                if(GetProxyAuthScheme() == asBasic)
+                {
+                    strVal = "Basic realm=\"";
+                    strVal += strRealm;
+                    strVal += "\"";
+                }
+                else if(GetProxyAuthScheme() == asDigest)
+                {
+                    
+                    struct timeval tval;
+                    struct timezone tzone;
+                    gettimeofday(&tval, &tzone);
+                    char szNonce[35];
+                    srandom(time(NULL));
+                    unsigned long long thisp64 = (unsigned long long)this;
+                    thisp64 <<= 32;
+                    thisp64 >>= 32;
+                    unsigned long thisp32 = (unsigned long)thisp64;
+                    
+                    sprintf(szNonce, "%08x%016lx%08x%02x", tval.tv_sec, tval.tv_usec + 0x01B21DD213814000ULL, thisp32, random()%255);
+                    
+                    strVal = "Digest realm=\"";
+                    strVal += strRealm;
+                    strVal += "\", qop=\"auth,auth-int\", nonce=\"";
+                    strVal += szNonce;
+                    strVal += "\", opaque=\"";
+                    strVal += szHexMD5Realm;
+                    strVal += "\"";
+                    
+                }
+                //printf("%s\n", strVal.c_str());
+                header.SetField("Proxy-Authenticate", strVal.c_str());
+                
+                header.SetField("Content-Type", "text/html");
+                header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                
+                SendHeader(header.Text(), header.Length());
+                SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                return httpContinue;
+            }
         }
-    }
-    else
-    {
-        if(!CHttpBase::m_enable_http_tunneling && (m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL))
+        
+        //go ahead after authentication
+        if(m_http_tunneling_connection == HTTP_Tunneling_None)
         {
-            CHttpResponseHdr header(m_response_header.GetMap());
-            header.SetStatusCode(SC404);
+            if(m_http_method == hmPut || m_http_method == hmDelete)
+            {
+                CHttpResponseHdr header(m_response_header.GetMap());
+                header.SetStatusCode(SC405);
 
-            header.SetField("Content-Type", "text/html");
-            header.SetField("Content-Length", header.GetDefaultHTMLLength());
-            SendHeader(header.Text(), header.Length());
-            SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-        }
-        else if(!CHttpBase::m_enable_http_tunneling && m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
-        {
-            CHttpResponseHdr header(m_response_header.GetMap());
-            header.SetStatusCode(SC405);
-
-            header.SetField("Content-Type", "text/html");
-            header.SetField("Content-Length", header.GetDefaultHTMLLength());
-            SendHeader(header.Text(), header.Length());
-            SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                header.SetField("Content-Type", "text/html");
+                header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                SendHeader(header.Text(), header.Length());
+                SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            }
+            else
+            {
+                Response();
+            }
         }
         else
         {
-            Tunneling();
+            if(!CHttpBase::m_enable_http_tunneling && (m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL))
+            {
+                CHttpResponseHdr header(m_response_header.GetMap());
+                header.SetStatusCode(SC404);
+
+                header.SetField("Content-Type", "text/html");
+                header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                SendHeader(header.Text(), header.Length());
+                SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            }
+            else if(!CHttpBase::m_enable_http_tunneling && m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
+            {
+                CHttpResponseHdr header(m_response_header.GetMap());
+                header.SetStatusCode(SC405);
+
+                header.SetField("Content-Type", "text/html");
+                header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                SendHeader(header.Text(), header.Length());
+                SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            }
+            else
+            {
+                Tunneling();
+            }
         }
     }
-    
     return (m_keep_alive && m_enabled_keep_alive) ? httpKeepAlive : httpClose;
             
 }

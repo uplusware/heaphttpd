@@ -386,11 +386,11 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 		}
 	}
 	
-	pSession = new Session(session_param->srvobjmap, session_param->sockfd, ssl,
+	pSession = new Session(-1, session_param->srvobjmap, session_param->sockfd, ssl,
         session_param->client_ip.c_str(), client_cert, session_param->https, isHttp2, session_param->cache);
 	if(pSession != NULL)
 	{
-		pSession->Process();
+		pSession->Processing();
 		delete pSession;
         pSession = NULL;
 	}
@@ -746,11 +746,15 @@ Service::Service(Service_Type st)
     m_sockfd_ssl = -1;
 	m_st = st;
 	m_service_name = SVR_NAME_TBL[m_st];
+    
+    m_session_group = new Session_Group();
 }
 
 Service::~Service()
 {
-
+    if(m_session_group)
+        delete m_session_group;
+    m_session_group = NULL;
 }
 
 void Service::Stop()

@@ -86,7 +86,7 @@ void Session_Group::Processing()
             map<int, Session*>::iterator iter = m_session_list.find(m_epoll_events[i].data.fd);
             if(iter != m_session_list.end() && iter->second)
             {
-                if(iter->second->Processing(m_epoll_fd) == httpClose)
+                if(iter->second->AsyncProcessing(m_epoll_fd) == httpClose)
                 {
                     Remove(m_epoll_events[i].data.fd);
                 }
@@ -99,7 +99,7 @@ void Session_Group::Processing()
             map<int, Session*>::iterator iter = m_session_list.find(m_epoll_events[i].data.fd);
             if(iter != m_session_list.end() && iter->second)
             {
-                if(iter->second->Processing(m_epoll_fd) == httpClose)
+                if(iter->second->AsyncProcessing(m_epoll_fd) == httpClose)
                 {
                     Remove(m_epoll_events[i].data.fd);
                 }

@@ -21,7 +21,7 @@ enum stream_state_e
 class http2_stream
 {
 public:
-    http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd,
+    http2_stream(int epoll_fd, uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd,
         const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
@@ -76,7 +76,9 @@ private:
     CHttp2* m_http2;
     CHttp* m_http1;
     hpack* m_hpack;
-        
+    
+    int m_epoll_fd;
+    
     uint_32 m_stream_ind;
     ServiceObjMap * m_srvobj;
     int m_sockfd;

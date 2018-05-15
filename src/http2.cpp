@@ -74,7 +74,7 @@
 
 #define PRE_MALLOC_SIZE 1024
 
-CHttp2::CHttp2(time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp2::CHttp2(int epoll_fd, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -107,6 +107,7 @@ CHttp2::CHttp2(time_t connection_first_request_time, time_t connection_keep_aliv
     
     m_srvobj = srvobj;
     m_sockfd = sockfd;
+    m_epoll_fd = epoll_fd;
     m_servername = servername;
     m_serverport = serverport;
     m_clientip = clientip;
@@ -396,7 +397,7 @@ http2_stream* CHttp2::create_stream_instance(uint_32 stream_ind)
 {
     if(stream_ind > 0)
     {
-        return new http2_stream(stream_ind,
+        return new http2_stream(m_epoll_fd, stream_ind,
                                     m_initial_local_window_size,
                                     m_initial_peer_window_size,
                                     this,
@@ -469,7 +470,92 @@ int CHttp2::HttpRecv(char* buf, int len)
 	else
 		return m_lsockfd->drecv(buf, len);	
 }
-                    
+
+int CHttp2::AsyncSend()
+{
+    int len = 0;
+    if(m_async_send_buf && m_async_send_data_len > 0)
+    {
+        len = m_ssl ? SSL_write(m_ssl, m_async_send_buf, m_async_send_data_len) : send(m_sockfd, m_async_send_buf, m_async_send_data_len, 0);
+        
+        if(len > 0)
+        {
+            memmove(m_async_send_buf, m_async_send_buf + len, m_async_send_data_len - len);
+            m_async_send_data_len -= len;
+            
+            struct epoll_event event; 
+            event.data.fd = m_sockfd;  
+            event.events = m_async_send_data_len == 0 ? (EPOLLIN | EPOLLHUP | EPOLLERR) : EPOLLIN | EPOLLOUT| EPOLLHUP | EPOLLERR;
+            epoll_ctl (m_epoll_fd, EPOLL_CTL_MOD, m_sockfd, &event);
+        }
+    }
+    
+    return len;
+		
+}
+
+int CHttp2::AsyncRecv()
+{
+    char buf[1024];
+
+    int len = len = m_ssl ? SSL_read(m_ssl, buf, 1024) : recv(m_sockfd, buf, 1024, 0);;
+    
+    if(len > 0)
+    {
+        m_async_recv_buf_size = m_async_recv_data_len + len;
+        char* new_buf = (char*)malloc(m_async_recv_buf_size);
+        
+        if(m_async_recv_buf)
+        {
+            memcpy(new_buf, m_async_recv_buf, m_async_recv_data_len);
+            free(m_async_recv_buf);
+        }
+        memcpy(new_buf + m_async_recv_data_len, buf, len);
+        m_async_recv_data_len += len;
+        m_async_recv_buf = new_buf;
+    }
+    
+    return len;
+}
+
+int CHttp2::AsyncHttpSend(const char* buf, int len)
+{
+	if(len > 0)
+    {
+        m_async_send_buf_size = m_async_send_data_len + len;
+        char* new_buf = (char*)malloc(m_async_send_buf_size);
+        
+        if(m_async_send_buf)
+        {
+            memcpy(new_buf, m_async_send_buf, m_async_send_data_len);
+            free(m_async_send_buf);
+        }
+        memcpy(new_buf + m_async_send_data_len, buf, len);
+        m_async_send_data_len += len;
+        m_async_send_buf = new_buf;
+    }
+    
+    return len;
+		
+}
+
+int CHttp2::AsyncHttpRecv(char* buf, int len)
+{
+    int min_len = 0;
+	if(m_async_recv_buf && m_async_recv_data_len > 0)
+    {
+        min_len = len < m_async_recv_data_len ? len : m_async_recv_data_len;
+        memcpy(buf, m_async_recv_buf, min_len);
+        if(min_len > 0)
+        {
+            memmove(m_async_recv_buf, m_async_recv_buf + min_len, m_async_recv_data_len - min_len);
+            m_async_recv_data_len -= min_len;
+        }
+    }
+    
+    return min_len;
+}
+        
 int CHttp2::ProtRecv()
 {
     HTTP2_Frame frame_hdr;// = (HTTP2_Frame*)malloc(sizeof(HTTP2_Frame));
@@ -961,6 +1047,14 @@ Http_Connection CHttp2::Processing()
             break;
         }
     }
+    return httpConn;
+}
+
+
+Http_Connection CHttp2::AsyncProcessing()
+{
+    Http_Connection httpConn = httpKeepAlive;
+    
     return httpConn;
 }
 

@@ -3,7 +3,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //http2_stream
-http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd,
+http2_stream::http2_stream(int epoll_fd, uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd,
         const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
@@ -27,6 +27,7 @@ http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_3
     m_stream_ind = stream_ind;
     m_srvobj = srvobj;
     m_sockfd = sockfd;
+    m_epoll_fd = epoll_fd;
     m_servername = servername;
     m_serverport = serverport;
     m_clientip = clientip;
@@ -51,7 +52,7 @@ http2_stream::http2_stream(uint_32 stream_ind, uint_32 local_window_size, uint_3
     
     m_http2 = phttp2;
     
-    m_http1 = new CHttp(m_connection_first_request_time, m_connection_keep_alive_timeout, m_connection_keep_alive_request_tickets, m_http_tunneling, m_srvobj,
+    m_http1 = new CHttp(m_epoll_fd, m_connection_first_request_time, m_connection_keep_alive_timeout, m_connection_keep_alive_request_tickets, m_http_tunneling, m_srvobj,
                             m_sockfd,
                             m_servername.c_str(),
                             m_serverport,

@@ -819,7 +819,6 @@ void http_tunneling::relay_processing()
                     }
                     else if(len > 0)
                     {
-                        //printf("RECV(CLT): %d\n", len);
                         buf_descr_frm_client.w_pos += len;
                         FD_SET(m_backend_sockfd, &mask_w);
                     }
@@ -854,7 +853,6 @@ void http_tunneling::relay_processing()
                     }
                     else if(len > 0)
                     {
-                        //printf("SEND(SRV): %d\n", len);
                         buf_descr_frm_client.r_pos += len;
                         if(buf_descr_frm_client.r_pos == buf_descr_frm_client.w_pos)
                             FD_CLR(m_backend_sockfd, &mask_w);
@@ -900,7 +898,6 @@ void http_tunneling::relay_processing()
                     }
                     else if(len > 0)
                     {
-                        //printf("RECV(SRV): %d\n", len);
                         buf_descr_frm_backend.w_pos += len;
                         FD_SET(m_client_sockfd, &mask_w);
                     }
@@ -935,7 +932,6 @@ void http_tunneling::relay_processing()
                     }
                     else if(len > 0)
                     {
-                        //printf("SEND(CLT): %d\n", len);
                         buf_descr_frm_backend.r_pos += len;
                         if(buf_descr_frm_backend.r_pos == buf_descr_frm_backend.w_pos)
                             FD_CLR(m_client_sockfd, &mask_w);
