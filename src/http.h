@@ -36,6 +36,7 @@ enum Http_State
     httpReqHeader = 0,
     httpReqData,
     httpResponse,
+    httpComplete
 };
 
 class IHttp
@@ -106,6 +107,7 @@ public:
 
 	Http_Connection LineParse(const char* text);
     Http_Connection DataParse();
+    Http_Connection ResponseReply();
     
 	virtual int HttpSend(const char* buf, int len);
     virtual int HttpRecv(char* buf, int len);
@@ -316,6 +318,10 @@ protected:
     unsigned int m_connection_keep_alive_request_tickets;
     
     Http_State m_http_state;
+    
+    BOOL m_tunneling_ext_handled;
+    BOOL m_backend_connected;
+    BOOL m_tunneling_connection_established;
 };
 
 #endif /* _HTTP_H_ */

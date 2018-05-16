@@ -22,7 +22,7 @@ public:
 
     void Processing();
     
-    int GetSessionCount() { return m_session_list.size(); }
+    unsigned int Count();
     
     int Get_epoll_fd() { return m_epoll_fd; }
 private:
@@ -30,6 +30,8 @@ private:
     
     int m_epoll_fd;
     struct epoll_event * m_epoll_events;
+    
+    unsigned int m_session_count;
 };
 
 #endif /* _SESSION_GROUP_H_ */

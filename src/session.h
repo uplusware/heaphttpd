@@ -43,13 +43,16 @@ protected:
     unsigned int m_connection_keep_alive_tickets;
     time_t m_first_connection_request_time;
     
+    void CreateProtocol();
+    
 public:
 	Session(int epoll_fd, ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, BOOL https, BOOL http2, memory_cache* ch);
 	virtual ~Session();
 	
+    
 	void Processing();
     
-    Http_Connection AsyncProcessing(int epoll_fd);
+    Http_Connection AsyncProcessing();
     
     int AsyncRecv()
     {
@@ -67,6 +70,7 @@ public:
             return -1;
     }
     
+    int get_sock_fd() { return m_sockfd; }
 	memory_cache* m_cache;
 };
 #endif /* _SESSION_H_*/

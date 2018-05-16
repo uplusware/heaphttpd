@@ -454,21 +454,28 @@ uint_32  CHttp2::get_initial_local_window_size()
 
 int CHttp2::HttpSend(const char* buf, int len)
 {
-    if(m_ssl)
+#ifdef _WITH_ASYNC_
+    return AsyncHttpSend(buf, len);
+#else
+	if(m_ssl)
 		return SSLWrite(m_sockfd, m_ssl, buf, len, CHttpBase::m_connection_idle_timeout);
 	else
 		return _Send_( m_sockfd, buf, len, CHttpBase::m_connection_idle_timeout);
-		
+#endif /* _WITH_ASYNC_ */
 }
 
 int CHttp2::HttpRecv(char* buf, int len)
 {
-    if(m_ssl)
+#ifdef _WITH_ASYNC_
+    return AsyncHttpRecv(buf, len);
+#else
+	if(m_ssl)
 	{
 		return m_lssl->drecv(buf, len);
 	}
 	else
 		return m_lsockfd->drecv(buf, len);	
+#endif /* _WITH_ASYNC_ */	
 }
 
 int CHttp2::AsyncSend()
@@ -561,6 +568,8 @@ int CHttp2::AsyncHttpSend(const char* buf, int len)
         memcpy(new_buf + m_async_send_data_len, buf, len);
         m_async_send_data_len += len;
         m_async_send_buf = new_buf;
+        
+        AsyncSend();
     }
     
     return len;

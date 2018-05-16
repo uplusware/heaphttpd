@@ -225,7 +225,7 @@ volatile unsigned int Worker::m_STATIC_THREAD_IDLE_NUM = 0;
     
 void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 {   
-    Worker * p_worker = session_param->worker;
+    Worker * pWorkerInstance = session_param->worker;
 	BOOL isHttp2 = FALSE;
 	Session* pSession = NULL;
     SSL* ssl = NULL;
@@ -387,13 +387,13 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 		}
 	}
 #ifdef _WITH_ASYNC_
-    pSession = new Session(p_worker->GetSessionGroup()->Get_epoll_fd(), session_param->srvobjmap, session_param->sockfd, ssl,
+    pSession = new Session(pWorkerInstance->GetSessionGroup()->Get_epoll_fd(), session_param->srvobjmap, session_param->sockfd, ssl,
         session_param->client_ip.c_str(), client_cert, session_param->https, isHttp2, session_param->cache);
 	if(pSession != NULL)
 	{
-		p_worker->GetSessionGroup()->Append(session_param->sockfd, pSession);
+		pWorkerInstance->GetSessionGroup()->Append(session_param->sockfd, pSession);
 	}
-
+    return;
 #else
 	pSession = new Session(-1, session_param->srvobjmap, session_param->sockfd, ssl,
         session_param->client_ip.c_str(), client_cert, session_param->https, isHttp2, session_param->cache);
@@ -404,6 +404,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
         pSession = NULL;
 	}
 #endif /* _WITH_ASYNC_ */
+
 FAIL_CLEAN_SSL_1:
     if(client_cert)
         X509_free (client_cert);
@@ -446,8 +447,13 @@ void Worker::INIT_THREAD_POOL_HANDLER()
 
 void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 {
-    Worker* p_worker = (Worker*)arg;
-	m_STATIC_THREAD_POOL_EXIT = TRUE;
+    printf("START_THREAD_POOL_HANDLER\n");
+    PoolArg* pArg = (PoolArg*)arg;
+    Worker* pWorkerInstance;
+
+    memcpy(&pWorkerInstance, pArg->data, sizeof(Worker*));
+    
+    m_STATIC_THREAD_POOL_EXIT = TRUE;
 
 #ifdef HEAPHTTPD_DYNAMIC_WORKDERS	
     pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
@@ -465,6 +471,8 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 		clock_gettime(CLOCK_REALTIME, &ts);
 #ifndef _WITH_ASYNC_
 		ts.tv_sec += CHttpBase::m_service_idle_timeout;
+#else
+        ts.tv_sec += 0;
 #endif /* _WITH_ASYNC_ */
 		if(sem_timedwait(&m_STATIC_THREAD_POOL_SEM, &ts) == 0)
 		{
@@ -496,16 +504,22 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 		}
 #ifdef HEAPHTTPD_DYNAMIC_WORKDERS
 		else
-		{
-			
+		{	
+#ifdef _WITH_ASYNC_
             if(errno == EINTR || errno == ETIMEDOUT)
             {
-                p_worker->GetSessionGroup()->Processing();
+                if( pWorkerInstance->GetSessionGroup()->Count() > 0)
+                {
+                    pWorkerInstance->GetSessionGroup()->Processing();
+                }
             }
             else
             {
                 break; //exit from the current thread
             }
+#else
+            break;
+#endif /* _WITH_ASYNC_ */
 		}
 #endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 	}
@@ -589,7 +603,8 @@ void CLEAR_QUEUE(mqd_t qid)
 //Worker
 Worker::Worker(const char* service_name, int process_seq, int thread_num, int sockfd)
 {
-
+    m_session_group = new Session_Group();
+        
 	m_sockfd = sockfd;
 	m_thread_num = thread_num;
 	m_process_seq = process_seq;
@@ -603,8 +618,6 @@ Worker::Worker(const char* service_name, int process_seq, int thread_num, int so
     
     int flags = fcntl(m_sockfd, F_GETFL, 0); 
 	fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK);
-    
-    m_session_group = new Session_Group();
 }
 
 Worker::~Worker()
@@ -622,11 +635,12 @@ Worker::~Worker()
 
 void Worker::Working(CUplusTrace& uTrace)
 {
+    Worker* pWorkerInstance = this;
 #ifdef HEAPHTTPD_DYNAMIC_WORKDERS
-	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, this, 0, LEAVE_THREAD_POOL_HANDLER,
+	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, &pWorkerInstance, sizeof(Worker*), LEAVE_THREAD_POOL_HANDLER,
 		CHttpBase::m_thread_increase_step);
 #else
-	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, this, 0, LEAVE_THREAD_POOL_HANDLER,
+	ThreadPool WorkerPool(m_thread_num, INIT_THREAD_POOL_HANDLER, START_THREAD_POOL_HANDLER, &pWorkerInstance, sizeof(Worker*), LEAVE_THREAD_POOL_HANDLER,
 		CHttpBase::m_max_instance_thread_num);
 #endif /* HEAPHTTPD_DYNAMIC_WORKDERS*/	
     std::queue<SESSION_PARAM*> local_session_queue;
@@ -746,7 +760,6 @@ void Worker::Working(CUplusTrace& uTrace)
             {
                 local_session_queue.push(session_param);
             }
-			
 #ifdef HEAPHTTPD_DYNAMIC_WORKDERS
 			pthread_rwlock_rdlock(&m_STATIC_THREAD_IDLE_NUM_LOCK);
 			int current_idle_thread_num = m_STATIC_THREAD_IDLE_NUM;
@@ -755,11 +768,12 @@ void Worker::Working(CUplusTrace& uTrace)
             pthread_mutex_lock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
             int current_thread_pool_size = m_STATIC_THREAD_POOL_SIZE;
             pthread_mutex_unlock(&m_STATIC_THREAD_POOL_SIZE_MUTEX);
-    
+#ifndef _WITH_ASYNC_    
             if(current_idle_thread_num < CHttpBase::m_thread_increase_step && current_thread_pool_size < CHttpBase::m_max_instance_thread_num)
             {
                 WorkerPool.More((CHttpBase::m_max_instance_thread_num - current_thread_pool_size) < CHttpBase::m_thread_increase_step ? (CHttpBase::m_max_instance_thread_num - current_thread_pool_size) : CHttpBase::m_thread_increase_step);
             }
+#endif /* _WITH_ASYNC_ */
 #endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 		}
 	}

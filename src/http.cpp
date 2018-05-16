@@ -144,6 +144,10 @@ CHttp::CHttp(int epoll_fd, time_t connection_first_request_time, time_t connecti
     m_request_no_cache = FALSE;
     
     m_http_state = httpReqHeader;
+    
+    m_tunneling_ext_handled = FALSE;
+    m_backend_connected = FALSE;
+    m_tunneling_connection_established = FALSE;
 }
 
 CHttp::~CHttp()
@@ -172,21 +176,29 @@ CHttp::~CHttp()
 
 int CHttp::HttpSend(const char* buf, int len)
 {
+#ifdef _WITH_ASYNC_
+    return AsyncHttpSend(buf, len);
+#else
 	if(m_ssl)
 		return SSLWrite(m_sockfd, m_ssl, buf, len, CHttpBase::m_connection_idle_timeout);
 	else
 		return _Send_( m_sockfd, buf, len, CHttpBase::m_connection_idle_timeout);
+#endif /* _WITH_ASYNC_ */
 		
 }
 
 int CHttp::HttpRecv(char* buf, int len)
 {
+#ifdef _WITH_ASYNC_
+    return AsyncHttpRecv(buf, len);
+#else
 	if(m_ssl)
 	{
 		return m_lssl->drecv(buf, len);
 	}
 	else
 		return m_lsockfd->drecv(buf, len);	
+#endif /* _WITH_ASYNC_ */
 }
 
 int CHttp::AsyncHttpSend(const char* buf, int len)
@@ -204,6 +216,11 @@ int CHttp::AsyncHttpSend(const char* buf, int len)
         memcpy(new_buf + m_async_send_data_len, buf, len);
         m_async_send_data_len += len;
         m_async_send_buf = new_buf;
+        
+        //printf("AsyncHttpSend %d %d\n", m_async_send_data_len, len);
+        
+        AsyncSend();
+            
     }
     
     return len;
@@ -233,6 +250,8 @@ int CHttp::AsyncSend()
     if(m_async_send_buf && m_async_send_data_len > 0)
     {
         len = m_ssl ? SSL_write(m_ssl, m_async_send_buf, m_async_send_data_len) : send(m_sockfd, m_async_send_buf, m_async_send_data_len, 0);
+        
+        //printf("AsyncSend len %d %d\n", len, m_async_send_data_len);
         
         if(len > 0)
         {
@@ -268,7 +287,7 @@ int CHttp::AsyncRecv()
 {
     char buf[1024];
 
-    int len = len = m_ssl ? SSL_read(m_ssl, buf, 1024) : recv(m_sockfd, buf, 1024, 0);;
+    int len = m_ssl ? SSL_read(m_ssl, buf, 1024) : recv(m_sockfd, buf, 1024, 0);
     
     if(len > 0)
     {
@@ -313,10 +332,50 @@ int CHttp::ProtRecv(char* buf, int len, int alive_timeout)
 
 int CHttp::AsyncProtRecv(char* buf, int len)
 {
-    if(m_ssl)
-        return m_lssl->async_lrecv(buf, len);
+    char* p = NULL;
+    unsigned int recv_num = 0;
+
+    int left;
+    int right;
+    p = m_async_recv_data_len > 0 ? (char*)memchr(m_async_recv_buf, '\n', m_async_recv_data_len) : NULL;
+    if(p != NULL)
+    {
+        left = p - m_async_recv_buf + 1;
+        right = m_async_recv_data_len - left;
+    
+        if(len >= left)
+        {
+            memcpy(buf, m_async_recv_buf, left);
+            memmove(m_async_recv_buf, p + 1, right);
+            m_async_recv_data_len = right;
+            buf[left] = '\0';
+            return left;
+        }
+        else
+        {
+            memcpy(buf, m_async_recv_buf, len);
+            memmove(m_async_recv_buf, m_async_recv_buf + len, m_async_recv_data_len - len);
+            m_async_recv_data_len = m_async_recv_data_len - len;
+            return len;
+        }
+    }
     else
-        return m_lsockfd->async_lrecv(buf, len);
+    {
+        if(len >= m_async_recv_data_len)
+        {
+            memcpy(buf, m_async_recv_buf, m_async_recv_data_len);
+            recv_num = m_async_recv_data_len;
+            m_async_recv_data_len = 0;
+        }
+        else
+        {
+            memcpy(buf, m_async_recv_buf, len);
+            memmove(m_async_recv_buf, m_async_recv_buf + len, m_async_recv_data_len - len);
+            m_async_recv_data_len = m_async_recv_data_len - len;
+            return len;
+        }
+    }
+    return recv_num;
 }
 
 Http_Connection CHttp::Processing()
@@ -350,7 +409,7 @@ Http_Connection CHttp::AsyncProcessing()
     if(m_http_state == httpReqHeader)
     {
         char sz_http_data[4096];
-        int result = ProtRecv(sz_http_data, 4095, CHttpBase::m_connection_keep_alive_timeout);
+        int result = AsyncProtRecv(sz_http_data, 4095);
         if(result <= 0)
         {
             httpConn = httpClose; // socket is broken. close the keep-alive connection
@@ -361,10 +420,19 @@ Http_Connection CHttp::AsyncProcessing()
             httpConn = LineParse((const char*)sz_http_data);
         }
     }
-    else if(m_http_state == httpReqData || m_http_state == httpResponse)
+    else if(m_http_state == httpReqData)
     {
         httpConn = DataParse();
     }
+    else if(m_http_state == httpResponse)
+    {
+        httpConn = ResponseReply();
+    }
+    else if(m_http_state == httpComplete)
+    {
+        httpConn = httpClose;
+    }
+    
     return httpConn;
 }
 
@@ -918,52 +986,64 @@ void CHttp::AsyncRecvPostData()
 
 void CHttp::Tunneling()
 {
-    //4rd extension hook
-    bool session_is_continuing = true;
-    for(int x = 0; x < m_ext_list->size(); x++)
+    if(!m_tunneling_ext_handled)
     {
-        void* (*ext_tunneling)(CHttp*, const char*, const char*, const char*, const char*, unsigned short, http_ext_tunneling_continuing*);
-        ext_tunneling = (void*(*)(CHttp*, const char*, const char*, const char*, const char*, unsigned short, http_ext_tunneling_continuing*))dlsym((*m_ext_list)[x].handle, "ext_tunneling");
-        const char* errmsg;
-        if((errmsg = dlerror()) == NULL)
+        //4rd extension hook
+        bool session_is_continuing = true;
+        
+        for(int x = 0; x < m_ext_list->size(); x++)
         {
-            http_ext_tunneling_continuing ext_is_continuing = http_ext_tunneling_continuing_yes;
-            ext_tunneling(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(),
-                m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, &ext_is_continuing);
-            
-            if(ext_is_continuing == http_ext_tunneling_continuing_no)
+            void* (*ext_tunneling)(CHttp*, const char*, const char*, const char*, const char*, unsigned short, http_ext_tunneling_continuing*);
+            ext_tunneling = (void*(*)(CHttp*, const char*, const char*, const char*, const char*, unsigned short, http_ext_tunneling_continuing*))dlsym((*m_ext_list)[x].handle, "ext_tunneling");
+            const char* errmsg;
+            if((errmsg = dlerror()) == NULL)
             {
-                session_is_continuing = false;
+                http_ext_tunneling_continuing ext_is_continuing = http_ext_tunneling_continuing_yes;
+                ext_tunneling(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(),
+                    m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, &ext_is_continuing);
+                
+                if(ext_is_continuing == http_ext_tunneling_continuing_no)
+                {
+                    session_is_continuing = false;
+                }
             }
         }
-    }
-    
-    if(!session_is_continuing)
-    {
-        CHttpResponseHdr header(m_response_header.GetMap());
-        header.SetStatusCode(SC405);
-
-        header.SetField("Content-Type", "text/html");
-        header.SetField("Content-Length", header.GetDefaultHTMLLength());
-        SendHeader(header.Text(), header.Length());
-        SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
         
-        return;
+        m_tunneling_ext_handled = TRUE;
+        
+        if(!session_is_continuing)
+        {
+            CHttpResponseHdr header(m_response_header.GetMap());
+            header.SetStatusCode(SC405);
+
+            header.SetField("Content-Type", "text/html");
+            header.SetField("Content-Length", header.GetDefaultHTMLLength());
+            SendHeader(header.Text(), header.Length());
+            SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            
+            return;
+        }
     }
     
     if(!m_http_tunneling)
         m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache);
     
-    if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
+    if(m_backend_connected || m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
         m_http_tunneling_backend_address_backup1.c_str(), m_http_tunneling_backend_port_backup1, m_http_tunneling_url_backup1.c_str(),
         m_http_tunneling_backend_address_backup2.c_str(), m_http_tunneling_backend_port_backup2, m_http_tunneling_url_backup2.c_str(),
         m_request_no_cache)) //connected
     {
+        m_backend_connected = TRUE;
+        
         if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
         {
-            const char* connect_resp = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: "VERSION_STRING"\r\n\r\n";
-            HttpSend(connect_resp, strlen(connect_resp));
-            
+            if(!m_tunneling_connection_established)
+            {
+                const char* connect_resp = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: "VERSION_STRING"\r\n\r\n";
+                HttpSend(connect_resp, strlen(connect_resp));
+                
+                m_tunneling_connection_established = TRUE;
+            }
             m_http_tunneling->relay_processing();
         }
         else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL)
@@ -1089,38 +1169,11 @@ void CHttp::Response()
     }
 }
 
-Http_Connection CHttp::DataParse()
+Http_Connection CHttp::ResponseReply()
 {
-    if(m_http_state == httpReqHeader)
-    {
-        m_http_state = httpReqData;
-        //store the header content
-        m_header_content += "\r\n";
-    }
-    
-    if(m_http_state == httpReqData)
-    {
-        if(m_content_length < 0)
-        {
-            CHttpResponseHdr header(m_response_header.GetMap());
-            header.SetStatusCode(SC411);
-
-            header.SetField("Content-Type", "text/html");
-            header.SetField("Content-Length", header.GetDefaultHTMLLength());
-            SendHeader(header.Text(), header.Length());
-            SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-            
-            return httpClose;
-        }
-        
-        if(m_content_length >= 0)
-        {
-            RecvPostData();  
-        }
-    }
-    
     if(m_http_state == httpResponse)
     {
+        //printf("ResponseReply\n");
         //Authentication
         if(m_http_tunneling_connection == HTTP_Tunneling_None)
         {
@@ -1293,8 +1346,44 @@ Http_Connection CHttp::DataParse()
                 Tunneling();
             }
         }
+        
+        m_http_state = httpComplete;
     }
     return (m_keep_alive && m_enabled_keep_alive) ? httpKeepAlive : httpClose;
+}
+
+Http_Connection CHttp::DataParse()
+{    
+    if(m_http_state == httpReqData)
+    {
+        //printf("DataParse\n");
+        if(m_content_length < 0)
+        {
+            CHttpResponseHdr header(m_response_header.GetMap());
+            header.SetStatusCode(SC411);
+
+            header.SetField("Content-Type", "text/html");
+            header.SetField("Content-Length", header.GetDefaultHTMLLength());
+            SendHeader(header.Text(), header.Length());
+            SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+            
+            return httpClose;
+        }
+        
+        if(m_content_length >= 0)
+        {
+#ifdef _WITH_ASYNC_
+            AsyncRecvPostData();
+#else
+            RecvPostData();  
+#endif /* _WITH_ASYNC_ */
+        }
+    }
+#ifdef _WITH_ASYNC_
+    return httpContinue;
+#else
+    return ResponseReply();
+#endif /* _WITH_ASYNC_ */
             
 }
 
@@ -1309,7 +1398,7 @@ Http_Connection CHttp::LineParse(const char* text)
         m_line_text = m_line_text.substr(new_line + 1);
 
         strtrim(strtext);
-        //printf("<<<< %s\r\n", strtext.c_str());
+        /* printf("<<<< %s\r\n", strtext.c_str()); */
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)
         {
@@ -1420,7 +1509,14 @@ Http_Connection CHttp::LineParse(const char* text)
         }
         else if(strcasecmp(strtext.c_str(), "") == 0) /* if true, then http request header finished. */
         {
-           return DataParse();
+            //store the header content
+            m_header_content += "\r\n";
+            m_http_state = httpReqData;
+#ifdef _WITH_ASYNC_
+            return httpContinue;
+#else
+            return DataParse();
+#endif /* _WITH_ASYNC_ */ 
         }
         else
         {

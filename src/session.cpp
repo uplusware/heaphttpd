@@ -43,7 +43,9 @@ Session::Session(int epoll_fd, ServiceObjMap* srvobj, int sockfd, SSL* ssl, cons
     m_http_protocol_instance = NULL;
     
     m_connection_keep_alive_tickets = CHttpBase::m_connection_keep_alive_max;
-    m_first_connection_request_time = time(NULL);    
+    m_first_connection_request_time = time(NULL);
+    
+    CreateProtocol();
 }
 
 Session::~Session()
@@ -57,79 +59,78 @@ Session::~Session()
     m_http_protocol_instance = NULL;
 }
 
-Http_Connection Session::AsyncProcessing(int epoll_fd)
+void Session::CreateProtocol()
 {
-    Http_Connection httpConn = httpKeepAlive;
-    
     if(!m_http_protocol_instance)
     {
-        try
+        if(!m_https)
         {
-            if(!m_https)
+            m_http_protocol_instance = new CHttp(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
+                m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
+                m_clientip.c_str(), m_client_cert, m_cache,
+                CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(),
+                CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
+                CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
+                &CHttpBase::m_cgi_list,
+                CHttpBase::m_private_path.c_str(), m_wwwauth_scheme, m_proxyauth_scheme);
+        }
+        else if(m_https)
+        {
+            if(m_http2)
             {
-                m_http_protocol_instance = new CHttp(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
-                    m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
+                m_http_protocol_instance = new CHttp2(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
+                    m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
                     m_clientip.c_str(), m_client_cert, m_cache,
-                    CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(),
+                    CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(), 
                     CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
                     CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
                     &CHttpBase::m_cgi_list,
-                    CHttpBase::m_private_path.c_str(), m_wwwauth_scheme, m_proxyauth_scheme);
-            }
-            else if(m_https)
-            {
-                if(m_http2)
-                {
-                    m_http_protocol_instance = new CHttp2(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
-                        m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
-                        m_clientip.c_str(), m_client_cert, m_cache,
-                        CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(), 
-                        CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
-                        CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
-                        &CHttpBase::m_cgi_list,
-                        CHttpBase::m_private_path.c_str(), m_wwwauth_scheme, m_proxyauth_scheme, m_ssl);
-                }
-                else
-                {
-                    m_http_protocol_instance = new CHttp(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
-                        m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
-                        m_clientip.c_str(), m_client_cert, m_cache,
-                        CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(), 
-                        CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
-                        CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
-                        &CHttpBase::m_cgi_list,
-                        CHttpBase::m_private_path.c_str(), m_wwwauth_scheme, m_proxyauth_scheme, m_ssl);
-                }
+                    CHttpBase::m_private_path.c_str(), m_wwwauth_scheme, m_proxyauth_scheme, m_ssl);
             }
             else
             {
-                throw(new string("wrong protocol type"));
+                m_http_protocol_instance = new CHttp(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
+                    m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
+                    m_clientip.c_str(), m_client_cert, m_cache,
+                    CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(), 
+                    CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
+                    CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
+                    &CHttpBase::m_cgi_list,
+                    CHttpBase::m_private_path.c_str(), m_wwwauth_scheme, m_proxyauth_scheme, m_ssl);
             }
         }
-        catch(string* e)
+    }
+}
+
+Http_Connection Session::AsyncProcessing()
+{
+    Http_Connection httpConn = httpKeepAlive;
+    
+    CreateProtocol();
+    
+    if(m_http_protocol_instance)
+    {
+        httpConn = m_http_protocol_instance->AsyncProcessing();
+        
+        if(httpConn == httpClose || httpConn == httpKeepAlive)
         {
-            printf("Catch exception: %s\n", e->c_str());
-            delete e;
-            shutdown(m_sockfd, SHUT_RDWR);
-            m_sockfd = -1;
-            return httpClose;
+            m_http_tunneling  = m_http_protocol_instance->GetHttpTunneling();
+
+            if(m_connection_keep_alive_tickets > 0)
+            {
+                m_connection_keep_alive_tickets--;
+            }
+            
+            if(m_connection_keep_alive_tickets == 0 || (time(NULL) - m_first_connection_request_time) > CHttpBase::m_connection_keep_alive_timeout)
+            {
+                httpConn = httpClose;
+            }
         }
     }
-                
-    httpConn = m_http_protocol_instance->AsyncProcessing();
-    
-    m_http_tunneling  = m_http_protocol_instance->GetHttpTunneling();
-       
-    if(m_connection_keep_alive_tickets > 0)
-    {
-        m_connection_keep_alive_tickets--;
-    }
-    
-    if(m_connection_keep_alive_tickets == 0 || (time(NULL) - m_first_connection_request_time) > CHttpBase::m_connection_keep_alive_timeout)
+    else
     {
         httpConn = httpClose;
     }
-    
     return httpConn;
 }
 
@@ -139,72 +140,28 @@ void Session::Processing()
     
     while(httpConn != httpClose)
     {
-        try
+        CreateProtocol();
+        
+        if(m_http_protocol_instance)
         {
-            if(!m_https)
+            httpConn = m_http_protocol_instance->Processing();
+            
+            m_http_tunneling  = m_http_protocol_instance->GetHttpTunneling();
+            
+            delete m_http_protocol_instance;
+            m_http_protocol_instance = NULL;
+            
+            if(m_connection_keep_alive_tickets > 0)
             {
-                m_http_protocol_instance = new CHttp(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
-                    m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
-                    m_clientip.c_str(), m_client_cert, m_cache,
-					CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(),
-                    CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
-                    CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
-                    &CHttpBase::m_cgi_list,
-                    CHttpBase::m_private_path.c_str(), m_wwwauth_scheme, m_proxyauth_scheme);
+                m_connection_keep_alive_tickets--;
             }
-            else if(m_https)
+            
+            if(m_connection_keep_alive_tickets == 0 || (time(NULL) - m_first_connection_request_time) > CHttpBase::m_connection_keep_alive_timeout)
             {
-                if(m_http2)
-                {
-                    m_http_protocol_instance = new CHttp2(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
-                        m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
-                        m_clientip.c_str(), m_client_cert, m_cache,
-                        CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(), 
-                        CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
-                        CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
-                        &CHttpBase::m_cgi_list,
-                        CHttpBase::m_private_path.c_str(), m_wwwauth_scheme, m_proxyauth_scheme, m_ssl);
-                }
-                else
-                {
-                    m_http_protocol_instance = new CHttp(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
-                        m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
-                        m_clientip.c_str(), m_client_cert, m_cache,
-                        CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(), 
-                        CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
-                        CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
-                        &CHttpBase::m_cgi_list,
-                        CHttpBase::m_private_path.c_str(), m_wwwauth_scheme, m_proxyauth_scheme, m_ssl);
-                }
-            }
-            else
-            {
-                throw(new string("wrong protocol type"));
+                httpConn = httpClose;
             }
         }
-        catch(string* e)
-        {
-            printf("Catch exception: %s\n", e->c_str());
-            delete e;
-            shutdown(m_sockfd, SHUT_RDWR);
-            m_sockfd = -1;
-            return;
-        }
-        int tmp1 = time(NULL);
-                    
-        httpConn = m_http_protocol_instance->Processing();
-        
-        m_http_tunneling  = m_http_protocol_instance->GetHttpTunneling();
-        
-        delete m_http_protocol_instance;
-        m_http_protocol_instance = NULL;
-        
-        if(m_connection_keep_alive_tickets > 0)
-        {
-            m_connection_keep_alive_tickets--;
-        }
-        
-        if(m_connection_keep_alive_tickets == 0 || (time(NULL) - m_first_connection_request_time) > CHttpBase::m_connection_keep_alive_timeout)
+        else
         {
             httpConn = httpClose;
         }
