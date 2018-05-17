@@ -3,7 +3,6 @@
 	uplusware@gmail.com
 */
 #include "tunneling.h"
-#include "http_client.h"
 #include "httpcomm.h"
 #include "version.h"
 #include "util/security.h"
@@ -31,7 +30,7 @@ http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling
     m_backend_send_buf[4095] = '\0';
     m_backend_send_buf_len = 4095;
     m_backend_send_buf_used_len = 0;
-    
+    m_client = NULL;
 }
 
 http_tunneling::~http_tunneling()
@@ -48,6 +47,9 @@ http_tunneling::~http_tunneling()
 		
 	}
     m_backend_sockfd = -1;
+	
+	if(m_client)
+		delete m_client;
 }
 
 void http_tunneling::tunneling_close()
@@ -648,7 +650,7 @@ bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr
         int http_header_length = -1;
         int http_content_length = -1;
                     
-        http_client the_client(m_cache, m_http_tunneling_url.c_str(), this);
+        m_client = new http_client(m_cache, m_http_tunneling_url.c_str(), this);
         string str_header;
         int received_len = 0;
         
@@ -705,8 +707,11 @@ bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr
                 {
                     response_buf[len] = '\0';
                     
-                    if(!the_client.processing(response_buf, len))
+                    if(!m_client->processing(response_buf, len))
                     {
+						delete m_client;
+						m_client = NULL;
+						
                         tunneling_ongoing = FALSE;
                     }
                 }

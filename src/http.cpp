@@ -429,7 +429,9 @@ Http_Connection CHttp::AsyncProcessing()
         httpConn = DataParse();
     }
     
-	if(m_http_state == httpAuthentication || m_http_state == httpResponse)
+	if(m_http_state == httpAuthentication
+		|| (m_http_state >= httpResponse && m_http_state <= httpResponseComplete)
+		|| (m_http_state >= httpTunnling && m_http_state <= httpTunnlingComplete))
     {
         httpConn = ResponseReply();
     }
@@ -992,7 +994,7 @@ void CHttp::AsyncRecvPostData()
 
 void CHttp::Tunneling()
 {
-    if(!m_tunneling_ext_handled)
+    if(m_http_state == httpTunnlingExtension)
     {
         //4rd extension hook
         bool session_is_continuing = true;
@@ -1015,8 +1017,8 @@ void CHttp::Tunneling()
             }
         }
         
-        m_tunneling_ext_handled = TRUE;
-        
+		m_http_state = httpTunnlingConnecting;
+		
         if(!session_is_continuing)
         {
             CHttpResponseHdr header(m_response_header.GetMap());
@@ -1034,48 +1036,63 @@ void CHttp::Tunneling()
     if(!m_http_tunneling)
         m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache);
     
-    if(m_backend_connected || m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
-        m_http_tunneling_backend_address_backup1.c_str(), m_http_tunneling_backend_port_backup1, m_http_tunneling_url_backup1.c_str(),
-        m_http_tunneling_backend_address_backup2.c_str(), m_http_tunneling_backend_port_backup2, m_http_tunneling_url_backup2.c_str(),
-        m_request_no_cache)) //connected
-    {
-        m_backend_connected = TRUE;
-        
-        if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
-        {
-            if(!m_tunneling_connection_established)
-            {
-                const char* connect_resp = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: "VERSION_STRING"\r\n\r\n";
-                HttpSend(connect_resp, strlen(connect_resp));
-                
-                m_tunneling_connection_established = TRUE;
-            }
-            m_http_tunneling->relay_processing();
-        }
-        else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL)
-        {
-            const char* pRequestHeader = m_header_content.c_str();
-            int nRequestHeaderLen = m_header_content.length();
-            
-            const char* pRequestData = NULL;
-            int nRequestDataLen = 0;
-            if(m_content_type == multipart_form_data && m_postdata_ex)
-            {
-                pRequestData = m_postdata_ex->c_buffer();
-                nRequestDataLen = m_postdata_ex->length();
-            }
-            else
-            {
-                pRequestData = m_postdata.c_str();
-                nRequestDataLen = m_postdata.length();
-            }
-            
-            if(m_http_tunneling->send_request_to_backend(pRequestHeader, nRequestHeaderLen, pRequestData, nRequestDataLen))
-            {
-                m_http_tunneling->recv_response_from_backend_relay_to_client(&m_response_header);
-            }
-        }
+	if(m_http_state == httpTunnlingConnecting)
+	{
+		if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
+			m_http_tunneling_backend_address_backup1.c_str(), m_http_tunneling_backend_port_backup1, m_http_tunneling_url_backup1.c_str(),
+			m_http_tunneling_backend_address_backup2.c_str(), m_http_tunneling_backend_port_backup2, m_http_tunneling_url_backup2.c_str(),
+			m_request_no_cache)) //connected
+		{
+			
+			m_http_state = httpTunnlingConnected;
+		}
     }
+	
+	if(m_http_state == httpTunnlingConnected)
+	{
+		if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
+		{
+			const char* connect_resp = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: "VERSION_STRING"\r\n\r\n";
+			HttpSend(connect_resp, strlen(connect_resp));
+			
+			m_http_state = httpTunnlingEstablished;
+		}
+		else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL)
+		{
+			m_http_state = httpTunnlingEstablished;
+		}
+	}
+	
+	if(m_http_state == httpTunnlingEstablished)
+	{
+		if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
+		{	
+			m_http_tunneling->relay_processing();
+		}
+		else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL)
+		{
+			const char* pRequestHeader = m_header_content.c_str();
+			int nRequestHeaderLen = m_header_content.length();
+			
+			const char* pRequestData = NULL;
+			int nRequestDataLen = 0;
+			if(m_content_type == multipart_form_data && m_postdata_ex)
+			{
+				pRequestData = m_postdata_ex->c_buffer();
+				nRequestDataLen = m_postdata_ex->length();
+			}
+			else
+			{
+				pRequestData = m_postdata.c_str();
+				nRequestDataLen = m_postdata.length();
+			}
+			
+			if(m_http_tunneling->send_request_to_backend(pRequestHeader, nRequestHeaderLen, pRequestData, nRequestDataLen))
+			{
+				m_http_tunneling->recv_response_from_backend_relay_to_client(&m_response_header);
+			}
+		}
+	}
 }
 
 void CHttp::Response()
@@ -1241,6 +1258,8 @@ Http_Connection CHttp::ResponseReply()
                 SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                 return httpContinue;
             }
+			
+			m_http_state = httpResponse;
         }
         else
         {
@@ -1304,11 +1323,13 @@ Http_Connection CHttp::ResponseReply()
                 SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                 return httpContinue;
             }
+			m_http_state = httpTunnling;
         }
-        m_http_state = httpResponse;
+        
     }
     
-    if(m_http_state == httpResponse)
+    if((m_http_state >= httpResponse && m_http_state <= httpResponseComplete)
+		|| (m_http_state >= httpTunnling && m_http_state <= httpTunnlingComplete))
     {
         //go ahead after authentication
         if(m_http_tunneling_connection == HTTP_Tunneling_None)
@@ -1351,7 +1372,7 @@ Http_Connection CHttp::ResponseReply()
                 SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
             }
             else
-            {
+            {	
                 Tunneling();
             }
         }

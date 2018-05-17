@@ -37,6 +37,13 @@ enum Http_State
     httpReqData,
     httpAuthentication,
     httpResponse,
+	httpResponseComplete,
+	httpTunnling,
+	httpTunnlingExtension = httpTunnling,
+	httpTunnlingConnecting,
+	httpTunnlingConnected,
+	httpTunnlingEstablished,
+	httpTunnlingComplete,
     httpComplete
 };
 

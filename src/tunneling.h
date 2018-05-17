@@ -16,6 +16,10 @@
 #include "util/general.h"
 #include "httpcomm.h"
 
+class http_client;
+
+#include "http_client.h"
+
 #include <arpa/inet.h>
  
 using namespace std;
@@ -86,5 +90,7 @@ protected:
     char* m_backend_send_buf;
     int m_backend_send_buf_len;
     int m_backend_send_buf_used_len;
+	
+	http_client * m_client;
 };
 #endif /* _TUNNELING_H_ */
