@@ -94,7 +94,7 @@ void Session_Group::Processing()
     int n, i;
     n = epoll_wait (m_epoll_fd, m_epoll_events, 65535*2, 0);
     
-    if(n == 0 || (n == -1 && errno == EINTR))
+    /*if(n == 0 || (n == -1 && errno == EINTR))
     {
         for(map<int, Session*>::iterator iter = m_session_list.begin(); iter != m_session_list.end(); iter++)
         {
@@ -107,7 +107,7 @@ void Session_Group::Processing()
                 }
             }
         }
-    }
+    }*/
     
     for (i = 0; i < n; i++)  
     {
@@ -117,7 +117,7 @@ void Session_Group::Processing()
             map<int, Session*>::iterator iter = m_session_list.find(m_epoll_events[i].data.fd);
             if(iter != m_session_list.end() && iter->second)
             {
-                if(iter->second->AsyncSend() < 0)
+                if(iter->second->AsyncSend() < 0 || iter->second->AsyncProcessing() == httpClose)
                 {
                     Remove(m_epoll_events[i].data.fd);
                 }

@@ -408,27 +408,33 @@ Http_Connection CHttp::AsyncProcessing()
     Http_Connection httpConn = httpKeepAlive;
     if(m_http_state == httpReqHeader)
     {
-        char sz_http_data[4096];
-        int result = AsyncProtRecv(sz_http_data, 4095);
-        if(result <= 0)
-        {
-            httpConn = httpClose; // socket is broken. close the keep-alive connection
-        }
-        else
-        {
-            sz_http_data[result] = '\0';
-            httpConn = LineParse((const char*)sz_http_data);
-        }
+		while(m_http_state == httpReqHeader)
+		{
+			char sz_http_data[4096];
+			int result = AsyncProtRecv(sz_http_data, 4095);
+			if(result == 0)
+			{
+				break;
+			}
+			else
+			{
+				sz_http_data[result] = '\0';
+				httpConn = LineParse((const char*)sz_http_data);
+			}
+		}
     }
-    else if(m_http_state == httpReqData)
+    
+	if(m_http_state == httpReqData)
     {
         httpConn = DataParse();
     }
-    else if(m_http_state == httpResponse)
+    
+	if(m_http_state == httpResponse)
     {
         httpConn = ResponseReply();
     }
-    else if(m_http_state == httpComplete)
+    
+	if(m_http_state == httpComplete)
     {
         httpConn = httpClose;
     }
@@ -1398,7 +1404,7 @@ Http_Connection CHttp::LineParse(const char* text)
         m_line_text = m_line_text.substr(new_line + 1);
 
         strtrim(strtext);
-        /* printf("<<<< %s\r\n", strtext.c_str()); */
+        //printf("<<<< %s\r\n", strtext.c_str());
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)
         {
