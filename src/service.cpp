@@ -387,7 +387,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 		}
 	}
 #ifdef _WITH_ASYNC_
-    pSession = new Session(pWorkerInstance->GetSessionGroup()->Get_epoll_fd(), session_param->srvobjmap, session_param->sockfd, ssl,
+    pSession = new Session(pWorkerInstance->GetSessionGroup(), pWorkerInstance->GetSessionGroup()->Get_epoll_fd(), session_param->srvobjmap, session_param->sockfd, ssl,
         session_param->client_ip.c_str(), client_cert, session_param->https, isHttp2, session_param->cache);
 	if(pSession != NULL)
 	{
@@ -395,7 +395,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 	}
     return;
 #else
-	pSession = new Session(-1, session_param->srvobjmap, session_param->sockfd, ssl,
+	pSession = new Session(NULL, -1, session_param->srvobjmap, session_param->sockfd, ssl,
         session_param->client_ip.c_str(), client_cert, session_param->https, isHttp2, session_param->cache);
 	if(pSession != NULL)
 	{

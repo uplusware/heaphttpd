@@ -4,10 +4,12 @@
 */
 
 #include "session.h"
+#include "session_group.h"
 
-Session::Session(int epoll_fd, ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert,
+Session::Session(Session_Group* group, int epoll_fd, ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert,
     BOOL https, BOOL http2, memory_cache* ch)
 {
+    m_group = group;
     m_srvobj = srvobj;
 	m_sockfd = sockfd;
     m_epoll_fd = epoll_fd;
@@ -115,7 +117,17 @@ Http_Connection Session::AsyncProcessing()
         if(httpConn == httpClose || httpConn == httpKeepAlive)
         {
             m_http_tunneling  = m_http_protocol_instance->GetHttpTunneling();
-
+            
+            if(httpConn == httpClose)
+            {
+                m_group->Remove(m_sockfd);
+            }
+            else if(httpConn == httpKeepAlive)
+            {
+                delete m_http_protocol_instance;
+                m_http_protocol_instance = NULL;
+            }
+            
             if(m_connection_keep_alive_tickets > 0)
             {
                 m_connection_keep_alive_tickets--;

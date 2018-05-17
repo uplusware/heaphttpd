@@ -429,14 +429,14 @@ Http_Connection CHttp::AsyncProcessing()
         httpConn = DataParse();
     }
     
-	if(m_http_state == httpResponse)
+	if(m_http_state == httpAuthentication || m_http_state == httpResponse)
     {
         httpConn = ResponseReply();
     }
     
 	if(m_http_state == httpComplete)
     {
-        httpConn = httpClose;
+        httpConn = (m_keep_alive && m_enabled_keep_alive) ? httpKeepAlive : httpClose;
     }
     
     return httpConn;
@@ -936,7 +936,7 @@ void CHttp::RecvPostData()
             }
         }
     }
-    m_http_state = httpResponse;
+    m_http_state = httpAuthentication;
 }
 
 void CHttp::AsyncRecvPostData()
@@ -958,7 +958,7 @@ void CHttp::AsyncRecvPostData()
                 
                 if(m_postdata.length() == m_content_length)
                 {
-                    m_http_state = httpResponse;
+                    m_http_state = httpAuthentication;
                 }
             }
         }
@@ -975,18 +975,18 @@ void CHttp::AsyncRecvPostData()
             }
             else
             {
-                 m_http_state = httpResponse;
+                 m_http_state = httpAuthentication;
             }
             
             if(m_postdata_ex->length() == m_content_length)
             {
-                m_http_state = httpResponse;
+                m_http_state = httpAuthentication;
             }
         }
     }
     else if(m_content_length == 0)
     {
-        m_http_state = httpResponse;
+        m_http_state = httpAuthentication;
     }
 }
 
@@ -1177,9 +1177,8 @@ void CHttp::Response()
 
 Http_Connection CHttp::ResponseReply()
 {
-    if(m_http_state == httpResponse)
+    if(m_http_state == httpAuthentication)
     {
-        //printf("ResponseReply\n");
         //Authentication
         if(m_http_tunneling_connection == HTTP_Tunneling_None)
         {
@@ -1306,7 +1305,11 @@ Http_Connection CHttp::ResponseReply()
                 return httpContinue;
             }
         }
-        
+        m_http_state = httpResponse;
+    }
+    
+    if(m_http_state == httpResponse)
+    {
         //go ahead after authentication
         if(m_http_tunneling_connection == HTTP_Tunneling_None)
         {

@@ -35,6 +35,7 @@ enum Http_State
 {
     httpReqHeader = 0,
     httpReqData,
+    httpAuthentication,
     httpResponse,
     httpComplete
 };

@@ -18,6 +18,8 @@
 #include "util/trace.h"
 #include "tunneling.h"
 
+class Session_Group;
+
 typedef enum
 {
 	stHTTP = 1,
@@ -43,10 +45,12 @@ protected:
     unsigned int m_connection_keep_alive_tickets;
     time_t m_first_connection_request_time;
     
+    Session_Group* m_group;
+    
     void CreateProtocol();
     
 public:
-	Session(int epoll_fd, ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, BOOL https, BOOL http2, memory_cache* ch);
+	Session(Session_Group* group, int epoll_fd, ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, BOOL https, BOOL http2, memory_cache* ch);
 	virtual ~Session();
 	
     
