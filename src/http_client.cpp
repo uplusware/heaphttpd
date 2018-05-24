@@ -9,7 +9,7 @@
 //http_chunk
 http_chunk::http_chunk(http_tunneling* tunneling)
 {    
-    m_chunk_len = -1;
+    m_chunk_len = 0;
     m_sent_chunk = 0;
     m_state = HTTP_Client_Parse_State_Chunk_Header;
     m_http_tunneling = tunneling;
@@ -43,17 +43,17 @@ bool http_chunk::processing(char* & derived_buf, int& derived_buf_used_len)
                         
                         if(sscanf(chunked_len, "%x", &m_chunk_len) != 1)
                             return false;
-                        
+
                         if(m_chunk_len > 0)
                         {
                             m_chunk_len += 2;
-                        
+                            
                             if(m_http_tunneling->client_send(derived_buf, last_search_pos_crlf + 2) < 0) //send both the length number and crlf
                                 return false;
                             
                             memmove(derived_buf, derived_buf + last_search_pos_crlf + 2, derived_buf_used_len - last_search_pos_crlf - 2);
                             derived_buf_used_len = derived_buf_used_len - last_search_pos_crlf - 2;
-                            
+
                             m_state = HTTP_Client_Parse_State_Chunk_Content;
                         
                             if(derived_buf_used_len > 0) /* begin to send chunk data */
@@ -67,7 +67,7 @@ bool http_chunk::processing(char* & derived_buf, int& derived_buf_used_len)
                                 
                                 m_sent_chunk += should_send_len;
                                 derived_buf_used_len -= should_send_len;
-                                
+                                                                
                                 if(m_sent_chunk == m_chunk_len)
                                 {
                                     m_state = HTTP_Client_Parse_State_Chunk_Header;
@@ -249,7 +249,7 @@ bool http_client::parse(const char* text)
     
     if(m_line_text.length() > 64*1024) // too long line
     {
-        m_http_tunneling->tunneling_close();
+        m_http_tunneling->force_tunneling_close();
                 
         return false;
     }
@@ -320,18 +320,21 @@ bool http_client::parse(const char* text)
             {
                 m_is_200_ok = true;
             }
-            else
-            {
-                m_has_content_length = true;
-                m_content_length = 0;
-            }
         }
         else if(strncasecmp(strtext.c_str(), "Content-Length:", 15) == 0)
         {
-            string strLen;
-            strcut(strtext.c_str(), "Content-Length:", NULL, strLen);
-            strtrim(strLen);	
-            m_content_length = atoll(strLen.c_str());
+            if(m_http_tunneling->get_http()->GetMethod() == hmHead)
+            {
+                m_content_length = 0;
+            }
+            else
+            {
+                string strLen;
+                strcut(strtext.c_str(), "Content-Length:", NULL, strLen);
+                strtrim(strLen);	
+                m_content_length = atoll(strLen.c_str());
+            }
+            
             if(m_content_length >= 0)
             {
                 m_has_content_length = true;
@@ -504,23 +507,25 @@ bool http_client::parse(const char* text)
 
 bool http_client::processing(const char* buf, int buf_len)
 {
-    //Concatenate the buffer
-    if(m_buf_len - m_buf_used_len < buf_len)
+    if(buf_len > 0)
     {
-        char* new_buf = (char*)malloc(m_buf_used_len + buf_len + 1);
-        new_buf[m_buf_used_len + buf_len] = '\0';
+        //Concatenate the buffer
+        if(m_buf_len - m_buf_used_len < buf_len)
+        {
+            char* new_buf = (char*)malloc(m_buf_used_len + buf_len + 1);
+            new_buf[m_buf_used_len + buf_len] = '\0';
+            
+            memcpy(new_buf, m_buf, m_buf_used_len);
+            
+            free(m_buf);
+            
+            m_buf = new_buf;
+            m_buf_len = m_buf_used_len + buf_len;
+        }
         
-        memcpy(new_buf, m_buf, m_buf_used_len);
-        
-        free(m_buf);
-        
-        m_buf = new_buf;
-        m_buf_len = m_buf_used_len + buf_len;
+        memcpy(m_buf + m_buf_used_len, buf, buf_len);
+        m_buf_used_len += buf_len;
     }
-    
-    memcpy(m_buf + m_buf_used_len, buf, buf_len);
-    m_buf_used_len += buf_len;
-    
     if(m_state == HTTP_Client_Parse_State_Header)
     {        
         if(m_buf_used_len >= 4)

@@ -7,7 +7,7 @@
 #include "version.h"
 #include "util/security.h"
 
-http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling type, memory_cache* cache)
+http_tunneling::http_tunneling(int epoll_fd, map<int, backend_session*>* backend_list, int client_socked, SSL* client_ssl, HTTPTunneling type, BOOL request_no_cache, memory_cache* cache)
 {
     m_address = "";
     m_port = 0;
@@ -31,31 +31,232 @@ http_tunneling::http_tunneling(int client_socked, SSL* client_ssl, HTTPTunneling
     m_backend_send_buf_len = 4095;
     m_backend_send_buf_used_len = 0;
     m_client = NULL;
+    m_backend_list = backend_list;
+    m_epoll_fd = epoll_fd;
+    
+    
+    m_tunneling_state = TunnlingNew;
+    
+    m_request_no_cache = request_no_cache;
+    
+    m_async_backend_recv_buf = NULL;
+    m_async_backend_recv_data_len = 0;
+    m_async_backend_recv_buf_size = 0;
+        
 }
 
 http_tunneling::~http_tunneling()
 {
     if(m_client_send_buf)
         free(m_client_send_buf);
+    m_client_send_buf = NULL;
     
     if(m_backend_send_buf)
         free(m_backend_send_buf);
-    
-    if(m_backend_sockfd > 0)
-	{
-        close(m_backend_sockfd);
-		
-	}
-    m_backend_sockfd = -1;
+    m_backend_send_buf = NULL;
+   
+    if(m_async_backend_recv_buf)
+        free(m_async_backend_recv_buf);
+    m_async_backend_recv_buf = NULL;
+    m_async_backend_recv_data_len = 0;
+    m_async_backend_recv_buf_size = 0;
+        
+    backend_close();
 	
 	if(m_client)
 		delete m_client;
+
 }
 
-void http_tunneling::tunneling_close()
+void http_tunneling::set_http_session_data(CHttp* http_session, CHttpResponseHdr* session_response_header, const char* req_header, int req_header_len, const char* req_data, int req_data_len,
+    const char* backend_addr, unsigned short backend_port, const char* http_url,
+    const char* backend_addr_backup1, unsigned short backend_port_backup1, const char* http_url_backup1,
+    const char* backend_addr_backup2, unsigned short backend_port_backup2, const char* http_url_backup2)
 {
+    m_http = http_session;
+    m_req_header = req_header;
+    m_req_header_len = req_header_len;
+    m_req_data = req_data;
+    m_req_data_len = req_data_len;
+    m_session_response_header = session_response_header;
+    
+    
+    m_backend_addr = backend_addr;
+    m_backend_port = backend_port;
+    m_http_url = http_url;
+    m_backend_addr_backup1 = backend_addr_backup1;
+    m_backend_port_backup1 = backend_port_backup1;
+    m_http_url_backup1 = http_url_backup1,
+    m_backend_addr_backup2 = backend_addr_backup2;
+    m_backend_port_backup2 = backend_port_backup2;
+    m_http_url_backup2 = http_url_backup2;
+}
+
+int http_tunneling::async_processing()
+{
+     processing();
+}
+
+int http_tunneling::processing()
+{
+    if(m_tunneling_state == TunnlingConnecting)
+    {
+        
+        if(connect_backend(m_backend_addr.c_str(), m_backend_port, m_http_url.c_str(),
+            m_backend_addr_backup1.c_str(), m_backend_port_backup1, m_http_url_backup1.c_str(),
+            m_backend_addr_backup2.c_str(), m_backend_port_backup2, m_http_url_backup2.c_str(),
+            m_request_no_cache)) //connected
+        {
+            m_tunneling_state = TunnlingEstablished;
+        }
+        else
+        {
+            m_tunneling_state = TunnlingError;
+        }
+    }
+            
+    if(m_tunneling_state >= TunnlingEstablished && m_tunneling_state < TunnlingComplete)
+    {    
+        if(m_type == HTTP_Tunneling_With_CONNECT)
+        {	
+            relay_processing();
+        }
+        else if(m_type == HTTP_Tunneling_Without_CONNECT || m_type == HTTP_Tunneling_Without_CONNECT_SSL)
+        {
+            if(m_tunneling_state == TunnlingSendingReqToBackend)
+            {
+               send_request_to_backend(m_req_header, m_req_header_len, m_req_data, m_req_data_len);
+            }
+            
+            if(m_tunneling_state >= TunnlingRelayingData1 && m_tunneling_state <= TunnlingRelayingDataComplete)
+            {
+                if(m_tunneling_cache_instance)
+                {
+                    acquire_cache_relay_to_client(m_session_response_header);
+                }
+                else
+                {
+                    recv_response_from_backend_relay_to_client(m_session_response_header);
+                }
+            }
+        }
+    }
+    
+    if(m_tunneling_state >= TunnlingComplete)
+    {
+        if(m_client)
+            delete m_client;
+        m_client = NULL;
+    }
+    return 0;
+}
+
+int http_tunneling::append_backend_session()
+{
+    if(m_epoll_fd != -1 && m_backend_list && m_backend_sockfd > 0)
+    {
+        struct epoll_event event; 
+        event.data.fd = m_backend_sockfd;  
+        event.events = EPOLLIN | EPOLLHUP | EPOLLERR; 
+        int epoll_r = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, m_backend_sockfd, &event);
+        
+        if (epoll_r == -1)  
+        {  
+            fprintf(stderr, "%s %u# epoll_ctl: %s\n", __FILE__, __LINE__, strerror(errno));
+            return -1;
+        }
+        
+        m_backend_list->insert(map<int, backend_session*>::value_type(m_backend_sockfd, this));
+    }
+    return 0;
+
+}
+
+int http_tunneling::remove_backend_session()
+{
+    if(m_epoll_fd != -1 && m_backend_list && m_backend_sockfd > 0)
+    {
+        map<int, backend_session*>::iterator iter = m_backend_list->find(m_backend_sockfd);
+        if(iter != m_backend_list->end())
+        {           
+            m_backend_list->erase(iter);
+            
+            int epoll_r = epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, m_backend_sockfd, NULL);
+            
+            if (epoll_r == -1)  
+            {  
+                fprintf(stderr, "%s %u# epoll_ctl: %s\n", __FILE__, __LINE__, strerror(errno));
+                return -1;
+            }
+        
+        }
+        
+
+    }
+    return 0;
+}
+
+int http_tunneling::backend_session_writeable(bool writeable)
+{
+    if(m_epoll_fd != -1 && m_backend_list && m_backend_sockfd > 0)
+    {
+        map<int, backend_session*>::iterator iter = m_backend_list->find(m_backend_sockfd);
+        if(iter != m_backend_list->end())
+        {
+            struct epoll_event event; 
+            event.data.fd = m_backend_sockfd;  
+            event.events = writeable ? (EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR) : (EPOLLIN | EPOLLHUP | EPOLLERR); 
+            int epoll_r = epoll_ctl(m_epoll_fd, EPOLL_CTL_MOD, m_backend_sockfd, &event);
+            
+            if (epoll_r == -1)  
+            {  
+                fprintf(stderr, "%s %u# epoll_ctl: %s\n", __FILE__, __LINE__, strerror(errno));
+                return -1;
+            }
+        }
+    }
+    return 0;
+}
+
+
+int http_tunneling::client_session_writeable(bool writeable)
+{
+    if(m_epoll_fd != -1 && m_client_sockfd > 0)
+    {
+        struct epoll_event event; 
+        event.data.fd = m_client_sockfd;  
+        event.events = writeable ? (EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR) : (EPOLLIN | EPOLLHUP | EPOLLERR); 
+        int epoll_r = epoll_ctl(m_epoll_fd, EPOLL_CTL_MOD, m_client_sockfd, &event);
+        
+        if (epoll_r == -1)  
+        {  
+            fprintf(stderr, "%s %u# epoll_ctl: %s\n", __FILE__, __LINE__, strerror(errno));
+            return -1;
+        }
+    }
+    return 0;
+}
+
+void http_tunneling::backend_close()
+{
+#ifdef _WITH_ASYNC_
+    remove_backend_session();
+#endif /* _WITH_ASYNC_ */
+    
+    if(m_backend_sockfd > 0)
+        close(m_backend_sockfd);
+    m_backend_sockfd = -1;
+}
+
+void http_tunneling::force_tunneling_close()
+{
+#ifdef _WITH_ASYNC_
+    remove_backend_session();
+#endif /* _WITH_ASYNC_ */
+    
     if(m_client_sockfd > 0)
         close(m_client_sockfd);
+    
     if(m_backend_sockfd > 0)
         close(m_backend_sockfd);
     
@@ -63,8 +264,11 @@ void http_tunneling::tunneling_close()
      m_backend_sockfd = -1;
 }
 
-void http_tunneling::client_flush()
+int http_tunneling::client_flush()
 {
+#ifdef _WITH_ASYNC_
+    return m_http->AsyncHttpFlush();
+#else
     if(m_client_send_buf_used_len > 0)
     {
         int sent_len = 0;
@@ -79,14 +283,39 @@ void http_tunneling::client_flush()
              memmove(m_client_send_buf, m_client_send_buf + sent_len, m_client_send_buf_used_len - sent_len);
              m_client_send_buf_used_len -= sent_len;
         }
+        else if(sent_len < 0)
+        {
+            if(m_client_ssl)
+            {
+                int ret = SSL_get_error(m_client_ssl, sent_len);
+                if(ret != SSL_ERROR_WANT_READ && ret != SSL_ERROR_WANT_WRITE)
+                {
+                    m_client_send_buf_used_len = 0;
+                    return -1;
+                }
+            }
+            else
+            {
+                if(errno != EAGAIN)
+                {
+                    m_client_send_buf_used_len = 0;
+                    return -1;
+                }
+            }
+            
+        }
         else
         {
             m_client_send_buf_used_len = 0;
+            return -1;
         }
     }
+    
+    return m_client_send_buf_used_len;
+#endif /* _WITH_ASYNC_ */
 }
 
-void http_tunneling::backend_flush()
+int http_tunneling::backend_flush()
 {
     if(m_backend_send_buf_used_len > 0)
     {
@@ -101,16 +330,53 @@ void http_tunneling::backend_flush()
         {
              memmove(m_backend_send_buf, m_backend_send_buf + sent_len, m_backend_send_buf_used_len - sent_len);
              m_backend_send_buf_used_len -= sent_len;
+           
+        }
+        else if(sent_len < 0)
+        {
+            if(m_backend_ssl)
+            {
+                int ret = SSL_get_error(m_backend_ssl, sent_len);
+                if(ret != SSL_ERROR_WANT_READ && ret != SSL_ERROR_WANT_WRITE)
+                {
+                    m_backend_send_buf_used_len = 0;
+                    return -1;
+                }
+            }
+            else
+            {
+                if(errno != EAGAIN)
+                {
+                    m_backend_send_buf_used_len = 0;
+                    return -1;
+
+                }
+            }
         }
         else
         {
             m_backend_send_buf_used_len = 0;
+            return -1;
         }
     }
+#ifdef _WITH_ASYNC_    
+    if(m_backend_send_buf_used_len > 0)
+    {
+        backend_session_writeable(true);
+    }
+    else
+    {
+        backend_session_writeable(false);
+    }
+#endif /* _WITH_ASYNC_ */
+    return m_backend_send_buf_used_len;
 }
 
 int http_tunneling::client_send(const char* buf, int len)
 {
+#ifdef _WITH_ASYNC_
+    return m_http->AsyncHttpSend(buf, len);
+#else
     //Concatenate the send buffer
     if(m_client_send_buf_len - m_client_send_buf_used_len < len)
     {
@@ -144,14 +410,37 @@ int http_tunneling::client_send(const char* buf, int len)
 			sent_len = SSL_write(m_client_ssl, m_client_send_buf, m_client_send_buf_used_len);
 		else
 			sent_len = send( m_client_sockfd, m_client_send_buf, m_client_send_buf_used_len, 0);
-		
+        
 		if(sent_len > 0)
 		{
 			 memmove(m_client_send_buf, m_client_send_buf + sent_len, m_client_send_buf_used_len - sent_len);
 			 m_client_send_buf_used_len -= sent_len;        
 		}
+        else if(sent_len < 0)
+        {
+            if(m_client_ssl)
+            {
+                int ret = SSL_get_error(m_client_ssl, sent_len);
+                if(ret != SSL_ERROR_WANT_READ && ret != SSL_ERROR_WANT_WRITE)
+                {
+                    m_client_send_buf_used_len = 0;
+                }
+            }
+            else
+            {
+                if(errno != EAGAIN)
+                {
+                    m_client_send_buf_used_len = 0;
+                }
+            }
+        }
+        else
+        {
+            m_client_send_buf_used_len = 0;
+        }
     }
     return sent_len;
+#endif /* _WITH_ASYNC_ */
 }
 
 int http_tunneling::backend_send(const char* buf, int len)
@@ -173,7 +462,7 @@ int http_tunneling::backend_send(const char* buf, int len)
     m_backend_send_buf_used_len += len;
 
 	int sent_len = 0;
-	
+#ifndef _WITH_ASYNC_	
 	if(m_backend_send_buf_used_len >= 4096)
 	{
 		if(m_backend_ssl)
@@ -184,6 +473,7 @@ int http_tunneling::backend_send(const char* buf, int len)
 		m_backend_send_buf_used_len = 0;
 	}
 	else
+#endif /* _WITH_ASYNC_ */
 	{
 		if(m_backend_ssl)
 			sent_len = SSL_write(m_backend_ssl, m_backend_send_buf, m_backend_send_buf_used_len);
@@ -195,13 +485,32 @@ int http_tunneling::backend_send(const char* buf, int len)
 			 memmove(m_backend_send_buf, m_backend_send_buf + sent_len, m_backend_send_buf_used_len - sent_len);
 			 m_backend_send_buf_used_len -= sent_len;        
 		}
+        else if(sent_len < 0)
+        {
+            if(m_backend_ssl)
+            {
+                int ret = SSL_get_error(m_backend_ssl, sent_len);
+                if(ret != SSL_ERROR_WANT_READ && ret != SSL_ERROR_WANT_WRITE)
+                {
+                    m_backend_send_buf_used_len = 0;
+                }
+            }
+            else
+            {
+                if(errno != EAGAIN)
+                {
+                    m_backend_send_buf_used_len = 0;
+                }
+            }
+        }
     }
+    
     return sent_len;
 }
 
-bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, const char* http_url,
-    const char* szAddrBackup1, unsigned short nPortBackup1, const char* http_url_backup1,
-    const char* szAddrBackup2, unsigned short nPortBackup2, const char* http_url_backup2,
+bool http_tunneling::connect_backend(const char* backend_addr, unsigned short backend_port, const char* http_url,
+    const char* backend_addr_backup1, unsigned short backend_port_backup1, const char* http_url_backup1,
+    const char* backend_addr_backup2, unsigned short backend_port_backup2, const char* http_url_backup2,
     BOOL request_no_cache)
 {
     //try 1st one cache
@@ -245,9 +554,9 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         }
     }
     
-	if((m_address == szAddr && m_port == nPort && m_backend_sockfd > 0)
-        || (m_address == szAddrBackup1 && nPortBackup1 == nPort && m_backend_sockfd > 0)
-        || (m_address == szAddrBackup2 && nPortBackup2 == nPort && m_backend_sockfd > 0))
+	if((m_address == backend_addr && m_port == backend_port && m_backend_sockfd > 0)
+        || (m_address == backend_addr_backup1 && backend_port_backup1 == backend_port && m_backend_sockfd > 0)
+        || (m_address == backend_addr_backup2 && backend_port_backup2 == backend_port && m_backend_sockfd > 0))
 		return true;
     
     for(int t = 0; t < 3; t++)
@@ -255,26 +564,26 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         //connect to the new address:port
         if(t == 0)
         {
-            if(*szAddr == '\0' || nPort == 0)
+            if(*backend_addr == '\0' || backend_port == 0)
                 continue;
-            m_address = szAddr;
-            m_port = nPort;
+            m_address = backend_addr;
+            m_port = backend_port;
             m_http_tunneling_url = http_url;
         }
         else if(t == 1)
         {
-            if(*szAddrBackup1 == '\0' || nPortBackup1 == 0)
+            if(*backend_addr_backup1 == '\0' || backend_port_backup1 == 0)
                 continue;
-            m_address = szAddrBackup1;
-            m_port = nPortBackup1;
+            m_address = backend_addr_backup1;
+            m_port = backend_port_backup1;
             m_http_tunneling_url = http_url_backup1;
         }
         else if(t == 2)
         {
-            if(*szAddrBackup2 == '\0'|| nPortBackup2 == 0)
+            if(*backend_addr_backup2 == '\0'|| backend_port_backup2 == 0)
                 continue;
-            m_address = szAddrBackup2;
-            m_port = nPortBackup2;
+            m_address = backend_addr_backup2;
+            m_port = backend_port_backup2;
             m_http_tunneling_url = http_url_backup2;
         }
         
@@ -397,8 +706,11 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
 
             fd_set mask_r, mask_w; 
             struct timeval timeout; 
-        
+#ifdef _WITH_ASYNC_        
+            timeout.tv_sec = 3; 
+#else
             timeout.tv_sec = CHttpBase::m_connection_sync_timeout; 
+#endif /* _WITH_ASYNC_ */    
             timeout.tv_usec = 0;
             
             int s = connect(m_backend_sockfd, rp->ai_addr, rp->ai_addrlen);
@@ -418,17 +730,13 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
                 }
                 else
                 {
-                    if(m_backend_sockfd > 0)
-                        close(m_backend_sockfd);
-                    m_backend_sockfd = -1;
+                    backend_close();
                     continue;
                 }  
             }
             else
             {
-                if(m_backend_sockfd > 0)
-                    close(m_backend_sockfd);
-                m_backend_sockfd = -1;
+                backend_close();
                 continue;
             }
         }
@@ -437,9 +745,7 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
         
         if(!connected)
         {            
-            if(m_backend_sockfd > 0)
-                close(m_backend_sockfd);
-            m_backend_sockfd = -1;
+            backend_close();
                     
             continue;
         }
@@ -493,9 +799,7 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
                     ca_key_client.c_str(),
                     &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout) == FALSE)
                 {
-                    if(m_backend_sockfd > 0)
-                        close(m_backend_sockfd);
-                    m_backend_sockfd = -1;
+                    backend_close();
                     continue;
                 }
             }
@@ -503,12 +807,18 @@ bool http_tunneling::connect_backend(const char* szAddr, unsigned short nPort, c
             {
                 if(connect_ssl(m_backend_sockfd, NULL, NULL, NULL, NULL, &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout) == FALSE)
                 {
-                    if(m_backend_sockfd > 0)
-                        close(m_backend_sockfd);
-                    m_backend_sockfd = -1;
+                    backend_close();
                     continue;
                 }
             }
+        }
+#ifdef _WITH_ASYNC_        
+        append_backend_session();
+#endif /* _WITH_ASYNC_ */        
+        if(m_type == HTTP_Tunneling_With_CONNECT)
+        {
+            const char* connection_established = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: "VERSION_STRING"\r\n\r\n";
+            client_send(connection_established, strlen(connection_established));
         }
         //connected!
         return true;
@@ -522,21 +832,41 @@ bool http_tunneling::send_request_to_backend(const char* hbuf, int hlen, const c
 {
     if(m_type == HTTP_Tunneling_Without_CONNECT || m_type == HTTP_Tunneling_Without_CONNECT_SSL)
     {
-        if(m_tunneling_cache_instance)
+        if(m_tunneling_state == TunnlingSendingReqToBackend)
         {
-            return true;
-        }
+            if(m_tunneling_cache_instance)
+            {
+                m_tunneling_state = TunnlingSentReqToBackend;
+                return true;
+            }
+            
+            //skip since there's cache
+            //if(hlen > 0)
+            //    printf("[%.*s]", hlen, hbuf);
+            
+            if(hbuf && hlen > 0 && backend_send(hbuf, hlen) < 0)
+            {
+                m_tunneling_state = TunnlingError;
+                return false;
+            }
+            
+            //if(dlen > 0)
+            //    printf("[%.*s]", dlen, dbuf);
         
-        //skip since there's cache
-        if(hbuf && hlen > 0 && backend_send(hbuf, hlen) < 0)
-            return false;
-        if(dbuf && dlen > 0 && backend_send(dbuf, dlen) < 0)
-            return false;
+            if(dbuf && dlen > 0 && backend_send(dbuf, dlen) < 0)
+            {
+                
+                m_tunneling_state = TunnlingError;
+                return false;
+            }
+            
+            m_tunneling_state = TunnlingSentReqToBackend;
+        }
     }
     return true;
 }
 
-bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr* session_response_header)
+bool http_tunneling::acquire_cache_relay_to_client(CHttpResponseHdr* session_response_header)
 {
     if(m_type == HTTP_Tunneling_Without_CONNECT || m_type == HTTP_Tunneling_Without_CONNECT_SSL)
     {
@@ -545,90 +875,258 @@ bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr
             TUNNELING_CACHE_DATA* tunneling_cache_data = m_tunneling_cache_instance->tunneling_rdlock();
             if(tunneling_cache_data)
             {
-                CHttpResponseHdr cache_header;
-                cache_header.SetStatusCode(SC200);
-                if(tunneling_cache_data->type != "")
-                    cache_header.SetField("Content-Type", tunneling_cache_data->type.c_str());
-                if(tunneling_cache_data->cache != "")
-                    cache_header.SetField("Cache-Control", tunneling_cache_data->cache.c_str());                
-                if(tunneling_cache_data->allow != "")
-                    cache_header.SetField("Allow", tunneling_cache_data->allow.c_str());
-                if(tunneling_cache_data->encoding != "")
-                    cache_header.SetField("Content-Encoding", tunneling_cache_data->encoding.c_str());
-                if(tunneling_cache_data->language != "")
-                    cache_header.SetField("Content-Language", tunneling_cache_data->language.c_str());
-                if(tunneling_cache_data->etag != "")
-                    cache_header.SetField("ETag", tunneling_cache_data->etag.c_str());
-                if(tunneling_cache_data->len >= 0)
-                    cache_header.SetField("Content-Length", tunneling_cache_data->len);
-                if(tunneling_cache_data->expires != "")
-                    cache_header.SetField("Expires", tunneling_cache_data->expires.c_str());
-                if(tunneling_cache_data->last_modified != "")
-                    cache_header.SetField("Last-Modified", tunneling_cache_data->last_modified.c_str());
-                
-                cache_header.SetField("Connection", "Keep-Alive");
-                
-                string strVia;
-                
-                if(tunneling_cache_data->via == "")
+                if(m_tunneling_state == TunnlingRelayingData1)
                 {
-                    strVia = "HTTP/1.1 ";
-                    strVia += CHttpBase::m_localhostname.c_str();
-                    strVia += "("VERSION_STRING")";                    
-                }
-                else
-                {
-                    strVia = tunneling_cache_data->via;
-                    strVia += ", HTTP/1.1 ";
-                    strVia += CHttpBase::m_localhostname.c_str();
-                    strVia += "("VERSION_STRING")";
-                }
-                
-                cache_header.SetField("Via", strVia.c_str());
-                
-                string str_header_crlf = cache_header.Text();
-                str_header_crlf += "\r\n";
-                
-                if(client_send(str_header_crlf.c_str(), str_header_crlf.length()) < 0)
-                {
-                    m_tunneling_cache_instance->tunneling_unlock();
-                    return false;
-                }                
-                if(tunneling_cache_data->buf && tunneling_cache_data->len > 0)
-                {
-                    if(client_send( tunneling_cache_data->buf, tunneling_cache_data->len) < 0)
+                    CHttpResponseHdr cache_header;
+                    cache_header.SetStatusCode(SC200);
+                    if(tunneling_cache_data->type != "")
+                        cache_header.SetField("Content-Type", tunneling_cache_data->type.c_str());
+                    if(tunneling_cache_data->cache != "")
+                        cache_header.SetField("Cache-Control", tunneling_cache_data->cache.c_str());                
+                    if(tunneling_cache_data->allow != "")
+                        cache_header.SetField("Allow", tunneling_cache_data->allow.c_str());
+                    if(tunneling_cache_data->encoding != "")
+                        cache_header.SetField("Content-Encoding", tunneling_cache_data->encoding.c_str());
+                    if(tunneling_cache_data->language != "")
+                        cache_header.SetField("Content-Language", tunneling_cache_data->language.c_str());
+                    if(tunneling_cache_data->etag != "")
+                        cache_header.SetField("ETag", tunneling_cache_data->etag.c_str());
+                    if(tunneling_cache_data->len >= 0)
+                        cache_header.SetField("Content-Length", tunneling_cache_data->len);
+                    if(tunneling_cache_data->expires != "")
+                        cache_header.SetField("Expires", tunneling_cache_data->expires.c_str());
+                    if(tunneling_cache_data->last_modified != "")
+                        cache_header.SetField("Last-Modified", tunneling_cache_data->last_modified.c_str());
+                    
+                    cache_header.SetField("Connection", "Keep-Alive");
+                    
+                    string strVia;
+                    
+                    if(tunneling_cache_data->via == "")
+                    {
+                        strVia = "HTTP/1.1 ";
+                        strVia += CHttpBase::m_localhostname.c_str();
+                        strVia += "("VERSION_STRING")";                    
+                    }
+                    else
+                    {
+                        strVia = tunneling_cache_data->via;
+                        strVia += ", HTTP/1.1 ";
+                        strVia += CHttpBase::m_localhostname.c_str();
+                        strVia += "("VERSION_STRING")";
+                    }
+                    
+                    cache_header.SetField("Via", strVia.c_str());
+                    
+                    string str_header_crlf = cache_header.Text();
+                    str_header_crlf += "\r\n";
+                    
+                    if(client_send(str_header_crlf.c_str(), str_header_crlf.length()) < 0)
                     {
                         m_tunneling_cache_instance->tunneling_unlock();
+                        m_tunneling_state = TunnlingError;
                         return false;
+                    }                
+                    if(tunneling_cache_data->buf && tunneling_cache_data->len > 0)
+                    {
+                        if(client_send( tunneling_cache_data->buf, tunneling_cache_data->len) < 0)
+                        {
+                            m_tunneling_cache_instance->tunneling_unlock();
+                            m_tunneling_state = TunnlingError;
+                            return false;
+                        }
+                    }
+                    
+                    m_tunneling_state = TunnlingRelayingData2;
+                }
+                
+                if(m_tunneling_state == TunnlingRelayingData2)
+                {
+                    if(client_flush() == 0)
+                    {
+                        m_tunneling_state = TunnlingRelayingData3;
                     }
                 }
             }
             m_tunneling_cache_instance->tunneling_unlock();
             
-            //flush the buffer
+            if(m_tunneling_state == TunnlingRelayingData3)
+            {
+#ifdef _WITH_ASYNC_
+                if(client_flush() == 0)
+                {
+                    m_tunneling_state = TunnlingComplete;
+                }
+#else
+                //flush the buffer
+                fd_set mask_w; 
+                fd_set mask_e; 
+                struct timeval timeout; 
+                while(m_client_send_buf_used_len > 0)
+                {
+                    FD_ZERO(&mask_w);
+                    FD_ZERO(&mask_e);
+                    
+                    timeout.tv_sec = CHttpBase::m_connection_idle_timeout; 
+                    timeout.tv_usec = 0;
+                    
+                    if(m_client_send_buf_used_len > 0)
+                    {
+                        FD_SET(m_client_sockfd, &mask_w);
+                    }
+                    
+                    FD_SET(m_client_sockfd, &mask_e);
+                    
+                    int ret_val = select(m_client_send_buf_used_len + 1, NULL, &mask_w, &mask_e, &timeout);
+                    
+                    if( ret_val <= 0)
+                    {
+                        break; // quit from the loop since error or timeout
+                    }
+                    
+                    if(FD_ISSET(m_client_sockfd, &mask_w))
+                    {
+                        client_flush();
+                    }
+                    
+                    if(FD_ISSET(m_client_sockfd, &mask_e))
+                    {
+                        m_client_send_buf_used_len = 0;
+                        close(m_client_sockfd);
+                        m_client_sockfd = -1;
+                    }
+                }
+                
+                m_tunneling_state = TunnlingComplete;
+#endif /* _WITH_ASYNC_ */
+            }
+            return true;
+        }
+    }
+    
+    return true;
+}
+
+bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr* session_response_header)
+{
+    if(m_type == HTTP_Tunneling_Without_CONNECT || m_type == HTTP_Tunneling_Without_CONNECT_SSL)
+    {
+#ifdef _WITH_ASYNC_
+        if(m_tunneling_state == TunnlingRelayingData1)
+        {
+            if(!m_client)
+            {
+                m_client = new http_client(m_cache, m_http_tunneling_url.c_str(), this);
+            }
+            
+            auto_ptr<char> response_buf_obj(new char[4096]);
+            char* response_buf = response_buf_obj.get();
+            
+            int len = 0;
+            do
+            {
+                len = backend_recv(response_buf, 4095);
+                if(len > 0)
+                {
+                    response_buf[len] = '\0';
+                    
+                    if(!m_client->processing(response_buf, len))
+                    { 
+                        m_tunneling_state = TunnlingRelayingDataComplete;
+                        break;
+                    }
+                }
+                else if(len < 0)
+                {
+                    m_tunneling_state = TunnlingError;
+                }
+                client_flush();
+            } while(len > 0);
+        }
+        
+        if(m_tunneling_state == TunnlingRelayingDataComplete)
+        {
+            m_tunneling_state = TunnlingComplete;
+        }
+#else
+        if(m_tunneling_state == TunnlingRelayingData1)
+        {
+            if(!m_client)
+                m_client = new http_client(m_cache, m_http_tunneling_url.c_str(), this);
+            
+            auto_ptr<char> response_buf_obj(new char[4096]);
+            char* response_buf = response_buf_obj.get();
+            
+            fd_set mask_r; 
             fd_set mask_w; 
             fd_set mask_e; 
             struct timeval timeout; 
-            while(m_client_send_buf_used_len > 0)
+            
+            BOOL tunneling_ongoing = TRUE;
+            
+            int tunneling_max_sockfd = m_backend_sockfd > m_client_sockfd ? m_backend_sockfd : m_client_sockfd;
+            
+            while(m_backend_send_buf_used_len > 0 || m_client_send_buf_used_len > 0 || tunneling_ongoing)
             {
+                FD_ZERO(&mask_r);
                 FD_ZERO(&mask_w);
                 FD_ZERO(&mask_e);
                 
                 timeout.tv_sec = CHttpBase::m_connection_idle_timeout; 
                 timeout.tv_usec = 0;
+
+                FD_SET(m_backend_sockfd, &mask_r);
                 
+                int write_fd_size = 0;
+                if(m_backend_send_buf_used_len > 0)
+                {
+                    write_fd_size++;
+                    FD_SET(m_backend_sockfd, &mask_w);
+                }
                 if(m_client_send_buf_used_len > 0)
                 {
+                    write_fd_size++;
                     FD_SET(m_client_sockfd, &mask_w);
                 }
                 
                 FD_SET(m_client_sockfd, &mask_e);
+                FD_SET(m_backend_sockfd, &mask_e);
                 
-                int ret_val = select(m_client_send_buf_used_len + 1, NULL, &mask_w, &mask_e, &timeout);
+                int ret_val = select(tunneling_max_sockfd + 1, &mask_r, write_fd_size > 0 ? &mask_w : NULL, &mask_e, &timeout);
                 
                 if( ret_val <= 0)
                 {
                     break; // quit from the loop since error or timeout
+                }
+                
+                if(FD_ISSET(m_backend_sockfd, &mask_r))
+                {
+                    int len = recv(m_backend_sockfd, response_buf, 4095, 0);
+                    
+                    if(len > 0)
+                    {
+                        response_buf[len] = '\0';
+                        
+                        if(!m_client->processing(response_buf, len))
+                        {
+                            delete m_client;
+                            m_client = NULL;
+                            
+                            tunneling_ongoing = FALSE;
+                        }
+                    }
+                    else if(len < 0)
+                    {
+                        if( errno == EAGAIN)
+                            continue;
+                        
+                        tunneling_ongoing = FALSE;
+                    }
+                }
+                
+                if(FD_ISSET(m_backend_sockfd, &mask_w))
+                {
+                    backend_flush();
                 }
                 
                 if(FD_ISSET(m_client_sockfd, &mask_w))
@@ -636,120 +1134,24 @@ bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr
                     client_flush();
                 }
                 
+                if(FD_ISSET(m_backend_sockfd, &mask_e))
+                {
+                    m_backend_send_buf_used_len = 0;
+                    backend_close();
+                    tunneling_ongoing = FALSE;
+                }
+                
                 if(FD_ISSET(m_client_sockfd, &mask_e))
                 {
                     m_client_send_buf_used_len = 0;
                     close(m_client_sockfd);
                     m_client_sockfd = -1;
-                }
-            }
-            return true;
-        }
-        //skip since there's cache
-        
-        int http_header_length = -1;
-        int http_content_length = -1;
-                    
-        m_client = new http_client(m_cache, m_http_tunneling_url.c_str(), this);
-        string str_header;
-        int received_len = 0;
-        
-        auto_ptr<char> response_buf_obj(new char[4096]);
-        char* response_buf = response_buf_obj.get();
-        
-        fd_set mask_r; 
-        fd_set mask_w; 
-        fd_set mask_e; 
-        struct timeval timeout; 
-        
-        BOOL tunneling_ongoing = TRUE;
-        
-        int tunneling_max_sockfd = m_backend_sockfd > m_client_sockfd ? m_backend_sockfd : m_client_sockfd;
-        
-        while(m_backend_send_buf_used_len > 0 || m_client_send_buf_used_len > 0 || tunneling_ongoing)
-        {
-            FD_ZERO(&mask_r);
-            FD_ZERO(&mask_w);
-            FD_ZERO(&mask_e);
-            
-            timeout.tv_sec = CHttpBase::m_connection_idle_timeout; 
-            timeout.tv_usec = 0;
-
-            FD_SET(m_backend_sockfd, &mask_r);
-            
-            int write_fd_size = 0;
-            if(m_backend_send_buf_used_len > 0)
-            {
-                write_fd_size++;
-                FD_SET(m_backend_sockfd, &mask_w);
-            }
-            if(m_client_send_buf_used_len > 0)
-            {
-                write_fd_size++;
-                FD_SET(m_client_sockfd, &mask_w);
-            }
-            
-            FD_SET(m_client_sockfd, &mask_e);
-            FD_SET(m_backend_sockfd, &mask_e);
-            
-            int ret_val = select(tunneling_max_sockfd + 1, &mask_r, write_fd_size > 0 ? &mask_w : NULL, &mask_e, &timeout);
-            
-            if( ret_val <= 0)
-            {
-                break; // quit from the loop since error or timeout
-            }
-            
-            if(FD_ISSET(m_backend_sockfd, &mask_r))
-            {
-                int len = recv(m_backend_sockfd, response_buf, 4095, 0);
-                
-                if(len > 0)
-                {
-                    response_buf[len] = '\0';
-                    
-                    if(!m_client->processing(response_buf, len))
-                    {
-						delete m_client;
-						m_client = NULL;
-						
-                        tunneling_ongoing = FALSE;
-                    }
-                }
-                else if(len < 0)
-                {
-                    if( errno == EAGAIN)
-                        continue;
-                    
                     tunneling_ongoing = FALSE;
                 }
             }
-            
-            if(FD_ISSET(m_backend_sockfd, &mask_w))
-            {
-                backend_flush();
-            }
-            
-            if(FD_ISSET(m_client_sockfd, &mask_w))
-            {
-                client_flush();
-            }
-            
-            if(FD_ISSET(m_backend_sockfd, &mask_e))
-            {
-                m_backend_send_buf_used_len = 0;
-                close(m_backend_sockfd);
-                m_backend_sockfd = -1;
-                tunneling_ongoing = FALSE;
-            }
-            
-            if(FD_ISSET(m_client_sockfd, &mask_e))
-            {
-                m_client_send_buf_used_len = 0;
-                close(m_client_sockfd);
-                m_client_sockfd = -1;
-                tunneling_ongoing = FALSE;
-            }
+            m_tunneling_state = TunnlingComplete;
         }
+#endif /* _WITH_ASYNC_ */
     }
     
     return true;
@@ -757,6 +1159,32 @@ bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr
 
 void http_tunneling::relay_processing()
 {
+#ifdef _WITH_ASYNC_
+    char client_recv_buf[4096];
+    
+    int client_recv_len = m_http->AsyncHttpRecv(client_recv_buf, 4095);
+    
+    if(client_recv_len > 0)
+    {
+        backend_send(client_recv_buf, client_recv_len);
+    }
+    else if(client_recv_len < 0)
+    {
+       m_tunneling_state = TunnlingError;
+    }
+    
+    char backend_recv_buf[4096];
+    int backend_recv_len = backend_recv(backend_recv_buf, 4095);
+    
+    if(backend_recv_len > 0)
+    {
+        client_send(backend_recv_buf, backend_recv_len);
+    }
+    else if(backend_recv_len < 0)
+    {            
+        m_tunneling_state = TunnlingError;
+    }
+#else
     Buffer_Descr buf_descr_frm_client, buf_descr_frm_backend;
     
     buf_descr_frm_client.buf = (char*)malloc(BUFFER_DESCR_BUF_LEN*2 + 1); //dup for implement ring buffer
@@ -808,8 +1236,7 @@ void http_tunneling::relay_processing()
                     if(len == 0)
                     {
                         close(m_client_sockfd);
-                        close(m_backend_sockfd);
-                        m_backend_sockfd = -1;
+                        backend_close();
                         break;
                     }
                     else if(len < 0)
@@ -817,8 +1244,7 @@ void http_tunneling::relay_processing()
                         if( errno != EAGAIN)
                         {
                             close(m_client_sockfd);
-                            close(m_backend_sockfd);
-                            m_backend_sockfd = -1;
+                            backend_close();
                             break;
                         }
                     }
@@ -842,8 +1268,7 @@ void http_tunneling::relay_processing()
                     if(len == 0)
                     {
                         close(m_client_sockfd);
-                        close(m_backend_sockfd);
-                        m_backend_sockfd = -1;
+                        backend_close();
                         break;
                     }
                     else if(len < 0)
@@ -851,8 +1276,7 @@ void http_tunneling::relay_processing()
                         if( errno != EAGAIN)
                         {
                             close(m_client_sockfd);
-                            close(m_backend_sockfd);
-                            m_backend_sockfd = -1;
+                            backend_close();
                             break;
                         }
                     }
@@ -887,8 +1311,7 @@ void http_tunneling::relay_processing()
                     if(len == 0)
                     {
                         close(m_client_sockfd);
-                        close(m_backend_sockfd);
-                        m_backend_sockfd = -1;
+                        backend_close();
                         break;
                     }
                     else if(len < 0)
@@ -896,8 +1319,7 @@ void http_tunneling::relay_processing()
                         if( errno != EAGAIN)
                         {
                             close(m_client_sockfd);
-                            close(m_backend_sockfd);
-                            m_backend_sockfd = -1;
+                            backend_close();
                             break;
                         }
                     }
@@ -921,8 +1343,7 @@ void http_tunneling::relay_processing()
                     if(len == 0)
                     {
                         close(m_client_sockfd);
-                        close(m_backend_sockfd);
-                        m_backend_sockfd = -1;
+                        backend_close();
                         break;
                     }
                     else if(len < 0)
@@ -930,8 +1351,7 @@ void http_tunneling::relay_processing()
                         if( errno != EAGAIN)
                         {
                             close(m_client_sockfd);
-                            close(m_backend_sockfd);
-                            m_backend_sockfd = -1;
+                            backend_close();
                             break;
                         }
                     }
@@ -951,28 +1371,90 @@ void http_tunneling::relay_processing()
             if(FD_ISSET(m_client_sockfd, &mask_e))
             {
                 close(m_client_sockfd);
-                close(m_backend_sockfd);
-                m_backend_sockfd = -1;
+                backend_close();
                 break;
             }
             
             if(FD_ISSET(m_backend_sockfd, &mask_e))
             {
                 close(m_client_sockfd);
-                close(m_backend_sockfd);
-                m_backend_sockfd = -1;
+                backend_close();
                 break;
             }
         }
         else
         {
 			close(m_client_sockfd);
-			close(m_backend_sockfd);
-            m_backend_sockfd = -1;
+			backend_close();
             break;
         }
     }
     
     free(buf_descr_frm_client.buf);
     free(buf_descr_frm_backend.buf);
+#endif /* _WITH_ASYNC_ */
+}
+
+int http_tunneling::backend_recv(char* buf, int len)
+{
+    int min_len = 0;
+	if(m_async_backend_recv_buf && m_async_backend_recv_data_len > 0)
+    {
+        min_len = len < m_async_backend_recv_data_len ? len : m_async_backend_recv_data_len;
+        memcpy(buf, m_async_backend_recv_buf, min_len);
+        if(min_len > 0)
+        {
+            memmove(m_async_backend_recv_buf, m_async_backend_recv_buf + min_len, m_async_backend_recv_data_len - min_len);
+            m_async_backend_recv_data_len -= min_len;
+        }
+    }
+    
+    return min_len;
+}
+
+int http_tunneling::backend_async_recv()
+{
+    char buf[1024];
+
+    int len = m_backend_ssl ? SSL_read(m_backend_ssl, buf, 1024) : recv(m_backend_sockfd, buf, 1024, 0);
+    if(len > 0)
+    {
+        
+        m_async_backend_recv_buf_size = m_async_backend_recv_data_len + len;
+        char* new_buf = (char*)malloc(m_async_backend_recv_buf_size);
+        
+        if(m_async_backend_recv_buf)
+        {
+            memcpy(new_buf, m_async_backend_recv_buf, m_async_backend_recv_data_len);
+            free(m_async_backend_recv_buf);
+        }
+        memcpy(new_buf + m_async_backend_recv_data_len, buf, len);
+        m_async_backend_recv_data_len += len;
+        m_async_backend_recv_buf = new_buf;
+    }
+    else if(len == 0)
+    {
+        return -1;
+    }
+    else
+    {
+        if(m_backend_ssl)
+        {
+            int ret = SSL_get_error(m_backend_ssl, len);
+            if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+                len = 0;
+        }
+        else
+        {
+            if( errno == EAGAIN)
+                len = 0;
+        }
+    }
+    
+    return len;
+}
+
+int http_tunneling::backend_async_flush()
+{
+        return backend_flush();
 }

@@ -40,8 +40,8 @@ public:
     bool processing(char* & derived_buf, int& derived_buf_used_len);
 
 protected:
-    unsigned long long m_chunk_len;
-    unsigned long long m_sent_chunk;
+    unsigned int m_chunk_len;
+    unsigned int m_sent_chunk;
     HTTP_Client_Parse_State m_state;
     
     string m_line_text;

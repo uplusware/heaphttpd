@@ -29,6 +29,7 @@ class Session
 {
 protected:
 	int m_sockfd;
+    map<int, backend_session*>* m_backend_list;
     int m_epoll_fd;
     SSL * m_ssl;
 	string m_clientip;
@@ -50,7 +51,7 @@ protected:
     void CreateProtocol();
     
 public:
-	Session(Session_Group* group, int epoll_fd, ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, BOOL https, BOOL http2, memory_cache* ch);
+	Session(Session_Group* group, ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert, BOOL https, BOOL http2, memory_cache* ch);
 	virtual ~Session();
 	
     
@@ -75,6 +76,9 @@ public:
     }
     
     int get_sock_fd() { return m_sockfd; }
+    
+    IHttp * get_http_protocol_instance() { return m_http_protocol_instance; }
+    
 	memory_cache* m_cache;
 };
 #endif /* _SESSION_H_*/

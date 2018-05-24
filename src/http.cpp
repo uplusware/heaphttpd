@@ -30,7 +30,7 @@
 
 const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" };
 
-CHttp::CHttp(int epoll_fd, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp::CHttp(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
 	const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
     cgi_socket_t fpm_socktype, const char* fpm_sockfile,
@@ -39,6 +39,7 @@ CHttp::CHttp(int epoll_fd, time_t connection_first_request_time, time_t connecti
 	const char* private_path, AUTH_SCHEME wwwauth_scheme, AUTH_SCHEME proxyauth_scheme, 
 	SSL* ssl, CHttp2* phttp2, uint_32 http2_stream_ind)
 {	
+    m_backend_list = backend_list;
     m_epoll_fd = epoll_fd;
     m_srvobj = srvobj;
     m_protocol_upgrade = FALSE;
@@ -201,6 +202,15 @@ int CHttp::HttpRecv(char* buf, int len)
 #endif /* _WITH_ASYNC_ */
 }
 
+int CHttp::AsyncHttpFlush()
+{
+    if(m_async_send_data_len > 0)
+    {
+        AsyncSend();
+    }
+    return m_async_send_data_len;
+}
+
 int CHttp::AsyncHttpSend(const char* buf, int len)
 {
 	if(len > 0)
@@ -216,8 +226,6 @@ int CHttp::AsyncHttpSend(const char* buf, int len)
         memcpy(new_buf + m_async_send_data_len, buf, len);
         m_async_send_data_len += len;
         m_async_send_buf = new_buf;
-        
-        //printf("AsyncHttpSend %d %d\n", m_async_send_data_len, len);
         
         AsyncSend();
             
@@ -251,17 +259,14 @@ int CHttp::AsyncSend()
     {
         len = m_ssl ? SSL_write(m_ssl, m_async_send_buf, m_async_send_data_len) : send(m_sockfd, m_async_send_buf, m_async_send_data_len, 0);
         
-        //printf("AsyncSend len %d %d\n", len, m_async_send_data_len);
-        
         if(len > 0)
         {
             memmove(m_async_send_buf, m_async_send_buf + len, m_async_send_data_len - len);
-            m_async_send_data_len -= len;
-            
-            struct epoll_event event; 
-            event.data.fd = m_sockfd;  
-            event.events = m_async_send_data_len == 0 ? (EPOLLIN | EPOLLHUP | EPOLLERR) : EPOLLIN | EPOLLOUT| EPOLLHUP | EPOLLERR;
-            epoll_ctl (m_epoll_fd, EPOLL_CTL_MOD, m_sockfd, &event);
+            m_async_send_data_len -= len;            
+        }
+        else if(len == 0)
+        {
+            return -1;
         }
         else
         {
@@ -277,6 +282,12 @@ int CHttp::AsyncSend()
                     len = 0;
             }
         }
+        
+        struct epoll_event event; 
+        event.data.fd = m_sockfd;  
+        event.events = m_async_send_data_len > 0 ? (EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR) : EPOLLIN | EPOLLHUP | EPOLLERR;
+        epoll_ctl (m_epoll_fd, EPOLL_CTL_MOD, m_sockfd, &event);
+            
     }
     
     return len;
@@ -302,6 +313,10 @@ int CHttp::AsyncRecv()
         memcpy(new_buf + m_async_recv_data_len, buf, len);
         m_async_recv_data_len += len;
         m_async_recv_buf = new_buf;
+    }
+    else if(len == 0)
+    {
+        return -1;
     }
     else
     {
@@ -404,7 +419,7 @@ Http_Connection CHttp::Processing()
 }
 
 Http_Connection CHttp::AsyncProcessing()
-{
+{    
     Http_Connection httpConn = httpKeepAlive;
     if(m_http_state == httpReqHeader)
     {
@@ -426,7 +441,12 @@ Http_Connection CHttp::AsyncProcessing()
     
 	if(m_http_state == httpReqData)
     {
-        httpConn = DataParse();
+        if(m_content_length > 0)
+            httpConn = DataParse();
+        else
+        {
+            m_http_state = httpAuthentication;
+        }
     }
     
 	if(m_http_state == httpAuthentication
@@ -992,7 +1012,7 @@ void CHttp::AsyncRecvPostData()
     }
 }
 
-void CHttp::Tunneling()
+int CHttp::Tunneling()
 {
     if(m_http_state == httpTunnlingExtension)
     {
@@ -1017,8 +1037,8 @@ void CHttp::Tunneling()
             }
         }
         
-		m_http_state = httpTunnlingConnecting;
-		
+        m_http_state = httpTunnlingExtensionComplete;
+        
         if(!session_is_continuing)
         {
             CHttpResponseHdr header(m_response_header.GetMap());
@@ -1029,73 +1049,52 @@ void CHttp::Tunneling()
             SendHeader(header.Text(), header.Length());
             SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
             
-            return;
+            m_http_state = httpComplete;
+            
+            return -1;
         }
     }
     
-    if(!m_http_tunneling)
-        m_http_tunneling = new http_tunneling(m_sockfd, m_ssl, m_http_tunneling_connection, m_cache);
-    
-	if(m_http_state == httpTunnlingConnecting)
-	{
-		if(m_http_tunneling->connect_backend(m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
-			m_http_tunneling_backend_address_backup1.c_str(), m_http_tunneling_backend_port_backup1, m_http_tunneling_url_backup1.c_str(),
-			m_http_tunneling_backend_address_backup2.c_str(), m_http_tunneling_backend_port_backup2, m_http_tunneling_url_backup2.c_str(),
-			m_request_no_cache)) //connected
-		{
-			
-			m_http_state = httpTunnlingConnected;
-		}
+    if(m_http_state >= httpTunnlingRelaying)
+    {
+        const char* req_header = m_header_content.c_str();
+        int req_header_len = m_header_content.length();
+        
+        const char* req_data = NULL;
+        int req_data_len = 0;
+        if(m_content_type == multipart_form_data && m_postdata_ex)
+        {
+            req_data = m_postdata_ex->c_buffer();
+            req_data_len = m_postdata_ex->length();
+        }
+        else
+        {
+            req_data = m_postdata.c_str();
+            req_data_len = m_postdata.length();
+        }
+                
+        if(!m_http_tunneling)
+            m_http_tunneling = new http_tunneling(m_epoll_fd, m_backend_list, m_sockfd, m_ssl, m_http_tunneling_connection, m_request_no_cache, m_cache);
+        
+        
+        m_http_tunneling->set_http_session_data(this, &m_response_header, req_header, req_header_len, req_data, req_data_len,
+            m_http_tunneling_backend_address.c_str(), m_http_tunneling_backend_port, m_http_tunneling_url.c_str(),
+            m_http_tunneling_backend_address_backup1.c_str(), m_http_tunneling_backend_port_backup1, m_http_tunneling_url_backup1.c_str(),
+            m_http_tunneling_backend_address_backup2.c_str(), m_http_tunneling_backend_port_backup2, m_http_tunneling_url_backup2.c_str());
+        
+        m_http_tunneling->processing();
+        
+        if(m_http_tunneling->get_tunneling_state() >= TunnlingComplete)
+        {
+            m_http_tunneling->set_tunneling_state(TunnlingNew);
+            m_http_state = httpComplete;
+        }
     }
-	
-	if(m_http_state == httpTunnlingConnected)
-	{
-		if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
-		{
-			const char* connect_resp = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: "VERSION_STRING"\r\n\r\n";
-			HttpSend(connect_resp, strlen(connect_resp));
-			
-			m_http_state = httpTunnlingEstablished;
-		}
-		else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL)
-		{
-			m_http_state = httpTunnlingEstablished;
-		}
-	}
-	
-	if(m_http_state == httpTunnlingEstablished)
-	{
-		if(m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
-		{	
-			m_http_tunneling->relay_processing();
-		}
-		else if(m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL)
-		{
-			const char* pRequestHeader = m_header_content.c_str();
-			int nRequestHeaderLen = m_header_content.length();
-			
-			const char* pRequestData = NULL;
-			int nRequestDataLen = 0;
-			if(m_content_type == multipart_form_data && m_postdata_ex)
-			{
-				pRequestData = m_postdata_ex->c_buffer();
-				nRequestDataLen = m_postdata_ex->length();
-			}
-			else
-			{
-				pRequestData = m_postdata.c_str();
-				nRequestDataLen = m_postdata.length();
-			}
-			
-			if(m_http_tunneling->send_request_to_backend(pRequestHeader, nRequestHeaderLen, pRequestData, nRequestDataLen))
-			{
-				m_http_tunneling->recv_response_from_backend_relay_to_client(&m_response_header);
-			}
-		}
-	}
+    
+    return 0;
 }
 
-void CHttp::Response()
+int CHttp::Response()
 {
     NIU_POST_GET_VARS(m_querystring.c_str(), _GET_VARS_);
     NIU_POST_GET_VARS(m_postdata.c_str(), _POST_VARS_);
@@ -1189,6 +1188,11 @@ void CHttp::Response()
         }
 
         delete doc;
+        return 0;
+    }
+    else
+    {
+        return -1;
     }
 }
 
@@ -1248,7 +1252,6 @@ Http_Connection CHttp::ResponseReply()
                     strVal += "\"";
                     
                 }
-                //printf("%s\n", strVal.c_str());
                 header.SetField("WWW-Authenticate", strVal.c_str());
                 
                 header.SetField("Content-Type", "text/html");
@@ -1256,6 +1259,9 @@ Http_Connection CHttp::ResponseReply()
                 
                 SendHeader(header.Text(), header.Length());
                 SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                
+                m_http_state = httpComplete;
+                
                 return httpContinue;
             }
 			
@@ -1313,7 +1319,6 @@ Http_Connection CHttp::ResponseReply()
                     strVal += "\"";
                     
                 }
-                //printf("%s\n", strVal.c_str());
                 header.SetField("Proxy-Authenticate", strVal.c_str());
                 
                 header.SetField("Content-Type", "text/html");
@@ -1321,8 +1326,12 @@ Http_Connection CHttp::ResponseReply()
                 
                 SendHeader(header.Text(), header.Length());
                 SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                
+                m_http_state = httpComplete;
+                
                 return httpContinue;
             }
+            
 			m_http_state = httpTunnling;
         }
         
@@ -1343,11 +1352,15 @@ Http_Connection CHttp::ResponseReply()
                 header.SetField("Content-Length", header.GetDefaultHTMLLength());
                 SendHeader(header.Text(), header.Length());
                 SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                
+                m_http_state = httpComplete;
             }
             else
             {
                 Response();
-            }
+                
+                m_http_state = httpComplete;
+            }            
         }
         else
         {
@@ -1360,6 +1373,8 @@ Http_Connection CHttp::ResponseReply()
                 header.SetField("Content-Length", header.GetDefaultHTMLLength());
                 SendHeader(header.Text(), header.Length());
                 SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                
+                m_http_state = httpComplete;
             }
             else if(!CHttpBase::m_enable_http_tunneling && m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT)
             {
@@ -1370,23 +1385,42 @@ Http_Connection CHttp::ResponseReply()
                 header.SetField("Content-Length", header.GetDefaultHTMLLength());
                 SendHeader(header.Text(), header.Length());
                 SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                
+                m_http_state = httpComplete;
             }
-            else
+            else if(CHttpBase::m_enable_http_tunneling
+                && (m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT
+                    || m_http_tunneling_connection == HTTP_Tunneling_Without_CONNECT_SSL
+                    || m_http_tunneling_connection == HTTP_Tunneling_With_CONNECT))
             {	
                 Tunneling();
+                if(m_http_state < httpComplete)
+                    return httpContinue;
             }
-        }
-        
-        m_http_state = httpComplete;
+            else
+            {
+                CHttpResponseHdr header(m_response_header.GetMap());
+                header.SetStatusCode(SC404);
+
+                header.SetField("Content-Type", "text/html");
+                header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                SendHeader(header.Text(), header.Length());
+                SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                
+                m_http_state = httpComplete;
+            }
+        }        
     }
-    return (m_keep_alive && m_enabled_keep_alive) ? httpKeepAlive : httpClose;
+    if(m_http_state != httpComplete)
+        return httpContinue;
+    else
+        return (m_keep_alive && m_enabled_keep_alive) ? httpKeepAlive : httpClose;
 }
 
 Http_Connection CHttp::DataParse()
 {    
     if(m_http_state == httpReqData)
     {
-        //printf("DataParse\n");
         if(m_content_length < 0)
         {
             CHttpResponseHdr header(m_response_header.GetMap());
@@ -1617,6 +1651,9 @@ Http_Connection CHttp::LineParse(const char* text)
                 strcut(strtext.c_str(), "Content-Length:", NULL, strLen);
                 strtrim(strLen);	
                 m_content_length = atoll(strLen.c_str());
+                
+                if(m_http_method == hmHead)
+                    m_content_length = 0;
             }
             else if(strncasecmp(strtext.c_str(),"Content-Type:", 13) == 0)
             {
@@ -1642,7 +1679,6 @@ Http_Connection CHttp::LineParse(const char* text)
             }
             else if(strncasecmp(strtext.c_str(), "Cookie:", 7) == 0)
             {
-                //printf("%s\n", strtext.c_str());
                 string strcookie;
                 strcut(strtext.c_str(), "Cookie:", NULL, strcookie);
                 strtrim(strcookie);

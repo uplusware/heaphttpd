@@ -7,6 +7,8 @@
 #define _SESSION_GROUP_H_
 
 #include "session.h"
+#include "backend_session.h"
+
 #include <sys/epoll.h>
 #include <map>
 using namespace std;
@@ -24,14 +26,16 @@ public:
     
     unsigned int Count();
     
-    int Get_epoll_fd() { return m_epoll_fd; }
+    int get_epoll_fd() { return m_epoll_fd; }
+    
+    map<int, backend_session*>* get_backend_list() { return &m_backend_list; }
+    
 private:
     map<int, Session*> m_session_list;
+    map<int, backend_session*> m_backend_list;
     
     int m_epoll_fd;
     struct epoll_event * m_epoll_events;
-    
-    unsigned int m_session_count;
 };
 
 #endif /* _SESSION_GROUP_H_ */

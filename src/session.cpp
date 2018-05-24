@@ -6,13 +6,14 @@
 #include "session.h"
 #include "session_group.h"
 
-Session::Session(Session_Group* group, int epoll_fd, ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert,
+Session::Session(Session_Group* group, ServiceObjMap* srvobj, int sockfd, SSL* ssl, const char* clientip, X509* client_cert,
     BOOL https, BOOL http2, memory_cache* ch)
 {
     m_group = group;
     m_srvobj = srvobj;
 	m_sockfd = sockfd;
-    m_epoll_fd = epoll_fd;
+    m_epoll_fd = group ? group->get_epoll_fd() : -1;
+    m_backend_list = group ? group->get_backend_list() : NULL;
     m_ssl = ssl;
 	m_clientip = clientip;
 	m_https = https;
@@ -67,7 +68,7 @@ void Session::CreateProtocol()
     {
         if(!m_https)
         {
-            m_http_protocol_instance = new CHttp(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
+            m_http_protocol_instance = new CHttp(m_epoll_fd, m_backend_list, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
                 m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
                 m_clientip.c_str(), m_client_cert, m_cache,
                 CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(),
@@ -80,7 +81,7 @@ void Session::CreateProtocol()
         {
             if(m_http2)
             {
-                m_http_protocol_instance = new CHttp2(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
+                m_http_protocol_instance = new CHttp2(m_epoll_fd, m_backend_list, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
                     m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
                     m_clientip.c_str(), m_client_cert, m_cache,
                     CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(), 
@@ -91,7 +92,7 @@ void Session::CreateProtocol()
             }
             else
             {
-                m_http_protocol_instance = new CHttp(m_epoll_fd, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
+                m_http_protocol_instance = new CHttp(m_epoll_fd, m_backend_list, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
                     m_http_tunneling, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
                     m_clientip.c_str(), m_client_cert, m_cache,
                     CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(), 
@@ -118,11 +119,7 @@ Http_Connection Session::AsyncProcessing()
         {
             m_http_tunneling  = m_http_protocol_instance->GetHttpTunneling();
             
-            if(httpConn == httpClose)
-            {
-                m_group->Remove(m_sockfd);
-            }
-            else if(httpConn == httpKeepAlive)
+            if(httpConn == httpKeepAlive || httpConn == httpClose)
             {
                 delete m_http_protocol_instance;
                 m_http_protocol_instance = NULL;

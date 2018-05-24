@@ -387,7 +387,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 		}
 	}
 #ifdef _WITH_ASYNC_
-    pSession = new Session(pWorkerInstance->GetSessionGroup(), pWorkerInstance->GetSessionGroup()->Get_epoll_fd(), session_param->srvobjmap, session_param->sockfd, ssl,
+    pSession = new Session(pWorkerInstance->GetSessionGroup(), session_param->srvobjmap, session_param->sockfd, ssl,
         session_param->client_ip.c_str(), client_cert, session_param->https, isHttp2, session_param->cache);
 	if(pSession != NULL)
 	{
@@ -395,7 +395,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
 	}
     return;
 #else
-	pSession = new Session(NULL, -1, session_param->srvobjmap, session_param->sockfd, ssl,
+	pSession = new Session(NULL, session_param->srvobjmap, session_param->sockfd, ssl,
         session_param->client_ip.c_str(), client_cert, session_param->https, isHttp2, session_param->cache);
 	if(pSession != NULL)
 	{
@@ -469,10 +469,10 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 	while(m_STATIC_THREAD_POOL_EXIT)
 	{
 		clock_gettime(CLOCK_REALTIME, &ts);
-#ifndef _WITH_ASYNC_
-		ts.tv_sec += CHttpBase::m_service_idle_timeout;
+#ifdef _WITH_ASYNC_
+		ts.tv_sec += 0;
 #else
-        ts.tv_sec += 0;
+        ts.tv_sec += CHttpBase::m_service_idle_timeout;
 #endif /* _WITH_ASYNC_ */
 		if(sem_timedwait(&m_STATIC_THREAD_POOL_SEM, &ts) == 0)
 		{

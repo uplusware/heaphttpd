@@ -5,7 +5,7 @@
 
 #ifndef _HTTP_H_
 #define _HTTP_H_
-
+#include "backend_session.h"
 #include "httpcomm.h"
 #include "formdata.h"
 #include "cache.h"
@@ -13,6 +13,9 @@
 #include "wwwauth.h"
 #include "serviceobjmap.h"
 #include "extension.h"
+
+class http_tunneling;
+
 #include "tunneling.h"
 
 enum WebSocket_HandShake
@@ -40,9 +43,8 @@ enum Http_State
 	httpResponseComplete,
 	httpTunnling,
 	httpTunnlingExtension = httpTunnling,
-	httpTunnlingConnecting,
-	httpTunnlingConnected,
-	httpTunnlingEstablished,
+    httpTunnlingExtensionComplete,
+    httpTunnlingRelaying = httpTunnlingExtensionComplete,
 	httpTunnlingComplete,
     httpComplete
 };
@@ -69,7 +71,7 @@ public:
         m_async_send_data_len = 0;
         m_async_send_buf_size = 0;
         
-         if(m_async_recv_buf)
+        if(m_async_recv_buf)
             free(m_async_recv_buf);
         m_async_recv_buf = NULL;
         m_async_recv_data_len = 0;
@@ -102,7 +104,7 @@ class CHttp : public IHttp
 {
 public:
     friend class CHttp2;
-	CHttp(int epoll_fd, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	CHttp(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -121,6 +123,7 @@ public:
     virtual int HttpRecv(char* buf, int len);
     virtual int AsyncHttpSend(const char* buf, int len);
     virtual int AsyncHttpRecv(char* buf, int len);
+    virtual int AsyncHttpFlush();
     virtual int AsyncSend();
     virtual int AsyncRecv();
 	virtual Http_Connection Processing();
@@ -132,8 +135,8 @@ public:
     void PushPostData(const char* buf, int len);
     void RecvPostData();
     void AsyncRecvPostData();
-    void Response();
-    void Tunneling();
+    int Response();
+    int Tunneling();
     
     void SetCookie(const char* szName, const char* szValue,
         int nMaxAge = -1, const char* szExpires = NULL,
@@ -330,6 +333,7 @@ protected:
     BOOL m_tunneling_ext_handled;
     BOOL m_backend_connected;
     BOOL m_tunneling_connection_established;
+    map<int, backend_session*>* m_backend_list;
 };
 
 #endif /* _HTTP_H_ */
