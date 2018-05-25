@@ -41,6 +41,7 @@ enum Tunneling_State
 {
 	TunnlingNew = 0,
 	TunnlingConnecting = TunnlingNew,
+    TunnlingConnectingWaiting,
 	TunnlingConnected,
 	TunnlingEstablished,
     TunnlingSendingReqToBackend = TunnlingEstablished,
@@ -112,6 +113,9 @@ public:
     int get_backend_sockfd() { return m_backend_sockfd; }
     
     CHttp * get_http() { return m_http; }
+    
+    bool connect_backend(const char* backend_addr, unsigned short backend_port, const char* http_url, BOOL request_no_cache);
+    
 protected:
     string m_address;
     unsigned short m_port;

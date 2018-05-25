@@ -60,7 +60,7 @@ http_tunneling::~http_tunneling()
     m_async_backend_recv_buf = NULL;
     m_async_backend_recv_data_len = 0;
     m_async_backend_recv_buf_size = 0;
-        
+    
     backend_close();
 	
 	if(m_client)
@@ -100,21 +100,118 @@ int http_tunneling::async_processing()
 int http_tunneling::processing()
 {
     if(m_tunneling_state == TunnlingConnecting)
-    {
-        
-        if(connect_backend(m_backend_addr.c_str(), m_backend_port, m_http_url.c_str(),
-            m_backend_addr_backup1.c_str(), m_backend_port_backup1, m_http_url_backup1.c_str(),
-            m_backend_addr_backup2.c_str(), m_backend_port_backup2, m_http_url_backup2.c_str(),
-            m_request_no_cache)) //connected
+    {            
+        if(!connect_backend(m_backend_addr.c_str(), m_backend_port, m_http_url.c_str(), m_request_no_cache)) //connected    
         {
-            m_tunneling_state = TunnlingEstablished;
-        }
-        else
-        {
-            m_tunneling_state = TunnlingError;
+             if(!connect_backend(m_backend_addr_backup1.c_str(), m_backend_port_backup1, m_http_url_backup1.c_str(), m_request_no_cache)) //connected
+             {
+                 if(!connect_backend(m_backend_addr_backup2.c_str(), m_backend_port_backup2, m_http_url_backup2.c_str(), m_request_no_cache)) //connected
+                 {
+                    m_tunneling_state = TunnlingError;
+                 }
+             }
         }
     }
-            
+    
+    if(m_tunneling_state == TunnlingConnectingWaiting)
+    {
+        fd_set backend_mask_r, backend_mask_w; 
+        struct timeval timeout; 
+        timeout.tv_sec = 0; 
+        timeout.tv_usec = 0;
+        //printf("select 1\n");
+        FD_ZERO(&backend_mask_r);
+        FD_ZERO(&backend_mask_w);
+        //printf("select 2\n");
+        FD_SET(m_backend_sockfd, &backend_mask_r);
+        FD_SET(m_backend_sockfd, &backend_mask_w);
+        
+        //printf("select 3\n");
+        int ret_val = select(m_backend_sockfd + 1, &backend_mask_r, &backend_mask_w, NULL, &timeout);
+        FD_CLR(m_backend_sockfd, &backend_mask_r);
+        FD_CLR(m_backend_sockfd, &backend_mask_w);
+        
+        //printf("select 4\n");
+        if(ret_val > 0)
+        {
+            m_tunneling_state = TunnlingConnected;
+        }
+    }
+    
+    
+    if(m_tunneling_state == TunnlingConnected)
+    {
+        if(m_type == HTTP_Tunneling_Without_CONNECT_SSL)
+        {
+            string ca_crt_root;
+            ca_crt_root = CHttpBase::m_ca_client_base_dir;
+            ca_crt_root += "/";
+            ca_crt_root += m_address;
+            ca_crt_root += "/ca.crt";
+
+            string ca_crt_client;
+            ca_crt_client = CHttpBase::m_ca_client_base_dir;
+            ca_crt_client += "/";
+            ca_crt_client += m_address;
+            ca_crt_client += "/client.crt";
+
+            string ca_key_client;
+            ca_key_client = CHttpBase::m_ca_client_base_dir;
+            ca_key_client += "/";
+            ca_key_client += m_address;
+            ca_key_client += "/client.key";
+
+            string ca_password_file;
+            ca_password_file = CHttpBase::m_ca_client_base_dir;
+            ca_password_file += "/";
+            ca_password_file += m_address;
+            ca_password_file += "/client.pwd";
+
+            struct stat file_stat;
+            if(stat(ca_crt_root.c_str(), &file_stat) == 0
+                && stat(ca_crt_client.c_str(), &file_stat) == 0 && stat(ca_key_client.c_str(), &file_stat) == 0
+                && stat(ca_password_file.c_str(), &file_stat) == 0)
+            {
+                string ca_password;
+                string strPwdEncoded;
+                ifstream ca_password_fd(ca_password_file.c_str(), ios_base::binary);
+                if(ca_password_fd.is_open())
+                {
+                    getline(ca_password_fd, strPwdEncoded);
+                    ca_password_fd.close();
+                    strtrim(strPwdEncoded);
+                }
+                
+                Security::Decrypt(strPwdEncoded.c_str(), strPwdEncoded.length(), ca_password);
+
+                if(connect_ssl(m_backend_sockfd,
+                    ca_crt_root.c_str(),
+                    ca_crt_client.c_str(), ca_password.c_str(),
+                    ca_key_client.c_str(),
+                    &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout) == FALSE)
+                {
+                    backend_close();
+                    return false;
+                }
+            }
+            else
+            {
+                if(connect_ssl(m_backend_sockfd, NULL, NULL, NULL, NULL, &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout) == FALSE)
+                {
+                    backend_close();
+                    return false;
+                }
+            }
+        }
+        else if(m_type == HTTP_Tunneling_With_CONNECT)
+        {
+            const char* connection_established = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: "VERSION_STRING"\r\n\r\n";
+            client_send(connection_established, strlen(connection_established));
+        }
+        
+        m_tunneling_state = TunnlingEstablished;
+    }
+    
     if(m_tunneling_state >= TunnlingEstablished && m_tunneling_state < TunnlingComplete)
     {    
         if(m_type == HTTP_Tunneling_With_CONNECT)
@@ -157,7 +254,7 @@ int http_tunneling::append_backend_session()
     {
         struct epoll_event event; 
         event.data.fd = m_backend_sockfd;  
-        event.events = EPOLLIN | EPOLLHUP | EPOLLERR; 
+        event.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR; 
         int epoll_r = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, m_backend_sockfd, &event);
         
         if (epoll_r == -1)  
@@ -508,324 +605,206 @@ int http_tunneling::backend_send(const char* buf, int len)
     return sent_len;
 }
 
-bool http_tunneling::connect_backend(const char* backend_addr, unsigned short backend_port, const char* http_url,
-    const char* backend_addr_backup1, unsigned short backend_port_backup1, const char* http_url_backup1,
-    const char* backend_addr_backup2, unsigned short backend_port_backup2, const char* http_url_backup2,
-    BOOL request_no_cache)
+bool http_tunneling::connect_backend(const char* backend_addr, unsigned short backend_port, const char* http_url, BOOL request_no_cache)
 {
-    //try 1st one cache
-	m_http_tunneling_url = http_url;    
-	
-    if(CHttpBase::m_enable_http_tunneling_cache && !request_no_cache && m_http_tunneling_url != "")
+    if(CHttpBase::m_enable_http_tunneling_cache && !request_no_cache && http_url && *http_url != '\0')
     {
         m_cache->rdlock_tunneling_cache();
-        m_cache->_find_tunneling_(m_http_tunneling_url.c_str(), &m_tunneling_cache_instance);
+        m_cache->_find_tunneling_(http_url, &m_tunneling_cache_instance);
         m_cache->unlock_tunneling_cache();
         
         if(m_tunneling_cache_instance)
         {
+            m_tunneling_state = TunnlingConnected;
             return true;
-        }
-        else
-        {
-            // try 2nd one cache
-            m_http_tunneling_url = http_url_backup1;
-            m_cache->rdlock_tunneling_cache();
-            m_cache->_find_tunneling_(m_http_tunneling_url.c_str(), &m_tunneling_cache_instance);
-            m_cache->unlock_tunneling_cache();
-            
-            if(m_tunneling_cache_instance)
-            {
-                return true;
-            }
-            else
-            {
-                // try 3rd one cache
-                m_http_tunneling_url = http_url_backup2;
-                m_cache->rdlock_tunneling_cache();
-                m_cache->_find_tunneling_(m_http_tunneling_url.c_str(), &m_tunneling_cache_instance);
-                m_cache->unlock_tunneling_cache();
-                
-                if(m_tunneling_cache_instance)
-                {
-                    return true;
-                }
-            }
         }
     }
     
-	if((m_address == backend_addr && m_port == backend_port && m_backend_sockfd > 0)
-        || (m_address == backend_addr_backup1 && backend_port_backup1 == backend_port && m_backend_sockfd > 0)
-        || (m_address == backend_addr_backup2 && backend_port_backup2 == backend_port && m_backend_sockfd > 0))
-		return true;
-    
-    for(int t = 0; t < 3; t++)
+	if(m_address == backend_addr && m_port == backend_port && m_backend_sockfd > 0)
     {
-        //connect to the new address:port
-        if(t == 0)
+        m_tunneling_state = TunnlingConnected;
+		return true;
+    }
+    
+    //connect to the new address:port
+    if(*backend_addr == '\0' || backend_port == 0)
+        return false;
+    
+    /* Get the IP from the name */
+    char backhost_ip[INET6_ADDRSTRLEN];
+    struct addrinfo hints;      
+    struct addrinfo *servinfo, *curr;  
+    struct sockaddr_in *sa;
+    struct sockaddr_in6 *sa6;
+
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_flags = AI_CANONNAME; 
+    
+    bool success_getaddrinfo = false;
+    for(;;)
+    {
+        int rval = getaddrinfo(backend_addr, NULL, &hints, &servinfo);
+        if (rval != 0)
         {
-            if(*backend_addr == '\0' || backend_port == 0)
-                continue;
+            if(rval == EAI_AGAIN)
+                continue;         
+            break;
+        }
+        else
+        {
+            success_getaddrinfo = true;
+            break;
+        }
+    }
+    
+    if(!success_getaddrinfo)
+        return false;
+    
+    bool found_ip = false;
+    curr = servinfo; 
+    while (curr && curr->ai_canonname)
+    {  
+        if(servinfo->ai_family == AF_INET6)
+        {
+            sa6 = (struct sockaddr_in6 *)curr->ai_addr;  
+            inet_ntop(AF_INET6, (void*)&sa6->sin6_addr, backhost_ip, sizeof (backhost_ip));
+            found_ip = TRUE;
+        }
+        else if(servinfo->ai_family == AF_INET)
+        {
+            sa = (struct sockaddr_in *)curr->ai_addr;  
+            inet_ntop(AF_INET, (void*)&sa->sin_addr, backhost_ip, sizeof (backhost_ip));
+            found_ip = TRUE;
+        }
+        curr = curr->ai_next;
+    }     
+
+    freeaddrinfo(servinfo);
+    
+    if(found_ip == false)
+    {
+        fprintf(stderr, "couldn't find ip for %s\n", backend_addr);
+        return false; //to to next backup
+    }
+    
+    int res; 
+    
+    /* struct addrinfo hints; */
+    struct addrinfo *server_addr, *rp;
+    
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+    hints.ai_protocol = 0;          /* Any protocol */
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+    
+    char szPort[32];
+    sprintf(szPort, "%u", backend_port);
+    
+    success_getaddrinfo = false;
+    for(;;)
+    {
+        int rval = getaddrinfo((backhost_ip && backhost_ip[0] != '\0') ? backhost_ip : NULL, szPort, &hints, &server_addr);
+        if (rval != 0)
+        {  
+           if(rval == EAI_AGAIN)
+               continue;
+            string strError = backhost_ip;
+            strError += ":";
+            strError += szPort;
+            strError += " ";
+            strError += strerror(errno);
+            
+            fprintf(stderr, "%s(line:%s): %s\n", __FILE__, __LINE__, strError.c_str());
+            break;
+        }
+        else
+        {
+            success_getaddrinfo = true;
+            break;
+        }
+    }
+    
+    if(!success_getaddrinfo)
+        return false;
+    
+    bool connected = false;
+    
+    for (rp = server_addr; rp != NULL; rp = rp->ai_next)
+    {
+        m_backend_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (m_backend_sockfd == -1)
+            continue;
+       
+        int flags = fcntl(m_backend_sockfd, F_GETFL, 0); 
+        fcntl(m_backend_sockfd, F_SETFL, flags | O_NONBLOCK);
+        
+        int s = connect(m_backend_sockfd, rp->ai_addr, rp->ai_addrlen);
+        if(s == 0 || (s < 0 && errno == EINPROGRESS))
+        {
+#ifdef _WITH_ASYNC_
+            append_backend_session();
+            
             m_address = backend_addr;
             m_port = backend_port;
             m_http_tunneling_url = http_url;
-        }
-        else if(t == 1)
-        {
-            if(*backend_addr_backup1 == '\0' || backend_port_backup1 == 0)
-                continue;
-            m_address = backend_addr_backup1;
-            m_port = backend_port_backup1;
-            m_http_tunneling_url = http_url_backup1;
-        }
-        else if(t == 2)
-        {
-            if(*backend_addr_backup2 == '\0'|| backend_port_backup2 == 0)
-                continue;
-            m_address = backend_addr_backup2;
-            m_port = backend_port_backup2;
-            m_http_tunneling_url = http_url_backup2;
-        }
-        
-        time_t t1 = time(NULL);
-        unsigned short backhost_port = m_port;
-        
-        /* Get the IP from the name */
-        char backhost_ip[INET6_ADDRSTRLEN];
-        struct addrinfo hints;      
-        struct addrinfo *servinfo, *curr;  
-        struct sockaddr_in *sa;
-        struct sockaddr_in6 *sa6;
-
-        memset(&hints, 0, sizeof hints);
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_flags = AI_CANONNAME; 
-        
-        bool success_getaddrinfo = false;
-        for(;;)
-        {
-            int rval = getaddrinfo(m_address.c_str(), NULL, &hints, &servinfo);
-            if (rval != 0)
-            {
-                if(rval == EAI_AGAIN)
-                    continue;         
-                break;
-            }
-            else
-            {
-                success_getaddrinfo = true;
-                break;
-            }
-        }
-        
-        if(!success_getaddrinfo)
-            continue;
-        
-        bool found_ip = false;
-        curr = servinfo; 
-        while (curr && curr->ai_canonname)
-        {  
-            if(servinfo->ai_family == AF_INET6)
-            {
-                sa6 = (struct sockaddr_in6 *)curr->ai_addr;  
-                inet_ntop(AF_INET6, (void*)&sa6->sin6_addr, backhost_ip, sizeof (backhost_ip));
-                found_ip = TRUE;
-            }
-            else if(servinfo->ai_family == AF_INET)
-            {
-                sa = (struct sockaddr_in *)curr->ai_addr;  
-                inet_ntop(AF_INET, (void*)&sa->sin_addr, backhost_ip, sizeof (backhost_ip));
-                found_ip = TRUE;
-            }
-            curr = curr->ai_next;
-        }     
-
-        freeaddrinfo(servinfo);
-        
-        if(found_ip == false)
-        {
-            fprintf(stderr, "couldn't find ip for %s\n", m_address.c_str());
-            continue; //to to next backup
-        }
-        
-        int res; 
-        
-        /* struct addrinfo hints; */
-        struct addrinfo *server_addr, *rp;
-        
-        memset(&hints, 0, sizeof(struct addrinfo));
-        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-        hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
-        hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-        hints.ai_protocol = 0;          /* Any protocol */
-        hints.ai_canonname = NULL;
-        hints.ai_addr = NULL;
-        hints.ai_next = NULL;
-        
-        char szPort[32];
-        sprintf(szPort, "%u", backhost_port);
-        
-        success_getaddrinfo = false;
-        for(;;)
-        {
-            int rval = getaddrinfo((backhost_ip && backhost_ip[0] != '\0') ? backhost_ip : NULL, szPort, &hints, &server_addr);
-            if (rval != 0)
-            {
-               
-               if(rval == EAI_AGAIN)
-                   continue;
-                string strError = backhost_ip;
-                strError += ":";
-                strError += szPort;
-                strError += " ";
-                strError += strerror(errno);
-                
-                fprintf(stderr, "%s(line:%s): %s\n", __FILE__, __LINE__, strError.c_str());
-                break;
-            }
-            else
-            {
-                success_getaddrinfo = true;
-                break;
-            }
-        }
-        
-        if(!success_getaddrinfo)
-            continue;
-        
-        bool connected = false;
-        
-        for (rp = server_addr; rp != NULL; rp = rp->ai_next)
-        {
-            m_backend_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-            if (m_backend_sockfd == -1)
-                continue;
-           
-            int flags = fcntl(m_backend_sockfd, F_GETFL, 0); 
-            fcntl(m_backend_sockfd, F_SETFL, flags | O_NONBLOCK);
-
-            fd_set mask_r, mask_w; 
-            struct timeval timeout; 
-#ifdef _WITH_ASYNC_        
-            timeout.tv_sec = 3; 
+            
+            m_tunneling_state = TunnlingConnectingWaiting;
+            
+            return true;
 #else
-            timeout.tv_sec = CHttpBase::m_connection_sync_timeout; 
-#endif /* _WITH_ASYNC_ */    
+            fd_set backend_mask_r, backend_mask_w; 
+            struct timeval timeout; 
+            timeout.tv_sec = CHttpBase::m_connection_sync_timeout;  
             timeout.tv_usec = 0;
             
-            int s = connect(m_backend_sockfd, rp->ai_addr, rp->ai_addrlen);
-            if(s == 0 || (s < 0 && errno == EINPROGRESS))
-            {
-
-                FD_ZERO(&mask_r);
-                FD_ZERO(&mask_w);
+            FD_ZERO(&backend_mask_r);
+            FD_ZERO(&backend_mask_w);
+        
+            FD_SET(m_backend_sockfd, &backend_mask_r);
+            FD_SET(m_backend_sockfd, &backend_mask_w);
+            int ret_val = select(m_backend_sockfd + 1, &backend_mask_r, &backend_mask_w, NULL, &timeout);
+            FD_CLR(m_backend_sockfd, &backend_mask_r);
+            FD_CLR(m_backend_sockfd, &backend_mask_w);
             
-                FD_SET(m_backend_sockfd, &mask_r);
-                FD_SET(m_backend_sockfd, &mask_w);
-                int ret_val = select(m_backend_sockfd + 1, &mask_r, &mask_w, NULL, &timeout);
-                if(ret_val > 0)
-                {
-                    connected = true;
-                    break;  /* Success */
-                }
-                else
-                {
-                    backend_close();
-                    continue;
-                }  
+            if(ret_val > 0)
+            {
+                connected = true;
+                break;  /* Success */
             }
             else
             {
                 backend_close();
                 continue;
             }
+#endif /* _WITH_ASYNC_ */
         }
-
-        freeaddrinfo(server_addr);           /* No longer needed */
-        
-        if(!connected)
-        {            
+        else
+        {
             backend_close();
-                    
             continue;
         }
-        
-        if(connected && m_type == HTTP_Tunneling_Without_CONNECT_SSL)
-        {
-            string ca_crt_root;
-            ca_crt_root = CHttpBase::m_ca_client_base_dir;
-            ca_crt_root += "/";
-            ca_crt_root += m_address;
-            ca_crt_root += "/ca.crt";
+    }
 
-            string ca_crt_client;
-            ca_crt_client = CHttpBase::m_ca_client_base_dir;
-            ca_crt_client += "/";
-            ca_crt_client += m_address;
-            ca_crt_client += "/client.crt";
-
-            string ca_key_client;
-            ca_key_client = CHttpBase::m_ca_client_base_dir;
-            ca_key_client += "/";
-            ca_key_client += m_address;
-            ca_key_client += "/client.key";
-
-            string ca_password_file;
-            ca_password_file = CHttpBase::m_ca_client_base_dir;
-            ca_password_file += "/";
-            ca_password_file += m_address;
-            ca_password_file += "/client.pwd";
-
-            struct stat file_stat;
-            if(stat(ca_crt_root.c_str(), &file_stat) == 0
-                && stat(ca_crt_client.c_str(), &file_stat) == 0 && stat(ca_key_client.c_str(), &file_stat) == 0
-                && stat(ca_password_file.c_str(), &file_stat) == 0)
-            {
-                string ca_password;
-                string strPwdEncoded;
-                ifstream ca_password_fd(ca_password_file.c_str(), ios_base::binary);
-                if(ca_password_fd.is_open())
-                {
-                    getline(ca_password_fd, strPwdEncoded);
-                    ca_password_fd.close();
-                    strtrim(strPwdEncoded);
-                }
-                
-                Security::Decrypt(strPwdEncoded.c_str(), strPwdEncoded.length(), ca_password);
-
-                if(connect_ssl(m_backend_sockfd,
-                    ca_crt_root.c_str(),
-                    ca_crt_client.c_str(), ca_password.c_str(),
-                    ca_key_client.c_str(),
-                    &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout) == FALSE)
-                {
-                    backend_close();
-                    continue;
-                }
-            }
-            else
-            {
-                if(connect_ssl(m_backend_sockfd, NULL, NULL, NULL, NULL, &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout) == FALSE)
-                {
-                    backend_close();
-                    continue;
-                }
-            }
-        }
-#ifdef _WITH_ASYNC_        
-        append_backend_session();
-#endif /* _WITH_ASYNC_ */        
-        if(m_type == HTTP_Tunneling_With_CONNECT)
-        {
-            const char* connection_established = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: "VERSION_STRING"\r\n\r\n";
-            client_send(connection_established, strlen(connection_established));
-        }
-        //connected!
-        return true;
+    freeaddrinfo(server_addr);           /* No longer needed */
+    
+    if(!connected)
+    {            
+        backend_close();         
+        return false;
     }
     
-    // have try 3 one, and couldn't connect to any backend server.
-    return false;
+    m_address = backend_addr;
+    m_port = backend_port;
+    m_http_tunneling_url = http_url;
+    
+    m_tunneling_state = TunnlingConnected;
+    //connected!
+    return true;
 }
 
 bool http_tunneling::send_request_to_backend(const char* hbuf, int hlen, const char* dbuf, int dlen)

@@ -1359,7 +1359,8 @@ Http_Connection CHttp::ResponseReply()
             {
                 Response();
                 
-                m_http_state = httpComplete;
+                if(m_http_state < httpComplete)
+                    return httpContinue;
             }            
         }
         else

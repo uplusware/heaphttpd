@@ -180,9 +180,7 @@ void Session_Group::Processing()
                         close(m_epoll_events[i].data.fd);
                     }
                 }
-            }
-
-            
+            } 
         }
         if (m_epoll_events[i].events & EPOLLHUP || m_epoll_events[i].events & EPOLLERR)
         {
