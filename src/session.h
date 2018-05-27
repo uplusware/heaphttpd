@@ -17,6 +17,7 @@
 #include "serviceobjmap.h"
 #include "util/trace.h"
 #include "tunneling.h"
+#include "fastcgi.h"
 
 class Session_Group;
 
@@ -38,6 +39,7 @@ protected:
     ServiceObjMap * m_srvobj;
     X509* m_client_cert;
     http_tunneling* m_http_tunneling;
+    fastcgi* m_php_fpm_instance;
     
     AUTH_SCHEME m_wwwauth_scheme;
     AUTH_SCHEME m_proxyauth_scheme;

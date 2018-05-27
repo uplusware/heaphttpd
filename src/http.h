@@ -13,6 +13,7 @@
 #include "wwwauth.h"
 #include "serviceobjmap.h"
 #include "extension.h"
+#include "fastcgi.h"
 
 class http_tunneling;
 
@@ -87,6 +88,7 @@ public:
     virtual int AsyncSend() = 0;
     virtual int AsyncRecv() = 0;
     virtual http_tunneling* GetHttpTunneling() = 0;
+    virtual fastcgi* GetPhpFpm() = 0;
 protected:
     char* m_async_send_buf;
     int m_async_send_data_len;
@@ -104,7 +106,8 @@ class CHttp : public IHttp
 {
 public:
     friend class CHttp2;
-	CHttp(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	CHttp(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets,
+        http_tunneling* tunneling, fastcgi* php_fpm_instance, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -171,6 +174,7 @@ public:
 	}
     
     virtual http_tunneling* GetHttpTunneling() { return m_http_tunneling; }
+    virtual fastcgi* GetPhpFpm() { return m_php_fpm_instance; }
     
 	memory_cache* m_cache;
     
@@ -319,6 +323,7 @@ protected:
        
     
     http_tunneling* m_http_tunneling;
+    fastcgi* m_php_fpm_instance;
     
     BOOL m_request_no_cache;
     

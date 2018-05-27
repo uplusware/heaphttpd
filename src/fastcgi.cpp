@@ -8,7 +8,8 @@
 fastcgi::fastcgi(const char* ipaddr, unsigned short port)
     : cgi_base(ipaddr, port)
 {
-
+    m_request_id = 0;
+    m_is_connected = false;
 }
 
 fastcgi::fastcgi(const char* sock_file)
@@ -22,10 +23,29 @@ fastcgi::~fastcgi()
 
 }
 
-int fastcgi::BeginRequest(unsigned short request_id)
+int fastcgi::Connect()
 {
-	m_RequestIDB0 = request_id & 0x00FF;
-	m_RequestIDB1 = (request_id & 0xFF00) >> 8;
+    m_request_id++;
+
+    if(m_is_connected)
+        return 0;
+    else
+    {
+        int c = cgi_base::Connect();
+        
+        if(c == 0)
+        {
+            m_is_connected = true;
+        }
+        
+        return c;
+    }
+}
+
+int fastcgi::BeginRequest()
+{
+	m_RequestIDB0 = m_request_id & 0x00FF;
+	m_RequestIDB1 = (m_request_id & 0xFF00) >> 8;
 	FCGI_Header fcgi_header;
 	memset(&fcgi_header, 0, sizeof(FCGI_Header));
 	fcgi_header.version = FCGI_VERSION_1;
@@ -455,7 +475,7 @@ int fastcgi::GetAppValue(const char* name, string& value)
 
 int fastcgi::SendParamsAndData(map<string, string> &params_map, const char* postdata, unsigned int postdata_len)
 {
-    if(BeginRequest(1) != 0)
+    if(BeginRequest() != 0)
         return -1;
     
     if(params_map.size() > 0)

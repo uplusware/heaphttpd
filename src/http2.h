@@ -11,6 +11,8 @@
 #include "http2comm.h"
 #include "http2stream.h"
 #include "hpack.h"
+#include "fastcgi.h"
+
 #include <queue>
 #include <utility>
 #include <map>
@@ -103,7 +105,7 @@ class http2_stream;
 class CHttp2 : public IHttp
 {
 public:
-	CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+	CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, fastcgi* php_fpm_instance, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -124,6 +126,7 @@ public:
     virtual int AsyncSend();
     virtual int AsyncRecv();
     virtual http_tunneling* GetHttpTunneling() { return m_http_tunneling; }
+    virtual fastcgi* GetPhpFpm() { return m_php_fpm_instance; }
     
     void PushPromise(uint_32 stream_ind, const char * path);
     
@@ -208,6 +211,7 @@ private:
     unsigned int m_connection_keep_alive_request_tickets;
     
     http_tunneling* m_http_tunneling;
+    fastcgi* m_php_fpm_instance;
     map<int, backend_session*>* m_backend_list;
 };
 

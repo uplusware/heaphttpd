@@ -126,9 +126,11 @@ public:
 	fastcgi(const char* sock_file);
 	virtual ~fastcgi();
 	
+    virtual int Connect();
+    
     int SendParamsAndData(map<string, string> &params_map, const char* postdata, unsigned int postdata_len);
     
-	int BeginRequest(unsigned short request_id);
+	int BeginRequest();
 	int SendParams(map<string, string> &params_map);
 	int SendEmptyParams();
 	int SendRequestData(const char* inbuf, unsigned long inbuf_len);
@@ -141,6 +143,10 @@ public:
 private:
 	unsigned char m_RequestIDB0;
 	unsigned char m_RequestIDB1;
+    
+    unsigned short m_request_id;
+    
+    bool m_is_connected;
 };
 
 #endif /* _FASTCGI_H_ */

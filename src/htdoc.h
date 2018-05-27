@@ -41,11 +41,13 @@ protected:
     vector<string>* m_default_webpages;
     
 	string m_phpcgi_path;
+    
+    fastcgi* m_php_fpm_instance;
 	
 public:
 	Htdoc(CHttp* session, const char* work_path, vector<string>* default_webpages, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
-        const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
+        const char* fpm_addr, unsigned short fpm_port, fastcgi* php_fpm_instance, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list)
 	{
 		m_session = session;
@@ -59,12 +61,15 @@ public:
         m_phpcgi_path = phpcgi_path;
         
         m_cgi_list = cgi_list;
+        m_php_fpm_instance = php_fpm_instance;
 	}
 	virtual ~Htdoc()
 	{
 		
 	}
-	void Response();	
+	void Response();
+    
+    fastcgi* GetPhpFpm() { return m_php_fpm_instance; }
 };
 #endif /* _HTDOC_H_ */
 

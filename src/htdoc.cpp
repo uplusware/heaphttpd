@@ -432,7 +432,7 @@ void Htdoc::Response()
                     return;
                 }
                 fastcgi* fcgi_instance = dynamic_cast<fastcgi*>(cgi_instance);
-                if(fcgi_instance && fcgi_instance->Connect() == 0 && fcgi_instance->BeginRequest(1) == 0)
+                if(fcgi_instance && fcgi_instance->Connect() == 0 && fcgi_instance->BeginRequest() == 0)
                 {	
                     if(m_session->m_cgi.m_meta_var.size() > 0)
                         fcgi_instance->SendParams(m_session->m_cgi.m_meta_var);
@@ -838,33 +838,35 @@ void Htdoc::Response()
                     m_session->SetMetaVar("SCRIPT_FILENAME", phpfile.c_str());
                     m_session->SetMetaVar("REDIRECT_STATUS", "200");
                     
-                    fastcgi* fcgi_instance = NULL;
-                    if(m_fpm_socktype == unix_socket)
-                        fcgi_instance = new fastcgi(m_fpm_sockfile.c_str());
-                    else if(m_fpm_socktype == inet_socket)
-                        fcgi_instance = new fastcgi(m_fpm_addr.c_str(), m_fpm_port);
-                    else
+                    if(!m_php_fpm_instance)
                     {
-                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
-                        header.SetStatusCode(SC500);
-                        
-                        header.SetField("Content-Type", "text/html");
-                        header.SetField("Content-Length", header.GetDefaultHTMLLength());
-                        
-                        m_session->SendHeader(header.Text(), header.Length());
-                        m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-                        return;
+                        if(m_fpm_socktype == unix_socket)
+                            m_php_fpm_instance = new fastcgi(m_fpm_sockfile.c_str());
+                        else if(m_fpm_socktype == inet_socket)
+                            m_php_fpm_instance = new fastcgi(m_fpm_addr.c_str(), m_fpm_port);
+                        else
+                        {
+                            CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
+                            header.SetStatusCode(SC500);
+                            
+                            header.SetField("Content-Type", "text/html");
+                            header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                            
+                            m_session->SendHeader(header.Text(), header.Length());
+                            m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                            return;
+                        }
                     }
-                    if(fcgi_instance && fcgi_instance->Connect() == 0 && fcgi_instance->BeginRequest(1) == 0)
+                    if(m_php_fpm_instance && m_php_fpm_instance->Connect() == 0 && m_php_fpm_instance->BeginRequest() == 0)
                     {	
                         if(m_session->m_cgi.m_meta_var.size() > 0)
-                            fcgi_instance->SendParams(m_session->m_cgi.m_meta_var);
-                        fcgi_instance->SendEmptyParams();
+                            m_php_fpm_instance->SendParams(m_session->m_cgi.m_meta_var);
+                        m_php_fpm_instance->SendEmptyParams();
                         if(m_session->m_cgi.GetDataLen() > 0)
                         {
-                            fcgi_instance->SendRequestData(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
+                            m_php_fpm_instance->SendRequestData(m_session->m_cgi.GetData(), m_session->m_cgi.GetDataLen());
                         }
-                        fcgi_instance->SendEmptyRequestData();
+                        m_php_fpm_instance->SendEmptyRequestData();
                         
                         vector<char> binaryResponse;
                         string strHeader, strDebug;
@@ -873,7 +875,7 @@ void Htdoc::Response()
                         unsigned char protocolstatus;
                         BOOL continue_recv;
                         
-                        fcgi_instance->RecvAppData(binaryResponse, strerr, appstatus, protocolstatus, continue_recv);
+                        m_php_fpm_instance->RecvAppData(binaryResponse, strerr, appstatus, protocolstatus, continue_recv);
                         
                         if(binaryResponse.size() > 0)
                         {
@@ -932,7 +934,7 @@ void Htdoc::Response()
                             while(continue_recv)
                             {
                                 binaryResponse.clear();
-                                fcgi_instance->RecvAppData(binaryResponse, strerr, appstatus, protocolstatus, continue_recv);
+                                m_php_fpm_instance->RecvAppData(binaryResponse, strerr, appstatus, protocolstatus, continue_recv);
                                 if(binaryResponse.size() > 0 && m_session->GetMethod() != hmHead)
                                     m_session->SendContent(&binaryResponse[0], binaryResponse.size());
                             }
@@ -959,10 +961,7 @@ void Htdoc::Response()
                         
                         m_session->SendHeader(header.Text(), header.Length());
                         m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-                    }
-                    if(fcgi_instance)
-                        delete fcgi_instance;
-                
+                    }                
                 }
                 else
                 {

@@ -41,9 +41,9 @@ public:
     cgi_base(int sockfd);
 	virtual ~cgi_base();
 	
-	int Connect();
-	int Send(const char* buf, unsigned long long len);
-	int Recv(const char* buf, unsigned long long len);
+	virtual int Connect();
+	virtual int Send(const char* buf, unsigned long long len);
+	virtual int Recv(const char* buf, unsigned long long len);
 	
 private:
 	string m_strIP;
