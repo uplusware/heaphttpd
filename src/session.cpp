@@ -66,6 +66,12 @@ Session::~Session()
         delete m_php_fpm_instance;
     m_php_fpm_instance = NULL;
     
+    map<string, fastcgi*>::iterator iter_instance;
+    for(iter_instance = m_fastcgi_instances.begin(); iter_instance != m_fastcgi_instances.end(); iter_instance++)
+    {
+        delete iter_instance->second;
+    }
+    
 }
 
 void Session::CreateProtocol()
@@ -75,7 +81,8 @@ void Session::CreateProtocol()
         if(!m_https)
         {
             m_http_protocol_instance = new CHttp(m_epoll_fd, m_backend_list, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
-                m_http_tunneling, m_php_fpm_instance, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
+                m_http_tunneling, m_php_fpm_instance, &m_fastcgi_instances,
+                m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpport,
                 m_clientip.c_str(), m_client_cert, m_cache,
                 CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(),
                 CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
@@ -88,7 +95,7 @@ void Session::CreateProtocol()
             if(m_http2)
             {
                 m_http_protocol_instance = new CHttp2(m_epoll_fd, m_backend_list, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
-                    m_http_tunneling, m_php_fpm_instance, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
+                    m_http_tunneling, m_php_fpm_instance, &m_fastcgi_instances, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
                     m_clientip.c_str(), m_client_cert, m_cache,
                     CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(), 
                     CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
@@ -99,7 +106,7 @@ void Session::CreateProtocol()
             else
             {
                 m_http_protocol_instance = new CHttp(m_epoll_fd, m_backend_list, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
-                    m_http_tunneling, m_php_fpm_instance, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
+                    m_http_tunneling, m_php_fpm_instance, &m_fastcgi_instances, m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
                     m_clientip.c_str(), m_client_cert, m_cache,
                     CHttpBase::m_work_path.c_str(), &CHttpBase::m_default_webpages, &CHttpBase::m_ext_list, &CHttpBase::m_reverse_ext_list, CHttpBase::m_php_mode.c_str(), 
                     CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 

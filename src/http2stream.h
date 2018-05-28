@@ -21,7 +21,8 @@ enum stream_state_e
 class http2_stream
 {
 public:
-    http2_stream(int epoll_fd, map<int, backend_session*>* backend_list, uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, fastcgi* php_fpm_instance, ServiceObjMap* srvobj, int sockfd,
+    http2_stream(int epoll_fd, map<int, backend_session*>* backend_list, uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets,
+        http_tunneling* tunneling, fastcgi* php_fpm_instance, map<string, fastcgi*>* fastcgi_instances, ServiceObjMap* srvobj, int sockfd,
         const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
@@ -122,6 +123,7 @@ private:
     
     http_tunneling* m_http_tunneling;
     fastcgi* m_php_fpm_instance;
+    map<string, fastcgi*>* m_fastcgi_instances;
     map<int, backend_session*>* m_backend_list;
     
 };

@@ -40,6 +40,7 @@ protected:
     X509* m_client_cert;
     http_tunneling* m_http_tunneling;
     fastcgi* m_php_fpm_instance;
+    map<string, fastcgi*> m_fastcgi_instances;
     
     AUTH_SCHEME m_wwwauth_scheme;
     AUTH_SCHEME m_proxyauth_scheme;

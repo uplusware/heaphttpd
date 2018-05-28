@@ -30,7 +30,10 @@
 
 const char* HTTP_METHOD_NAME[] = { "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" };
 
-CHttp::CHttp(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, fastcgi* php_fpm_instance, ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp::CHttp(int epoll_fd, map<int, backend_session*>* backend_list,
+    time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets,
+    http_tunneling* tunneling, fastcgi* php_fpm_instance, map<string, fastcgi*>* fastcgi_instances,
+    ServiceObjMap * srvobj, int sockfd, const char* servername, unsigned short serverport,
     const char* clientip, X509* client_cert, memory_cache* ch,
 	const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
     cgi_socket_t fpm_socktype, const char* fpm_sockfile,
@@ -45,7 +48,9 @@ CHttp::CHttp(int epoll_fd, map<int, backend_session*>* backend_list, time_t conn
     m_protocol_upgrade = FALSE;
     m_upgrade_protocol = "";
     m_web_socket_handshake = Websocket_None;
-
+    
+    m_fastcgi_instances = fastcgi_instances;
+    
     m_connection_first_request_time = connection_first_request_time;
     m_connection_keep_alive_timeout = connection_keep_alive_timeout;
     m_connection_keep_alive_request_tickets = connection_keep_alive_request_tickets;
@@ -1153,7 +1158,7 @@ int CHttp::Response()
     {
         Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_default_webpages, m_php_mode.c_str(), 
             m_fpm_socktype, m_fpm_sockfile.c_str(), 
-            m_fpm_addr.c_str(), m_fpm_port, m_php_fpm_instance, m_phpcgi_path.c_str(),
+            m_fpm_addr.c_str(), m_fpm_port, m_php_fpm_instance, m_fastcgi_instances, m_phpcgi_path.c_str(),
             m_cgi_list);
 
         //2nd extension hook
@@ -1171,6 +1176,7 @@ int CHttp::Response()
         doc->Response();
         
         m_php_fpm_instance = doc->GetPhpFpm();
+        
         
         if(m_http2)
         {

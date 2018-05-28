@@ -292,7 +292,8 @@ void Htdoc::Response()
                     unsigned int body_len;
                     memsplit2str(&binaryResponse[0], binaryResponse.size(), "\r\n\r\n", strHeader, pbody, body_len);
                     
-                    /* memsplit2str removed the \r\n\r\n.
+                    /*
+                       memsplit2str removed the \r\n\r\n.
                        they are the last non-empty line's \r\n and the last empty line in header.
                        So need to appending \r\n
                     */
@@ -382,6 +383,7 @@ void Htdoc::Response()
 	}
     else
     {
+        string fastcgi_uniq_name;
         map<string, cgi_cfg_t>::iterator cgi_cfg;
         for(cgi_cfg = (*m_cgi_list).begin(); cgi_cfg != (*m_cgi_list).end(); cgi_cfg++)
         {
@@ -390,8 +392,12 @@ void Htdoc::Response()
                 fcgi_name += "/";
                 
                 if(strncmp(strResource.c_str(), fcgi_name.c_str(), fcgi_name.length()) == 0)
+                {
+                    fastcgi_uniq_name = cgi_cfg->second.cgi_name;
                     break;
+                }
         }
+        
         if(cgi_cfg != (*m_cgi_list).end())
         {
             string pyfile =  m_work_path.c_str();
@@ -409,31 +415,58 @@ void Htdoc::Response()
             m_session->SetMetaVar("SCRIPT_FILENAME", cgi_cfg->second.cgi_pgm.c_str());
             m_session->SetMetaVar("REDIRECT_STATUS", "200");
             
-            
-            cgi_base* cgi_instance = NULL;
-            
             if(cgi_cfg->second.cgi_type == fastcgi_e)
             {
-                if(cgi_cfg->second.cgi_socktype == unix_socket)
-                    cgi_instance = new fastcgi(cgi_cfg->second.cgi_sockfile.c_str());
-                else if(cgi_cfg->second.cgi_socktype == inet_socket)
-                    cgi_instance = new fastcgi(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
+                fastcgi* fcgi_instance = NULL;
+                
+                map<string, fastcgi*>::iterator iter_instance = m_fastcgi_instances->find(fastcgi_uniq_name);
+                
+                if(iter_instance == m_fastcgi_instances->end())
+                {
+                    if(cgi_cfg->second.cgi_socktype == unix_socket)
+                        fcgi_instance = new fastcgi(cgi_cfg->second.cgi_sockfile.c_str());
+                    else if(cgi_cfg->second.cgi_socktype == inet_socket)
+                        fcgi_instance = new fastcgi(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
+                    else
+                    {
+                        
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
+                        header.SetStatusCode(SC500);
+                        
+                        header.SetField("Content-Type", "text/html");
+                        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                        
+                        m_session->SendHeader(header.Text(), header.Length());
+                        m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                        return;
+                    }
+                    
+                    if(fcgi_instance)
+                    {
+                        m_fastcgi_instances->insert(map<string, fastcgi*>::value_type(fastcgi_uniq_name, fcgi_instance));
+                    }
+                    else
+                    {                        
+                        CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
+                        header.SetStatusCode(SC500);
+                        
+                        header.SetField("Content-Type", "text/html");
+                        header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                        
+                        m_session->SendHeader(header.Text(), header.Length());
+                        m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                        
+                        return;
+                        
+                    }
+                }
                 else
                 {
-                    
-                    CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
-                    header.SetStatusCode(SC500);
-                    
-                    header.SetField("Content-Type", "text/html");
-                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
-                    
-                    m_session->SendHeader(header.Text(), header.Length());
-                    m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
-                    return;
+                    fcgi_instance = iter_instance->second;
                 }
-                fastcgi* fcgi_instance = dynamic_cast<fastcgi*>(cgi_instance);
+                
                 if(fcgi_instance && fcgi_instance->Connect() == 0 && fcgi_instance->BeginRequest() == 0)
-                {	
+                {
                     if(m_session->m_cgi.m_meta_var.size() > 0)
                         fcgi_instance->SendParams(m_session->m_cgi.m_meta_var);
                     fcgi_instance->SendEmptyParams();
@@ -510,6 +543,7 @@ void Htdoc::Response()
                         
                         m_session->SendHeader(header.Text(), header.Length());
                         m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                        return;
                     }
                 }
                 else
@@ -522,14 +556,17 @@ void Htdoc::Response()
                     
                     m_session->SendHeader(header.Text(), header.Length());
                     m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    return;
                 }
             }
             else if(cgi_cfg->second.cgi_type == scgi_e)
             {
+                scgi* scgi_instance = NULL;
+                
                 if(cgi_cfg->second.cgi_socktype == unix_socket)
-                    cgi_instance = new scgi(cgi_cfg->second.cgi_sockfile.c_str());
+                    scgi_instance = new scgi(cgi_cfg->second.cgi_sockfile.c_str());
                 else if(cgi_cfg->second.cgi_socktype == inet_socket)
-                    cgi_instance = new scgi(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
+                    scgi_instance = new scgi(cgi_cfg->second.cgi_addr.c_str(), cgi_cfg->second.cgi_port);
                 else
                 {
                     CHttpResponseHdr header(m_session->GetResponseHeader()->GetMap());
@@ -540,9 +577,10 @@ void Htdoc::Response()
                     
                     m_session->SendHeader(header.Text(), header.Length());
                     m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    
                     return;
                 }
-                scgi* scgi_instance = dynamic_cast<scgi*>(cgi_instance);
+                
                 if(scgi_instance && scgi_instance->Connect() == 0)
                 {
                     vector<char> binaryResponse;
@@ -620,6 +658,11 @@ void Htdoc::Response()
                     m_session->SendHeader(header.Text(), header.Length());
                     m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                 }
+                
+                if(scgi_instance)
+                    delete scgi_instance;
+                
+                return;
             }
             else
             {
@@ -632,8 +675,6 @@ void Htdoc::Response()
                 m_session->SendHeader(header.Text(), header.Length());
                 m_session->SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
             }
-            if(cgi_instance)
-                delete cgi_instance;
         }
         else
         {

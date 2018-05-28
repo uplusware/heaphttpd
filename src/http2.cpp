@@ -74,7 +74,8 @@
 
 #define PRE_MALLOC_SIZE 1024
 
-CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets, http_tunneling* tunneling, fastcgi* php_fpm_instance, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets,
+        http_tunneling* tunneling, fastcgi* php_fpm_instance, map<string, fastcgi*>* fastcgi_instances, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -90,6 +91,7 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
     
     m_http_tunneling = tunneling;
     m_php_fpm_instance = php_fpm_instance;
+    m_fastcgi_instances = fastcgi_instances;
     
     m_peer_window_size = 0;
     m_local_window_size = 65536; // hardcode per rfc7540
@@ -408,6 +410,7 @@ http2_stream* CHttp2::create_stream_instance(uint_32 stream_ind)
                                     m_connection_keep_alive_request_tickets,
                                     m_http_tunneling,
                                     m_php_fpm_instance,
+                                    m_fastcgi_instances,
                                     m_srvobj,
                                     m_sockfd,
                                     m_servername.c_str(),
