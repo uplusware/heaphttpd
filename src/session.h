@@ -18,6 +18,7 @@
 #include "util/trace.h"
 #include "tunneling.h"
 #include "fastcgi.h"
+#include "scgi.h"
 
 class Session_Group;
 
@@ -41,6 +42,7 @@ protected:
     http_tunneling* m_http_tunneling;
     fastcgi* m_php_fpm_instance;
     map<string, fastcgi*> m_fastcgi_instances;
+    map<string, scgi*> m_scgi_instances;
     
     AUTH_SCHEME m_wwwauth_scheme;
     AUTH_SCHEME m_proxyauth_scheme;

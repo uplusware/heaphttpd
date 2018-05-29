@@ -4,7 +4,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //http2_stream
 http2_stream::http2_stream(int epoll_fd, map<int, backend_session*>* backend_list, uint_32 stream_ind, uint_32 local_window_size, uint_32 peer_window_size, CHttp2* phttp2, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets,
-        http_tunneling* tunneling, fastcgi* php_fpm_instance, map<string, fastcgi*>* fastcgi_instances, ServiceObjMap* srvobj, int sockfd,
+        http_tunneling* tunneling, fastcgi* php_fpm_instance, map<string, fastcgi*>* fastcgi_instances, map<string, scgi*>* scgi_instances, ServiceObjMap* srvobj, int sockfd,
         const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
@@ -22,6 +22,7 @@ http2_stream::http2_stream(int epoll_fd, map<int, backend_session*>* backend_lis
     m_http_tunneling = tunneling;
     m_php_fpm_instance = php_fpm_instance;
     m_fastcgi_instances = fastcgi_instances;
+    m_scgi_instances = scgi_instances;
     
     m_path = "";
     m_method = "";
@@ -57,7 +58,7 @@ http2_stream::http2_stream(int epoll_fd, map<int, backend_session*>* backend_lis
     m_http2 = phttp2;
     
     m_http1 = new CHttp(m_epoll_fd, m_backend_list, m_connection_first_request_time, m_connection_keep_alive_timeout, m_connection_keep_alive_request_tickets,
-                            m_http_tunneling, m_php_fpm_instance, m_fastcgi_instances,
+                            m_http_tunneling, m_php_fpm_instance, m_fastcgi_instances, m_scgi_instances,
                             m_srvobj,
                             m_sockfd,
                             m_servername.c_str(),

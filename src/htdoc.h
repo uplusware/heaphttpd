@@ -15,6 +15,8 @@
 #include "util/qp.h"
 #include "util/escape.h"
 #include "cache.h"
+#include "fastcgi.h"
+#include "scgi.h"
 
 typedef struct
 {
@@ -44,11 +46,14 @@ protected:
     
     fastcgi* m_php_fpm_instance;
     map<string, fastcgi*>* m_fastcgi_instances;
+    map<string, scgi*>* m_scgi_instances;
 	
 public:
 	Htdoc(CHttp* session, const char* work_path, vector<string>* default_webpages, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
-        const char* fpm_addr, unsigned short fpm_port, fastcgi* php_fpm_instance, map<string, fastcgi*>* fastcgi_instances, const char* phpcgi_path,
+        const char* fpm_addr, unsigned short fpm_port,
+        fastcgi* php_fpm_instance, map<string, fastcgi*>* fastcgi_instances, map<string, scgi*>* scgi_instances,
+        const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list)
 	{
 		m_session = session;
@@ -64,6 +69,7 @@ public:
         m_cgi_list = cgi_list;
         m_php_fpm_instance = php_fpm_instance;
         m_fastcgi_instances = fastcgi_instances;
+        m_scgi_instances = scgi_instances;
 	}
 	virtual ~Htdoc()
 	{

@@ -7,7 +7,7 @@
 scgi::scgi(const char* ipaddr, unsigned short port)
     : cgi_base(ipaddr, port)
 {
-    
+    m_is_connected = false;
 }
 
 scgi::scgi(const char* sock_file)
@@ -18,6 +18,32 @@ scgi::scgi(const char* sock_file)
 scgi::~scgi()
 {
     
+}
+
+int scgi::Connect()
+{    
+    if(m_is_connected)
+    {
+        char buf[1];
+        int err = recv(m_sockfd, buf, 1, MSG_DONTWAIT|MSG_PEEK);  
+        /* client already close connection. */  
+        if(err == 0 || (err < 0 && errno != EAGAIN))  
+        {
+            Close();
+            m_is_connected = false;
+        }
+        else
+            return 0;
+    }
+    
+    int c = cgi_base::Connect();
+        
+    if(c == 0)
+    {
+        m_is_connected = true;
+    }
+    
+    return c;
 }
 
 int scgi::SendParamsAndData(map<string, string> &params_map, const char* postdata, unsigned int postdata_len)
@@ -101,7 +127,9 @@ int scgi::RecvAppData(vector<char> &binaryResponse, BOOL& continue_recv)
     {
         int rlen = Recv(buf, 1500);
         if(rlen <= 0)
+        {
             break;
+        }
         
         for(int x = 0; x < rlen; x++)
         {        

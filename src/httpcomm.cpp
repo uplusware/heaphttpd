@@ -233,6 +233,11 @@ unsigned int CHttpResponseHdr::Length()
 	return m_strHeader.length();
 }
 
+const char* CHttpResponseHdr::GetField(const char* name)
+{
+	return m_mapHeader[name].c_str();
+}
+
 void CHttpResponseHdr::_update_header_()
 {
 	if(m_isHdrUpdated)

@@ -26,20 +26,29 @@ fastcgi::~fastcgi()
 int fastcgi::Connect()
 {
     m_request_id++;
-
+    
     if(m_is_connected)
-        return 0;
-    else
     {
-        int c = cgi_base::Connect();
-        
-        if(c == 0)
+        char buf[1];
+        int err = recv(m_sockfd, buf, 1, MSG_DONTWAIT|MSG_PEEK);  
+        /* client already close connection. */  
+        if(err == 0 || (err < 0 && errno != EAGAIN))  
         {
-            m_is_connected = true;
+            Close();
+            m_is_connected = false;
         }
-        
-        return c;
+        else
+            return 0;
     }
+    
+    int c = cgi_base::Connect();
+        
+    if(c == 0)
+    {
+        m_is_connected = true;
+    }
+    
+    return c;
 }
 
 int fastcgi::BeginRequest()

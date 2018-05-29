@@ -290,7 +290,9 @@ public:
     void SetField(const char* name, long long value);
     
 	void SetFields(const char* fields);
-
+    
+    const char* GetField(const char* name);
+    
 	const char* Text();
 	
 	unsigned int Length();

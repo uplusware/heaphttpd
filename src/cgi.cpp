@@ -28,10 +28,16 @@ cgi_base::cgi_base(int sockfd)
 
 cgi_base::~cgi_base()
 {
-	if(m_sockfd >= 0)
-		close(m_sockfd);
+	Close();
 }
 
+int cgi_base::Close()
+{
+    if(m_sockfd > 0)
+        close(m_sockfd);
+    m_sockfd = -1;
+}
+    
 int cgi_base::Connect()
 {
 	string err_msg;

@@ -42,6 +42,7 @@ public:
 	virtual ~cgi_base();
 	
 	virtual int Connect();
+    virtual int Close();
 	virtual int Send(const char* buf, unsigned long long len);
 	virtual int Recv(const char* buf, unsigned long long len);
 	
@@ -49,8 +50,9 @@ private:
 	string m_strIP;
 	unsigned short m_nPort;
 	string m_strSockfile;
-	int m_sockfd;
     CGI_SOCK m_sockType;
+protected:
+   	int m_sockfd;
 };
 
 

@@ -14,6 +14,7 @@
 #include "serviceobjmap.h"
 #include "extension.h"
 #include "fastcgi.h"
+#include "scgi.h"
 
 class http_tunneling;
 
@@ -107,7 +108,7 @@ class CHttp : public IHttp
 public:
     friend class CHttp2;
 	CHttp(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets,
-        http_tunneling* tunneling, fastcgi* php_fpm_instance, map<string, fastcgi*>* fastcgi_instances, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
+        http_tunneling* tunneling, fastcgi* php_fpm_instance, map<string, fastcgi*>* fastcgi_instances, map<string, scgi*>* scgi_instances, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
 		const char* work_path, vector<string>* default_webpages, vector<http_extension_t>* ext_list, vector<http_extension_t>* reverse_ext_list, const char* php_mode, 
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
@@ -325,6 +326,7 @@ protected:
     http_tunneling* m_http_tunneling;
     fastcgi* m_php_fpm_instance;
     map<string, fastcgi*>* m_fastcgi_instances;
+    map<string, scgi*>* m_scgi_instances;
     
     BOOL m_request_no_cache;
     
