@@ -18,7 +18,10 @@
 #include "http2.h"
 #include "hpack.h"
 
+//#define _http2_debug_ 1
+
 #include "debug.h"
+
 
 #ifdef _http2_debug_
     const char* error_table[] = {
@@ -81,6 +84,7 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
         cgi_socket_t fpm_socktype, const char* fpm_sockfile, 
         const char* fpm_addr, unsigned short fpm_port, const char* phpcgi_path,
         map<string, cgi_cfg_t>* cgi_list,
+        BOOL push_promise,
         const char* private_path, AUTH_SCHEME wwwauth_scheme, AUTH_SCHEME proxyauth_scheme,
 		SSL* ssl)
 {
@@ -98,7 +102,7 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
     m_local_window_size = 65536; // hardcode per rfc7540
     
     m_header_table_size = 4096; // hardcode per rfc7540
-    m_enable_push = TRUE; // hardcode per rfc7540
+    m_enable_push = push_promise; // TRUE per rfc7540
     m_max_concurrent_streams = 100; // hardcode per rfc7540
     
     m_initial_local_window_size = 65535; // hardcode per rfc7540
@@ -637,9 +641,10 @@ int CHttp2::ProtRecv()
             map<uint_32, http2_stream*>::iterator it = m_stream_list.find(stream_ind);
             if(it == m_stream_list.end() || m_stream_list[stream_ind] == NULL)
             {
-                map<uint_32, http2_stream*>::iterator oldest_it = m_stream_list.begin();
-                while(m_stream_list.size() >= m_max_concurrent_streams)
+                if(m_stream_list.size() >= m_max_concurrent_streams)
                 {
+                    map<uint_32, http2_stream*>::iterator oldest_it = m_stream_list.begin();
+                    
                     for(map<uint_32, http2_stream*>::iterator for_it = m_stream_list.begin();
                         for_it != m_stream_list.end(); ++for_it)
                     {
@@ -650,6 +655,7 @@ int CHttp2::ProtRecv()
                         }
                     }
                     send_rst_stream(oldest_it->first);
+                    
                     delete oldest_it->second;
                     m_stream_list.erase(oldest_it);
                 }
@@ -893,7 +899,7 @@ int CHttp2::ProtRecv()
 #endif /* _http2_debug_ */ 
                         break;
                     case HTTP2_SETTINGS_ENABLE_PUSH:
-                        m_enable_push = value == 0 ? FALSE : TRUE;
+                        m_enable_push = (value == 0 ? FALSE : TRUE);
 #ifdef _http2_debug_                    
                         printf("  Recieved HTTP2_SETTINGS_ENABLE_PUSH %d\n", value);
 #endif /* _http2_debug_ */ 

@@ -125,6 +125,7 @@ public:
 	static BOOL     m_enablehttp2;
 	static string   m_https_cipher;
     static string   m_http2_tls_cipher;
+    static BOOL     m_http2_push_promise;
     
     static vector<string> m_default_webpages;
     

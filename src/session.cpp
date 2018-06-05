@@ -107,6 +107,7 @@ void Session::CreateProtocol()
                     CHttpBase::m_fpm_socktype, CHttpBase::m_fpm_sockfile.c_str(), 
                     CHttpBase::m_fpm_addr.c_str(), CHttpBase::m_fpm_port, CHttpBase::m_phpcgi_path.c_str(),
                     &CHttpBase::m_cgi_list,
+                    CHttpBase::m_http2_push_promise,
                     CHttpBase::m_private_path.c_str(), m_wwwauth_scheme, m_proxyauth_scheme, m_ssl);
             }
             else

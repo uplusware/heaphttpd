@@ -45,6 +45,8 @@ string   CHttpBase::m_https_cipher = "ALL";
 
 BOOL   CHttpBase::m_enablehttp2 = FALSE;
 
+BOOL   CHttpBase::m_http2_push_promise = FALSE;
+
 /* OpenSSL TLSv1.2 default cipher list
  *
     ECDHE-RSA-AES256-GCM-SHA384
@@ -391,6 +393,13 @@ BOOL CHttpBase::LoadConfig()
 			{
 				strcut(strline.c_str(), "=", NULL, m_http2_tls_cipher);
 				strtrim(m_http2_tls_cipher);
+			}
+            else if(strcasecmp(strKey.c_str(), "HTTP2PushPromise") == 0)
+			{
+				string HTTP2PushPromise;
+				strcut(strline.c_str(), "=", NULL, HTTP2PushPromise );
+				strtrim(HTTP2PushPromise);
+				m_http2_push_promise = (strcasecmp(HTTP2PushPromise.c_str(), "yes")) == 0 ? TRUE : FALSE;
 			}
 			else if(strcasecmp(strKey.c_str(), "WWWAuthenticate") == 0)
 			{

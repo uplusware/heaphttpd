@@ -181,13 +181,7 @@ static int alpn_cb(SSL *ssl,
 		int len = p[0];
 		p++;
         
-		/*
-        for(int x = 0; x < len; x++)
-		{
-			printf("%c", p[x]);
-		}
-		printf("\n");
-        */
+		/* fprintf(stderr, "%.*s\n", len, p); */
         
 		if(len == 2 && memcmp(p, "h2", 2) == 0)
 		{
