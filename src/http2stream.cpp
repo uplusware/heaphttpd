@@ -350,3 +350,8 @@ time_t http2_stream::GetLastUsedTime()
 {
     return m_last_used_time;
 }
+
+vector<string>* http2_stream::GetHttp2PushPromiseList()
+{
+    return m_http1 ? m_http1->GetHttp2PushPromiseList() : NULL;
+}

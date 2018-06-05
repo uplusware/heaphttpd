@@ -234,6 +234,10 @@ public:
     
     CHttpResponseHdr* GetResponseHeader() { return &m_response_header; }
     
+    vector<string>* GetHttp2PushPromiseList() { return &m_http2_push_promise_list; }
+    
+    void PushHttp2PushPromiseFile(const char* file_path);
+    
 private:
     void ParseMethod(string & strtext);
 protected:
@@ -342,6 +346,7 @@ protected:
     BOOL m_backend_connected;
     BOOL m_tunneling_connection_established;
     map<int, backend_session*>* m_backend_list;
+    vector<string> m_http2_push_promise_list;
 };
 
 #endif /* _HTTP_H_ */

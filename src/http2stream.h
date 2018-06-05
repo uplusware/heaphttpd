@@ -73,6 +73,8 @@ public:
     string m_scheme;
     string m_status;
     
+    vector<string>* GetHttp2PushPromiseList();
+    
 private:
     CHttp2* m_http2;
     CHttp* m_http1;

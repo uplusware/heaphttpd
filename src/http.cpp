@@ -1936,3 +1936,8 @@ BOOL CHttp::GetClientCertCommonName(vector<string>& common_names)
         return FALSE;
     }
 }
+
+void CHttp::PushHttp2PushPromiseFile(const char* file_path)
+{
+    m_http2_push_promise_list.push_back(file_path);
+}
