@@ -906,6 +906,7 @@ void Htdoc::Response()
                     
                     if(!m_php_fpm_instance)
                     {
+                        
                         if(m_fpm_socktype == unix_socket)
                             m_php_fpm_instance = new fastcgi(m_fpm_sockfile.c_str());
                         else if(m_fpm_socktype == inet_socket)

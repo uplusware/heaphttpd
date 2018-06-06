@@ -74,7 +74,7 @@ public:
     string m_status;
     
     vector<string>* GetHttp2PushPromiseList();
-    
+    virtual fastcgi* GetPhpFpm() { return m_php_fpm_instance; }
 private:
     CHttp2* m_http2;
     CHttp* m_http1;

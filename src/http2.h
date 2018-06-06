@@ -128,7 +128,8 @@ public:
     virtual int AsyncSend();
     virtual int AsyncRecv();
     virtual http_tunneling* GetHttpTunneling() { return m_http_tunneling; }
-    virtual fastcgi* GetPhpFpm() { return m_php_fpm_instance; }
+    virtual fastcgi* GetPhpFpm(){ return m_php_fpm_instance; }
+    virtual void SetPhpFpm(fastcgi* inst){ m_php_fpm_instance = inst; }
     
     void PushPromise(uint_32 stream_ind, const char * path);
     

@@ -51,7 +51,7 @@ CHttp::CHttp(int epoll_fd, map<int, backend_session*>* backend_list,
     
     m_fastcgi_instances = fastcgi_instances;
     m_scgi_instances = scgi_instances;
-    
+    m_php_fpm_instance = php_fpm_instance;
     m_connection_first_request_time = connection_first_request_time;
     m_connection_keep_alive_timeout = connection_keep_alive_timeout;
     m_connection_keep_alive_request_tickets = connection_keep_alive_request_tickets;
@@ -1178,9 +1178,9 @@ int CHttp::Response()
         
         m_php_fpm_instance = doc->GetPhpFpm();
         
-        
         if(m_http2)
         {
+            m_http2->SetPhpFpm(m_php_fpm_instance);
             m_http2->SendHttp2EmptyContent(m_http2_stream_ind);
             m_http2->SendHttp2PushPromiseResponse();
         }
