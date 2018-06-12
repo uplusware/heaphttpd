@@ -1509,7 +1509,7 @@ void memory_cache::load()
 	m_type_table.insert(map<string, string>::value_type("z", "application/x-compress"));
 	m_type_table.insert(map<string, string>::value_type("zip", "application/zip"));
     
-    load_http2_push_list("/");
+    load_http2_push_list("/_http2push/");
 }
 
 void memory_cache::load_http2_push_list(const char* dir_path)

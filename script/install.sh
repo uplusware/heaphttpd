@@ -35,6 +35,7 @@ test -x /etc/heaphttpd || mkdir /etc/heaphttpd
 test -x /etc/heaphttpd/extension || mkdir /etc/heaphttpd/extension
 test -x /var/heaphttpd || mkdir /var/heaphttpd
 test -x /var/heaphttpd/html || mkdir /var/heaphttpd/html
+test -x /var/heaphttpd/html/_http2push || mkdir /var/heaphttpd/html/_http2push
 test -x /var/heaphttpd/cookie || mkdir /var/heaphttpd/cookie
 test -x /var/heaphttpd/variable || mkdir /var/heaphttpd/variable
 test -x /tmp/heaphttpd/private || mkdir /tmp/heaphttpd/private

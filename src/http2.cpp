@@ -380,16 +380,20 @@ void CHttp2::send_push_promise_request(uint_32 stream_ind)
 {
     if(stream_ind > 0)
     {
-        map<uint_32, http2_stream*>::iterator it = m_stream_list.find(stream_ind);
-        if(it != m_stream_list.end() && it->second)
+        for(int x = 0; x < m_ch->m_http2_push_list.size(); x++)
         {
-            for(int x = 0; x < it->second->GetHttp2PushPromiseList()->size(); x++)
-            {
-                PushPromise(stream_ind,(*it->second->GetHttp2PushPromiseList())[x].c_str());
-            }
+            PushPromise(stream_ind, m_ch->m_http2_push_list[x].path.c_str());
         }
     }
     
+    map<uint_32, http2_stream*>::iterator it = m_stream_list.find(stream_ind);
+    if(it != m_stream_list.end() && it->second)
+    {
+        for(int x = 0; x < it->second->GetHttp2PushPromiseList()->size(); x++)
+        {
+            PushPromise(stream_ind,(*it->second->GetHttp2PushPromiseList())[x].c_str());
+        }
+    }
 }
 
 void CHttp2::send_goaway(uint_32 last_stream_ind, uint_32 error_code)
