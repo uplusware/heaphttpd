@@ -23,6 +23,9 @@
 
 void Htdoc::Response()
 {
+    //default is complete, can be reset in the following code per the requirement
+    m_htdoc_state = htdocComplete;
+    
     if(m_session->GetWebSocketHandShake())
     {
         if(m_session->GetWebSocketHandShake() == Websocket_Nak)
@@ -183,7 +186,9 @@ void Htdoc::Response()
 	}
 	
 	m_session->SetResource(strResource.c_str());
-		
+	
+    //printf("[%s]\n", strResource.c_str());
+    
 	if(strncmp(strResource.c_str(), "/api/", 5) == 0)
 	{
         string strApiName = strResource.c_str() + 5; /* length of "/api/" */

@@ -109,7 +109,11 @@ string CHttpBase::m_phpcgi_path = "/usr/bin/php-cgi";
 map<string, cgi_cfg_t> CHttpBase::m_cgi_list;
 
 unsigned int CHttpBase::m_max_instance_num = 10;
-unsigned int CHttpBase::m_max_instance_thread_num = 1024;
+#ifdef _WITH_ASYNC_
+    unsigned int CHttpBase::m_max_instance_thread_num = 1;
+#else
+    unsigned int CHttpBase::m_max_instance_thread_num = 1024;
+#endif /* _WITH_ASYNC_ */
 BOOL CHttpBase::m_instance_prestart = FALSE;
 string CHttpBase::m_instance_balance_scheme = "R";
 
@@ -120,7 +124,11 @@ unsigned int    CHttpBase::m_connection_sync_timeout = 3;
 
 unsigned int    CHttpBase::m_service_idle_timeout = 600;
 
-unsigned int	CHttpBase::m_thread_increase_step = 8;
+#ifdef _WITH_ASYNC_
+    unsigned int	CHttpBase::m_thread_increase_step = 1;
+#else
+    unsigned int	CHttpBase::m_thread_increase_step = 8;
+#endif /* _WITH_ASYNC_ */
 
 unsigned int CHttpBase::m_runtime = 0;
 string	CHttpBase::m_config_file = CONFIG_FILE_PATH;
@@ -281,6 +289,7 @@ BOOL CHttpBase::LoadConfig()
 				strtrim(cache_size);
 				m_total_localfile_cache_size = atoi(cache_size.c_str()) * 1024 * 1024;
 			}
+#ifndef _WITH_ASYNC_
             else if(strcasecmp(strKey.c_str(), "ThreadIncreaseStep") == 0)
 			{
 				string thread_increase_step;
@@ -288,6 +297,7 @@ BOOL CHttpBase::LoadConfig()
 				strtrim(thread_increase_step);
 				m_thread_increase_step = atoi(thread_increase_step.c_str());
 			}
+#endif /*_WITH_ASYNC_*/
             else if(strcasecmp(strKey.c_str(), "TotalTunnelingCacheSize") == 0)
 			{
 				string cache_size;
@@ -308,7 +318,8 @@ BOOL CHttpBase::LoadConfig()
 				strcut(strline.c_str(), "=", NULL, cache_size );
 				strtrim(cache_size);
 				m_single_tunneling_cache_size = atoi(cache_size.c_str()) * 1024;
-			}            
+			}
+#ifndef _WITH_ASYNC_
 			else if(strcasecmp(strKey.c_str(), "InstanceThreadNum") == 0)
 			{
 				string inst_thread_num;
@@ -316,6 +327,7 @@ BOOL CHttpBase::LoadConfig()
 				strtrim(inst_thread_num);
 				m_max_instance_thread_num = atoi(inst_thread_num.c_str());
 			}
+#endif /* _WITH_ASYNC_ */
             else if(strcasecmp(strKey.c_str(), "InstancePrestart") == 0)
 			{
 				string instance_prestart;

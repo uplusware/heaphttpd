@@ -42,7 +42,17 @@ enum Http_State
     httpReqData,
     httpAuthentication,
     httpResponse,
-	httpResponseComplete,
+    httpResponding,
+    httpRespondingExtension1 = httpResponding,
+    httpRespondingExtensionComplete1,
+    httpRespondingDocNew = httpRespondingExtensionComplete1,
+    httpRespondingExtension2 = httpRespondingDocNew,
+    httpRespondingExtensionComplete2,
+    httpRespondingDocOngoing = httpRespondingExtensionComplete2,
+    httpRespondingDocComplete,
+    httpRespondingExtension3 = httpRespondingDocComplete,
+    httpRespondingExtensionComplete3,
+	httpResponseComplete = httpRespondingExtensionComplete3,
 	httpTunnling,
 	httpTunnlingExtension = httpTunnling,
     httpTunnlingExtensionComplete,
@@ -101,8 +111,12 @@ protected:
     
 };
 
+#include "htdoc.h"
+class Htdoc;
+
 #include "http2.h"
 class CHttp2;
+
 class CHttp : public IHttp
 {
 public:
@@ -244,6 +258,8 @@ protected:
     map<string, string> _POST_VARS_; /* var in post data */
 	map<string, string> _GET_VARS_; /* var in query string */
     map<string, string> _COOKIE_VARS_; /* var in cookie */
+    
+    Htdoc * m_http_doc;
     
 	SSL* m_ssl;
 	CHttp2 * m_http2;

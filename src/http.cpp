@@ -155,6 +155,8 @@ CHttp::CHttp(int epoll_fd, map<int, backend_session*>* backend_list,
     m_tunneling_ext_handled = FALSE;
     m_backend_connected = FALSE;
     m_tunneling_connection_established = FALSE;
+    
+    m_http_doc = NULL;
 }
 
 CHttp::~CHttp()
@@ -168,6 +170,9 @@ CHttp::~CHttp()
 		}
 	}
 	
+    if(m_http_doc)
+        delete m_http_doc;
+    
     if(m_lssl)
         delete m_lssl;
     
@@ -1102,66 +1107,92 @@ int CHttp::Tunneling()
 
 int CHttp::Response()
 {
-    NIU_POST_GET_VARS(m_querystring.c_str(), _GET_VARS_);
-    NIU_POST_GET_VARS(m_postdata.c_str(), _POST_VARS_);
-    NIU_COOKIE_VARS(m_cookie.c_str(), _COOKIE_VARS_);
-    
-    if(_COOKIE_VARS_.size() > 0)
+    if(m_http_state == httpResponse)
     {
-        /* Wouldn't save cookie in server side */
-        /* m_cache->reload_cookies(); */
-        map<string, string>::iterator iter_c;
-        for(iter_c = _COOKIE_VARS_.begin(); iter_c != _COOKIE_VARS_.end(); iter_c++)
-        {
-            if(iter_c->first == "__heaphttpd_session__")
-            {
-                m_session_var_uid = iter_c->second;
-                break;
-            }
-            /* Wouldn't save cookie in server side */
-            /* m_cache->access_cookie(iter_c->first.c_str()); */
-        }
-    }
-    
-    if(m_content_type == multipart_form_data)
-    {
-        m_cgi.SetData(m_postdata_ex->c_buffer(), m_postdata_ex->length());
-        char szLen[64];
-        sprintf(szLen, "%d", m_postdata.length());
-        m_cgi.SetMeta("CONTENT_LENGTH", szLen);
+        NIU_POST_GET_VARS(m_querystring.c_str(), _GET_VARS_);
+        NIU_POST_GET_VARS(m_postdata.c_str(), _POST_VARS_);
+        NIU_COOKIE_VARS(m_cookie.c_str(), _COOKIE_VARS_);
         
-        m_formdata = new formdata(m_postdata_ex->c_buffer(), m_postdata_ex->length(), m_boundary.c_str());
-    }
-    else
-    {
-        char szLen[64];
-        sprintf(szLen, "%d", m_postdata.length());
-        m_cgi.SetMeta("CONTENT_LENGTH", szLen);
-        m_cgi.SetData(m_postdata.c_str(), m_postdata.length());
-    }
-
-    //1st extension hook
-    BOOL skipSession = FALSE;
-    for(int x = 0; x < m_ext_list->size(); x++)
-    {
-        void* (*ext_request)(CHttp*, const char*, const char*, const char*, BOOL*);
-        ext_request = (void*(*)(CHttp*, const char*, const char*, const char*, BOOL*))dlsym((*m_ext_list)[x].handle, "ext_request");
-        const char* errmsg;
-        if((errmsg = dlerror()) == NULL)
+        if(_COOKIE_VARS_.size() > 0)
         {
-            BOOL skipAction = FALSE;
-            ext_request(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(), &skipAction);
-            skipSession = skipAction ? skipAction : skipSession;
+            /* Wouldn't save cookie in server side */
+            /* m_cache->reload_cookies(); */
+            map<string, string>::iterator iter_c;
+            for(iter_c = _COOKIE_VARS_.begin(); iter_c != _COOKIE_VARS_.end(); iter_c++)
+            {
+                if(iter_c->first == "__heaphttpd_session__")
+                {
+                    m_session_var_uid = iter_c->second;
+                    break;
+                }
+                /* Wouldn't save cookie in server side */
+                /* m_cache->access_cookie(iter_c->first.c_str()); */
+            }
+        }
+        
+        if(m_content_type == multipart_form_data)
+        {
+            m_cgi.SetData(m_postdata_ex->c_buffer(), m_postdata_ex->length());
+            char szLen[64];
+            sprintf(szLen, "%d", m_postdata.length());
+            m_cgi.SetMeta("CONTENT_LENGTH", szLen);
+            
+            m_formdata = new formdata(m_postdata_ex->c_buffer(), m_postdata_ex->length(), m_boundary.c_str());
+        }
+        else
+        {
+            char szLen[64];
+            sprintf(szLen, "%d", m_postdata.length());
+            m_cgi.SetMeta("CONTENT_LENGTH", szLen);
+            m_cgi.SetData(m_postdata.c_str(), m_postdata.length());
+        }
+        
+        m_http_state = httpResponding;
+    }
+    
+    if(m_http_state == httpRespondingExtension1)
+    {
+        //1st extension hook
+        BOOL skip_current_session = FALSE;
+        for(int x = 0; x < m_ext_list->size(); x++)
+        {
+            void* (*ext_request)(CHttp*, const char*, const char*, const char*, BOOL*);
+            ext_request = (void*(*)(CHttp*, const char*, const char*, const char*, BOOL*))dlsym((*m_ext_list)[x].handle, "ext_request");
+            const char* errmsg;
+            if((errmsg = dlerror()) == NULL)
+            {
+                BOOL skipAction = FALSE;
+                ext_request(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(), &skipAction);
+                skip_current_session = skipAction ? skipAction : skip_current_session;
+            }
+        }
+        
+        m_http_state = httpRespondingExtensionComplete1;
+        
+        if(skip_current_session)
+        {
+            return -1;
         }
     }
-
-    if(!skipSession)
+    
+    if(m_http_state == httpRespondingDocNew)
     {
-        Htdoc *doc = new Htdoc(this, m_work_path.c_str(), m_default_webpages, m_php_mode.c_str(), 
-            m_fpm_socktype, m_fpm_sockfile.c_str(), 
-            m_fpm_addr.c_str(), m_fpm_port, m_php_fpm_instance, m_fastcgi_instances, m_scgi_instances, m_phpcgi_path.c_str(),
-            m_cgi_list);
-
+        if(!m_http_doc)
+        {
+            m_http_doc = new Htdoc(this, m_work_path.c_str(), m_default_webpages, m_php_mode.c_str(), 
+                    m_fpm_socktype, m_fpm_sockfile.c_str(), 
+                    m_fpm_addr.c_str(), m_fpm_port, m_php_fpm_instance, m_fastcgi_instances, m_scgi_instances, m_phpcgi_path.c_str(),
+                    m_cgi_list);
+            
+            if(!m_http_doc)
+            {
+                return -1;
+            }
+        }
+    }
+    
+    if(m_http_state == httpRespondingExtension2)
+    {
         //2nd extension hook
         for(int x = 0; x < m_ext_list->size(); x++)
         {
@@ -1170,21 +1201,37 @@ int CHttp::Response()
             const char* errmsg;
             if((errmsg = dlerror()) == NULL)
             {
-                ext_response(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(), doc);
+                ext_response(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(), m_http_doc);
             }
         }
+        m_http_state = httpRespondingExtensionComplete2;
+    }
+    
+    if(m_http_state == httpRespondingDocOngoing)
+    {
+    
+        m_http_doc->Response();
         
-        doc->Response();
-        
-        m_php_fpm_instance = doc->GetPhpFpm();
-        
+        if(m_http_doc->get_state() == htdocComplete)
+        {
+            m_http_state = httpRespondingDocComplete;
+        }
+    }
+    
+    if(m_http_state == httpRespondingDocComplete)
+    {
+        m_php_fpm_instance = m_http_doc->GetPhpFpm();
+    
         if(m_http2)
         {
             m_http2->SetPhpFpm(m_php_fpm_instance);
             m_http2->SendHttp2EmptyContent(m_http2_stream_ind);
             m_http2->SendHttp2PushPromiseResponse();
         }
+    }
         
+    if(m_http_state == httpRespondingExtension3)
+    {
         //3rd extension hook
         for(int x = 0; x < m_ext_list->size(); x++)
         {
@@ -1193,17 +1240,20 @@ int CHttp::Response()
             const char* errmsg;
             if((errmsg = dlerror()) == NULL)
             {
-                ext_finish(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(), doc);
+                ext_finish(this, (*m_ext_list)[x].name.c_str(), (*m_ext_list)[x].description.c_str(), (*m_ext_list)[x].parameters.c_str(), m_http_doc);
             }
         }
-
-        delete doc;
-        return 0;
+        
+        m_http_state = httpRespondingExtensionComplete3;       
     }
-    else
+    
+    if(m_http_state == httpResponseComplete)
     {
-        return -1;
+        delete m_http_doc;
+        m_http_doc = NULL;
     }
+    
+    return 0;
 }
 
 Http_Connection CHttp::ResponseReply()
@@ -1364,13 +1414,34 @@ Http_Connection CHttp::ResponseReply()
                 SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
                 
                 m_http_state = httpComplete;
+                
+                return httpClose;
             }
             else
             {
-                Response();
+                if(Response() < 0)
+                {
+                    CHttpResponseHdr header(m_response_header.GetMap());
+                    header.SetStatusCode(SC500);
+
+                    header.SetField("Content-Type", "text/html");
+                    header.SetField("Content-Length", header.GetDefaultHTMLLength());
+                    SendHeader(header.Text(), header.Length());
+                    SendContent(header.GetDefaultHTML(), header.GetDefaultHTMLLength());
+                    
+                    m_http_state = httpComplete;
+                    
+                    return httpClose;
+                }
                 
-                if(m_http_state < httpComplete)
+                if(m_http_state < httpResponseComplete)
+                {
                     return httpContinue;
+                }
+                else if(m_http_state == httpResponseComplete)
+                {
+                    m_http_state = httpComplete;
+                }
             }            
         }
         else
@@ -1422,6 +1493,7 @@ Http_Connection CHttp::ResponseReply()
             }
         }        
     }
+    
     if(m_http_state != httpComplete)
         return httpContinue;
     else

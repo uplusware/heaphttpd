@@ -28,6 +28,12 @@ typedef struct
 
 } AttInfo;
 
+enum htdoc_state
+{
+    htdocOngoing,
+    htdocComplete
+};
+
 class Htdoc
 {
 protected:
@@ -47,6 +53,8 @@ protected:
     fastcgi* m_php_fpm_instance;
     map<string, fastcgi*>* m_fastcgi_instances;
     map<string, scgi*>* m_scgi_instances;
+    
+    htdoc_state m_htdoc_state;
 	
 public:
 	Htdoc(CHttp* session, const char* work_path, vector<string>* default_webpages, const char* php_mode, 
@@ -70,6 +78,8 @@ public:
         m_php_fpm_instance = php_fpm_instance;
         m_fastcgi_instances = fastcgi_instances;
         m_scgi_instances = scgi_instances;
+        
+        m_htdoc_state = htdocOngoing;
 	}
 	virtual ~Htdoc()
 	{
@@ -78,6 +88,10 @@ public:
 	void Response();
     
     fastcgi* GetPhpFpm() { return m_php_fpm_instance; }
+    
+    htdoc_state get_state() { return m_htdoc_state; }
+    
+    void set_state(htdoc_state state) { m_htdoc_state = state; } 
 };
 #endif /* _HTDOC_H_ */
 
