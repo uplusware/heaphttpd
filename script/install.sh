@@ -95,14 +95,14 @@ then
 	cp -f ${path}/libheapauth.so /usr/bin/libheapauth.so
 	cp -f ${path}/libheapwebsocket.so /usr/bin/libheapwebsocket.so
 else
-        if [ -x /usr/lib ]; then
-        	cp -f ${path}/libheaphttp.so /usr/lib/libheaphttp.so
-		cp -f ${path}/libheapauth.so /usr/lib/libheapauth.so
-		cp -f ${path}/libheapwebsocket.so /usr/lib/libheapwebsocket.so
-        elif [ -x /usr/lib64 ]; then 
-		cp -f ${path}/libheaphttp.so /usr/lib64/libheaphttp.so
+        if [ -x /usr/lib64 ]; then
+        	cp -f ${path}/libheaphttp.so /usr/lib64/libheaphttp.so
 		cp -f ${path}/libheapauth.so /usr/lib64/libheapauth.so
 		cp -f ${path}/libheapwebsocket.so /usr/lib64/libheapwebsocket.so
+        elif [ -x /usr/lib ]; then 
+		cp -f ${path}/libheaphttp.so /usr/lib/libheaphttp.so
+		cp -f ${path}/libheapauth.so /usr/lib/libheapauth.so
+		cp -f ${path}/libheapwebsocket.so /usr/lib/libheapwebsocket.so
 	else
     		exit -1
   	fi
