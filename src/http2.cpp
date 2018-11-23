@@ -18,8 +18,6 @@
 #include "http2.h"
 #include "hpack.h"
 
-//#define _http2_debug_ 1
-
 #include "debug.h"
 
 
@@ -164,7 +162,9 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
     memset(m_preface, 0, HTTP2_PREFACE_LEN);
     int ret = HttpRecv(m_preface, HTTP2_PREFACE_LEN);
 	m_preface[HTTP2_PREFACE_LEN] = '\0';
+#ifdef _http2_debug_
     printf("[%s]\n", m_preface);
+#endif /* _http2_debug_ */
     if(ret != HTTP2_PREFACE_LEN)
     {
         //clear resource before throw the exception
@@ -1099,7 +1099,7 @@ int CHttp2::ProtRecv()
                 {
                     m_peer_control_window_size += win_size;
 #ifdef _http2_debug_
-                    printf("  Current Peer Connection Window Size: %u\n", m_peer_control_window_size);
+                    printf("+  Current Peer Connection Window Size: %u %d\n", m_peer_control_window_size, win_size);
 #endif /* _http2_debug_ */
                 }
                 else
@@ -1109,7 +1109,7 @@ int CHttp2::ProtRecv()
                    {
                         http2_stream_inst->IncreasePeerWindowSize(win_size);
 #ifdef _http2_debug_
-                        printf("  Current Peer Stream[%u] Window Size: %u\n", stream_ind, http2_stream_inst->GetPeerWindowSize());
+                        printf("+  Current Peer Stream[%u] Window Size: %u %d\n", stream_ind, http2_stream_inst->GetPeerWindowSize(), win_size);
 #endif /* _http2_debug_ */       
                    }
                 }
@@ -1491,8 +1491,6 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
         http2_frm_data->flags = HTTP2_FRAME_FLAG_UNSET;
         http2_frm_data->r = HTTP2_FRAME_R_UNSET;
         
-        m_peer_control_window_size -= pre_send_len;
-        
         http2_frm_data->identifier = htonl(stream_ind) >> 1;
         
         HTTP2_Frame_Data2* data = (HTTP2_Frame_Data2*)(response_buf + sizeof(HTTP2_Frame));
@@ -1507,6 +1505,10 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
         {
             sent_len += pre_send_len;
             http2_stream_inst->DecreasePeerWindowSize(pre_send_len);
+            m_peer_control_window_size -= pre_send_len;
+#ifdef _http2_debug_            
+            printf("  Remote WIN[%d]: %d\n", stream_ind, http2_stream_inst ? http2_stream_inst->GetPeerWindowSize() : m_peer_control_window_size);
+#endif /* _http2_debug_ */
         }
         else
             break;

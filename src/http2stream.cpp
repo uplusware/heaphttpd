@@ -91,6 +91,10 @@ http2_stream::http2_stream(int epoll_fd, map<int, backend_session*>* backend_lis
     
     m_peer_window_size = peer_window_size;
     m_local_window_size = local_window_size;
+
+#ifdef _http2_debug_
+    printf("New Stream[%d]: LWIN %d RWIN %d\n", m_stream_ind, m_local_window_size, m_peer_window_size);
+#endif /* _http2_debug_ */    
     
     m_last_used_time = time(NULL);
 }
@@ -249,7 +253,7 @@ void http2_stream::IncreasePeerWindowSize(uint_32 window_size)
     {
         m_peer_window_size += window_size;
 #ifdef _http2_debug_
-        printf("    Current Stream[%u] Peer Windows Size %d\n", m_stream_ind, m_peer_window_size);
+        printf("    + Current Stream[%u] Peer Windows Size %d\n", m_stream_ind, m_peer_window_size);
 #endif /* _http2_debug_ */ 
     }
     else
@@ -265,9 +269,9 @@ void http2_stream::DecreasePeerWindowSize(uint_32 window_size)
     if(m_dependency_stream == 0)
     {
         m_peer_window_size -= window_size;
-    #ifdef _http2_debug_
-        printf("    Current Stream[%u] Peer Windows Size %d\n", m_stream_ind, m_peer_window_size);
-    #endif /* _http2_debug_ */ 
+#ifdef _http2_debug_
+        printf("    - Current Stream[%u] Peer Windows Size %d\n", m_stream_ind, m_peer_window_size);
+#endif /* _http2_debug_ */ 
     }
     else
     {
@@ -284,9 +288,9 @@ void http2_stream::IncreaseLocalWindowSize(uint_32 window_size)
     if(m_dependency_stream == 0)
     {
         m_local_window_size += window_size;
-    #ifdef _http2_debug_
+#ifdef _http2_debug_
         printf("    Current Stream[%u] Local Windows Size %d\n", m_stream_ind, m_local_window_size);
-    #endif /* _http2_debug_ */ 
+#endif /* _http2_debug_ */ 
     }
     else
     {
@@ -301,9 +305,9 @@ void http2_stream::DecreaseLocalWindowSize(uint_32 window_size)
     if(m_dependency_stream == 0)
     {
         m_local_window_size -= window_size;
-    #ifdef _http2_debug_
+#ifdef _http2_debug_
         printf("    Current Stream[%u] Local Windows Size %d\n", m_stream_ind, m_local_window_size);
-    #endif /* _http2_debug_ */ 
+#endif /* _http2_debug_ */ 
         
         if(m_local_window_size <= 0)
         {

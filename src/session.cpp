@@ -99,7 +99,6 @@ void Session::CreateProtocol()
         {
             if(m_http2)
             {
-                printf("http2\n");
                 m_http_protocol_instance = new CHttp2(m_epoll_fd, m_backend_list, m_first_connection_request_time, CHttpBase::m_connection_keep_alive_timeout, m_connection_keep_alive_tickets,
                     m_http_tunneling, m_php_fpm_instance, &m_fastcgi_instances, &m_scgi_instances,
                     m_srvobj, m_sockfd, CHttpBase::m_localhostname.c_str(), CHttpBase::m_httpsport,
