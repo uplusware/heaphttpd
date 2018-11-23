@@ -167,12 +167,14 @@ typedef struct
 	+---------------------------------------------------------------+
 */
 
-#define HTTP2_SETTINGS_HEADER_TABLE_SIZE         0x01
-#define HTTP2_SETTINGS_ENABLE_PUSH               0x02
-#define HTTP2_SETTINGS_MAX_CONCURRENT_STREAMS    0x03
-#define HTTP2_SETTINGS_INITIAL_WINDOW_SIZE       0x04
-#define HTTP2_SETTINGS_MAX_FRAME_SIZE            0x05
-#define HTTP2_SETTINGS_MAX_HEADER_LIST_SIZE      0x06
+/*
+    #define HTTP2_SETTINGS_HEADER_TABLE_SIZE         0x01
+    #define HTTP2_SETTINGS_ENABLE_PUSH               0x02
+    #define HTTP2_SETTINGS_MAX_CONCURRENT_STREAMS    0x03
+    #define HTTP2_SETTINGS_INITIAL_WINDOW_SIZE       0x04
+    #define HTTP2_SETTINGS_MAX_FRAME_SIZE            0x05
+    #define HTTP2_SETTINGS_MAX_HEADER_LIST_SIZE      0x06
+*/
 
 typedef struct
 {

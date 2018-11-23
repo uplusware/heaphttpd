@@ -40,7 +40,7 @@ public:
     CHttp* GetHttp1();
     hpack* GetHpack();
     Http_Method GetMethod();
-    void PushPostData(const char* buf, int len);
+    BOOL PushPostData(const char* buf, int len);
     void Response();
     
     void ClearHpack();

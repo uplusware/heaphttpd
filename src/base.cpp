@@ -396,10 +396,14 @@ BOOL CHttpBase::LoadConfig()
 			}
 			else if(strcasecmp(strKey.c_str(), "HTTP2Enable") == 0)
 			{
+#ifdef _WITH_ASYNC_
+                m_enablehttp2 = FALSE;
+#else
 				string HTTP2Enable;
 				strcut(strline.c_str(), "=", NULL, HTTP2Enable );
 				strtrim(HTTP2Enable);
 				m_enablehttp2= (strcasecmp(HTTP2Enable.c_str(), "yes")) == 0 ? TRUE : FALSE;
+#endif
 			}
             else if(strcasecmp(strKey.c_str(), "HTTP2TLSCipher") == 0)
 			{

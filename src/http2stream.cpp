@@ -174,14 +174,16 @@ Http_Method http2_stream::GetMethod()
     return m_http1->GetMethod();
 }
 
-void http2_stream::PushPostData(const char* buf, int len)
+BOOL http2_stream::PushPostData(const char* buf, int len)
 {
-    m_http1->PushPostData(buf, len);
+    m_http1->SetHttpStatus(httpReqData);
+    return m_http1->PushPostData(buf, len);
 }
 
 void http2_stream::Response()
 {
-    m_http1->Response();
+    m_http1->SetHttpStatus(httpAuthentication);
+    m_http1->ResponseReply();
 }
 
 void http2_stream::ClearHpack()

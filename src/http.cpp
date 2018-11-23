@@ -906,25 +906,33 @@ void CHttp::ParseMethod(string & strtext)
     free(sz_method);
 }
 
-void CHttp::PushPostData(const char* buf, int len)
+BOOL CHttp::PushPostData(const char* buf, int len)
 {
     if(m_content_type == application_x_www_form_urlencoded)
     {
         if(m_postdata.length() > MAX_APPLICATION_X_WWW_FORM_URLENCODED_LEN)
-            return;
+            return FALSE;
             
         char* rbuf = (char*)malloc(len + 1);
         memcpy(rbuf, buf, len);
         rbuf[len] = '\0';
         m_postdata += rbuf;
         free(rbuf);
+        //printf("~~~~~~~~~~~~~~~~~~~~~~~~~ PushPostData %d %d %d\n", m_content_length, m_postdata.length(), m_postdata_ex ? m_postdata_ex->length() : 0);
+        if(m_postdata.length() >= m_content_length)
+            return FALSE;
     }
     else if(m_content_type == multipart_form_data)
     {
         if(!m_postdata_ex)
             m_postdata_ex = new fbuffer(m_private_path.c_str());
         m_postdata_ex->bufcat(buf, len);
+        //printf("~~~~~~~~~~~~~~~~~~~~~~~~~ PushPostData %d %d %d\n", m_content_length, m_postdata.length(), m_postdata_ex ? m_postdata_ex->length() : 0);
+        if(m_postdata_ex->length() >= m_content_length)
+            return FALSE;
     }
+    
+    return TRUE;
 }
 
 void CHttp::RecvPostData()

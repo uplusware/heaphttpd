@@ -200,8 +200,8 @@ private:
     uint_32 m_initial_local_window_size;
     uint_32 m_initial_peer_window_size;
     
-    uint_32 m_local_window_size;    
-    uint_32 m_peer_window_size;
+    uint_32 m_local_control_window_size;    
+    uint_32 m_peer_control_window_size;
     
     uint_32 m_max_frame_size;
     uint_32 m_max_header_list_size;

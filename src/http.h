@@ -150,7 +150,7 @@ public:
     int ProtRecv(char* buf, int len, int alive_timeout);
     int AsyncProtRecv(char* buf, int len);
     
-    void PushPostData(const char* buf, int len);
+    BOOL PushPostData(const char* buf, int len);
     void RecvPostData();
     void AsyncRecvPostData();
     int Response();
@@ -251,6 +251,8 @@ public:
     vector<string>* GetHttp2PushPromiseList() { return &m_http2_push_promise_list; }
     
     void PushHttp2PushPromiseFile(const char* file_path);
+    
+    void SetHttpStatus(Http_State s) { m_http_state = s; }
     
 private:
     void ParseMethod(string & strtext);

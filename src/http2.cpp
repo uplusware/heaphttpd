@@ -18,7 +18,7 @@
 #include "http2.h"
 #include "hpack.h"
 
-// #define _http2_debug_ 1
+//#define _http2_debug_ 1
 
 #include "debug.h"
 
@@ -77,6 +77,8 @@
 
 #define PRE_MALLOC_SIZE 1024
 
+#define HTTP2_DEFAULT_WINDOW_SIZE 65535
+
 CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets,
         http_tunneling* tunneling, fastcgi* php_fpm_instance, map<string, fastcgi*>* fastcgi_instances, map<string, scgi*>* scgi_instances, ServiceObjMap* srvobj, int sockfd, const char* servername, unsigned short serverport,
 	    const char* clientip, X509* client_cert, memory_cache* ch,
@@ -98,15 +100,15 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
     m_fastcgi_instances = fastcgi_instances;
     m_scgi_instances = scgi_instances;
     
-    m_peer_window_size = 0;
-    m_local_window_size = 65536; // hardcode per rfc7540
+    m_peer_control_window_size = HTTP2_DEFAULT_WINDOW_SIZE;
+    m_local_control_window_size = HTTP2_DEFAULT_WINDOW_SIZE; // hardcode per rfc7540
     
     m_header_table_size = 4096; // hardcode per rfc7540
     m_enable_push = push_promise; // TRUE per rfc7540
-    m_max_concurrent_streams = 100; // hardcode per rfc7540
+    m_max_concurrent_streams = 101; // hardcode per rfc7540
     
-    m_initial_local_window_size = 65535; // hardcode per rfc7540
-    m_initial_peer_window_size = 65535; // hardcode per rfc7540
+    m_initial_local_window_size = HTTP2_DEFAULT_WINDOW_SIZE; // hardcode per rfc7540
+    m_initial_peer_window_size = HTTP2_DEFAULT_WINDOW_SIZE; // hardcode per rfc7540
     
     m_max_frame_size = 16384; // hardcode per rfc7540
     m_max_header_list_size = 0xFFFFFFFF;
@@ -162,6 +164,7 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
     memset(m_preface, 0, HTTP2_PREFACE_LEN);
     int ret = HttpRecv(m_preface, HTTP2_PREFACE_LEN);
 	m_preface[HTTP2_PREFACE_LEN] = '\0';
+    printf("[%s]\n", m_preface);
     if(ret != HTTP2_PREFACE_LEN)
     {
         //clear resource before throw the exception
@@ -243,8 +246,9 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
     }
     free(server_preface);
 	
-    //send_window_update(0, 1024*1024*16*100);
     send_initial_window_size(m_initial_local_window_size);
+    
+    //send_window_update(0, m_initial_local_window_size);
 }
 
 CHttp2::~CHttp2()
@@ -326,7 +330,7 @@ void CHttp2::send_window_update(uint_32 stream_ind, uint_32 increament_window_si
     
     http2_frm->length.len3b[0] = 0x00;
     http2_frm->length.len3b[1] = 0x00;
-    http2_frm->length.len3b[2] = sizeof(HTTP2_Frame_Window_Update); //length is 8
+    http2_frm->length.len3b[2] = sizeof(HTTP2_Frame_Window_Update); //length is 4
     http2_frm->type = HTTP2_FRAME_TYPE_WINDOW_UPDATE;
     http2_frm->flags = HTTP2_FRAME_FLAG_UNSET;
     http2_frm->r = HTTP2_FRAME_R_UNSET;
@@ -339,14 +343,16 @@ void CHttp2::send_window_update(uint_32 stream_ind, uint_32 increament_window_si
     HttpSend((const char*)http2_buf, sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Window_Update));
     
 #ifdef _http2_debug_
-    printf("  Send WINDOW_UPDATE as %d\n", increament_window_size);
+    printf("  Send WINDOW_UPDATE[%d] as %d\n", stream_ind, increament_window_size);
 #endif /* _http2_debug_ */
     free(http2_buf);
     
     if(http2_stream_inst)
+    {
         http2_stream_inst->IncreaseLocalWindowSize(increament_window_size);
+    }
     else
-        m_local_window_size += increament_window_size;
+        m_local_control_window_size += increament_window_size;
 }
 
 void CHttp2::send_initial_window_size(uint_32 window_size)
@@ -426,6 +432,8 @@ http2_stream* CHttp2::create_stream_instance(uint_32 stream_ind)
 {
     if(stream_ind > 0)
     {
+        send_window_update(0, HTTP2_DEFAULT_WINDOW_SIZE);
+        
         return new http2_stream(m_epoll_fd, m_backend_list, stream_ind,
                                     m_initial_local_window_size,
                                     m_initial_peer_window_size,
@@ -1009,14 +1017,16 @@ int CHttp2::ProtRecv()
         {
             http2_stream* http2_stream_inst = get_stream_instance(stream_ind);
             
-            if(stream_ind == 0)
+            m_local_control_window_size -= payload_len;
+            if(http2_stream_inst)
             {
-                m_local_window_size -= payload_len;
+                http2_stream_inst->DecreaseLocalWindowSize(payload_len);    
             }
-            else if(http2_stream_inst)
-            {
-                http2_stream_inst->DecreaseLocalWindowSize(payload_len);
-            }
+            
+            //printf("###################### [0]: %d  [%d]: %d\n", m_local_control_window_size, stream_ind, http2_stream_inst->GetLocalWindowSize());
+            
+            send_window_update(0, payload_len);
+            send_window_update(stream_ind, payload_len);
             
             if(stream_ind == 0
                 || ( http2_stream_inst && http2_stream_inst->GetStreamState() != stream_open))
@@ -1036,19 +1046,24 @@ int CHttp2::ProtRecv()
                     padding_len = data1->pad_length;
                     offset += sizeof(HTTP2_Frame_Data1);
                     
-                    http2_stream_inst->PushPostData(data1->data_padding, payload_len - padding_len);
+#ifdef _http2_debug_
+                    printf("  Recv Post Data: %d\n", payload_len - padding_len);
+#endif /* _http2_debug_ */
+                    if(!http2_stream_inst->PushPostData(data1->data_padding, payload_len - padding_len))
+                        http2_stream_inst->Response();
+                    
                 }
                 else
                 {
                     HTTP2_Frame_Data2 * data2 = (HTTP2_Frame_Data2* )payload;
                     offset += sizeof(HTTP2_Frame_Data2);
-                
-                    http2_stream_inst->PushPostData(data2->data, payload_len);
-                }
 #ifdef _http2_debug_
                     printf("  Recv Post Data: %d\n", payload_len);
 #endif /* _http2_debug_ */
-                http2_stream_inst->Response();
+                
+                    if(!http2_stream_inst->PushPostData(data2->data, payload_len))
+                         http2_stream_inst->Response();
+                }
                 
                 if((frame_hdr.flags & HTTP2_FRAME_FLAG_END_STREAM) == HTTP2_FRAME_FLAG_END_STREAM)
                 {
@@ -1082,9 +1097,9 @@ int CHttp2::ProtRecv()
             {
                 if(stream_ind == 0)
                 {
-                    m_peer_window_size += win_size;
+                    m_peer_control_window_size += win_size;
 #ifdef _http2_debug_
-                    printf("  Current Peer Connection Window Size: %u\n", m_peer_window_size);
+                    printf("  Current Peer Connection Window Size: %u\n", m_peer_control_window_size);
 #endif /* _http2_debug_ */
                 }
                 else
@@ -1366,6 +1381,7 @@ void CHttp2::TransHttp2ParseHttp1Header(uint_32 stream_ind, hpack* hdr)
             }
         }
     }
+        
     if(m_enable_push && !m_pushed_request)
     {
         m_pushed_request = TRUE;
@@ -1474,6 +1490,8 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
         http2_frm_data->type = HTTP2_FRAME_TYPE_DATA;
         http2_frm_data->flags = HTTP2_FRAME_FLAG_UNSET;
         http2_frm_data->r = HTTP2_FRAME_R_UNSET;
+        
+        m_peer_control_window_size -= pre_send_len;
         
         http2_frm_data->identifier = htonl(stream_ind) >> 1;
         
