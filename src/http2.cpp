@@ -1020,11 +1020,14 @@ int CHttp2::ProtRecv()
             {
                 http2_stream_inst->DecreaseLocalWindowSize(payload_len);    
             }
-            
-            //printf("###################### [0]: %d  [%d]: %d\n", m_local_control_window_size, stream_ind, http2_stream_inst->GetLocalWindowSize());
-            
-            send_window_update(0, payload_len);
-            send_window_update(stream_ind, payload_len);
+#ifdef _http2_debug_
+            printf("    Current Local Window Size: [0]: %d; [%d]: %d\n", m_local_control_window_size, stream_ind,
+                http2_stream_inst ? http2_stream_inst->GetLocalWindowSize() : m_local_control_window_size);
+#endif /* _http2_debug_ */
+            if(m_local_control_window_size < 1024 && m_initial_local_window_size > m_local_control_window_size)
+                send_window_update(0, m_initial_local_window_size - m_local_control_window_size);
+            if(http2_stream_inst && http2_stream_inst->GetLocalWindowSize() < 1024 && m_initial_local_window_size > http2_stream_inst->GetLocalWindowSize())
+                send_window_update(stream_ind, m_initial_local_window_size - http2_stream_inst->GetLocalWindowSize());
             
             if(stream_ind == 0
                 || ( http2_stream_inst && http2_stream_inst->GetStreamState() != stream_open))
