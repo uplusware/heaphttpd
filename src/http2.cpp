@@ -247,8 +247,6 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
     free(server_preface);
 	
     send_initial_window_size(m_initial_local_window_size);
-    
-    //send_window_update(0, m_initial_local_window_size);
 }
 
 CHttp2::~CHttp2()
@@ -1479,6 +1477,9 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
     while(1)
     {
         uint_32 pre_send_len = (len - sent_len) > m_max_frame_size ? m_max_frame_size : (len - sent_len);
+        
+        pre_send_len = http2_stream_inst->GetPeerWindowSize() > pre_send_len ? pre_send_len : http2_stream_inst->GetPeerWindowSize();
+        
 #ifdef _http2_debug_                    
         printf("  Send DATA Frame as Length: %d/%d on stream %u\n", pre_send_len, len, stream_ind);
 #endif /* _http2_debug_ */ 
@@ -1503,17 +1504,23 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
     
         if(ret == 0)
         {
+#ifdef _http2_debug_            
+            printf("    Remote WIN[%d]: %d\n", stream_ind, http2_stream_inst ? http2_stream_inst->GetPeerWindowSize() : m_peer_control_window_size);
+#endif /* _http2_debug_ */
+
             sent_len += pre_send_len;
             http2_stream_inst->DecreasePeerWindowSize(pre_send_len);
             m_peer_control_window_size -= pre_send_len;
-#ifdef _http2_debug_            
-            printf("  Remote WIN[%d]: %d\n", stream_ind, http2_stream_inst ? http2_stream_inst->GetPeerWindowSize() : m_peer_control_window_size);
-#endif /* _http2_debug_ */
         }
         else
             break;
         if(sent_len == len)
             break;
+        
+        if(http2_stream_inst->GetPeerWindowSize() == 0)
+        {
+            ProtRecv();
+        }
     }
     return ret;
 }

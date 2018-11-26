@@ -249,107 +249,108 @@ void http2_stream::RefreshLastUsedTime()
 
 void http2_stream::IncreasePeerWindowSize(uint_32 window_size)
 {
-    if(m_dependency_stream == 0)
-    {
+//    if(m_dependency_stream == 0)
+//    {
         m_peer_window_size += window_size;
 #ifdef _http2_debug_
-        printf("    + Current Stream[%u] Peer Windows Size %d\n", m_stream_ind, m_peer_window_size);
+        printf("    + Current Stream[%u] Peer Windows Size %d, total %d\n", m_stream_ind, window_size, m_peer_window_size);
 #endif /* _http2_debug_ */ 
-    }
-    else
-    {
-        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);
-        if(p_dependency_stream)
-            p_dependency_stream->IncreasePeerWindowSize(window_size);
-    }
+//    }
+//    else
+//    {
+//        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);
+//        if(p_dependency_stream)
+//            p_dependency_stream->IncreasePeerWindowSize(window_size);
+//    }
 }
 
 void http2_stream::DecreasePeerWindowSize(uint_32 window_size)
 {
-    if(m_dependency_stream == 0)
-    {
+//    if(m_dependency_stream == 0)
+//    {
         m_peer_window_size -= window_size;
 #ifdef _http2_debug_
-        printf("    - Current Stream[%u] Peer Windows Size %d\n", m_stream_ind, m_peer_window_size);
+        printf("    - Current Stream[%u] Peer Windows Size %d, left %d\n", m_stream_ind, window_size, m_peer_window_size);
 #endif /* _http2_debug_ */ 
-    }
-    else
-    {
-        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);      
-        if(p_dependency_stream)
-        {
-            p_dependency_stream->DecreasePeerWindowSize(window_size);
-        }
-    }
+//    }
+//    else
+//    {
+//        printf("%d %d\n", m_stream_ind, m_dependency_stream);
+//        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);      
+//        if(p_dependency_stream)
+//        {
+//            p_dependency_stream->DecreasePeerWindowSize(window_size);
+//        }
+//    }
 }
 
 void http2_stream::IncreaseLocalWindowSize(uint_32 window_size)
 {
-    if(m_dependency_stream == 0)
-    {
+//    if(m_dependency_stream == 0)
+//    {
         m_local_window_size += window_size;
 #ifdef _http2_debug_
-        printf("    Current Stream[%u] Local Windows Size %d\n", m_stream_ind, m_local_window_size);
+        printf("    + Current Stream[%u] Local Windows Size %d, total %d\n", m_stream_ind, window_size, m_local_window_size);
 #endif /* _http2_debug_ */ 
-    }
-    else
-    {
-        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);        
-        if(p_dependency_stream)
-            p_dependency_stream->IncreaseLocalWindowSize(window_size);
-    }
+//    }
+//    else
+//    {
+//        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);        
+//        if(p_dependency_stream)
+//            p_dependency_stream->IncreaseLocalWindowSize(window_size);
+//    }
 }
 
 void http2_stream::DecreaseLocalWindowSize(uint_32 window_size)
 {
-    if(m_dependency_stream == 0)
-    {
+//    if(m_dependency_stream == 0)
+//    {
         m_local_window_size -= window_size;
 #ifdef _http2_debug_
-        printf("    Current Stream[%u] Local Windows Size %d\n", m_stream_ind, m_local_window_size);
+        printf("    - Current Stream[%u] Local Windows Size %d, left %d\n", m_stream_ind, window_size, m_local_window_size);
 #endif /* _http2_debug_ */ 
         
         if(m_local_window_size <= 0)
         {
             m_http2->send_window_update(m_stream_ind, m_http2->get_initial_local_window_size());
         }
-    }
-    else
-    {
-        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);       
-        if(p_dependency_stream)
-        {
-            p_dependency_stream->DecreaseLocalWindowSize(window_size);
-        }
-    }
+//    }
+//    else
+//    {
+//        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);       
+//        if(p_dependency_stream)
+//        {
+//            p_dependency_stream->DecreaseLocalWindowSize(window_size);
+//        }
+//    }
 }
 
 int http2_stream::GetPeerWindowSize()
 {
-    if(m_dependency_stream == 0)
-    {
+//    if(m_dependency_stream == 0)
+//    {
         return m_peer_window_size;
-    }
-    else
-    {
-        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);
-        if(p_dependency_stream)
-            return p_dependency_stream->GetPeerWindowSize();
-    }
+//    }
+//    else
+//    {
+//        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);
+//        if(p_dependency_stream)
+//            return p_dependency_stream->GetPeerWindowSize();
+//    }
 }
 
 int http2_stream::GetLocalWindowSize()
 {
-    if(m_dependency_stream == 0)
-    {
+//    if(m_dependency_stream == 0)
+//    {
         return m_local_window_size;
-    }
-    else
-    {
-        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);
-        if(p_dependency_stream)
-            return p_dependency_stream->GetLocalWindowSize();
-    }
+//    }
+//    else
+//    {
+//        http2_stream* p_dependency_stream = m_http2->get_stream_instance(m_dependency_stream);
+//        if(p_dependency_stream)
+//            return p_dependency_stream->GetLocalWindowSize();
+//    }
 }
 
 time_t http2_stream::GetLastUsedTime()
