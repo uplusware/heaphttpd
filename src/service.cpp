@@ -1298,50 +1298,76 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
 		int nFlag;
         if(http_port > 0)
         {
-            struct addrinfo hints;
-            struct addrinfo *server_addr, *rp;
-            
-            memset(&hints, 0, sizeof(struct addrinfo));
-            hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-            hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
-            hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-            hints.ai_protocol = 0;          /* Any protocol */
-            hints.ai_canonname = NULL;
-            hints.ai_addr = NULL;
-            hints.ai_next = NULL;
-            
-            char szPort[32];
-            sprintf(szPort, "%u", http_port);
-
-            int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort, &hints, &server_addr);
-            if (s != 0)
+            if(!hostip || hostip[0] == '\0')
             {
-               fprintf(stderr, "getaddrinfo: %s %s %d", gai_strerror(s), __FILE__, __LINE__);
-               break;
+                sockaddr_in6 svr_addr6;
+                m_sockfd = socket(AF_INET6, SOCK_STREAM, 0);
+                if (m_sockfd == -1)
+                       break;
+                memset(&svr_addr6, 0, sizeof(sockaddr_in6));
+                svr_addr6.sin6_family = AF_INET6;
+                svr_addr6.sin6_port = htons(http_port);
+                svr_addr6.sin6_addr = in6addr_any;
+                
+                nFlag = 1;
+                setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
+                
+                nFlag = 0;
+                setsockopt(m_sockfd, SOL_SOCKET, IPV6_V6ONLY, (char*)&nFlag, sizeof(nFlag));
+                
+                if(bind(m_sockfd, (sockaddr*)&svr_addr6, sizeof(sockaddr_in6)) != 0)
+                {
+                    m_sockfd = -1;
+                    break;
+                }
             }
-            
-            for (rp = server_addr; rp != NULL; rp = rp->ai_next)
+            else
             {
-               m_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-               if (m_sockfd == -1)
-                   continue;
-               
-               nFlag = 1;
-               setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
-            
-               if (bind(m_sockfd, rp->ai_addr, rp->ai_addrlen) == 0)
-                   break;                  /* Success */
+                struct addrinfo hints;
+                struct addrinfo *server_addr, *rp;
+                
+                memset(&hints, 0, sizeof(struct addrinfo));
+                hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+                hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+                hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+                hints.ai_protocol = 0;          /* Any protocol */
+                hints.ai_canonname = NULL;
+                hints.ai_addr = NULL;
+                hints.ai_next = NULL;
+                
+                char szPort[32];
+                sprintf(szPort, "%u", http_port);
 
-               close(m_sockfd);
-            }
-            
-            if (rp == NULL)
-            {               /* No address succeeded */
-                  fprintf(stderr, "Could not bind %s %d", __FILE__, __LINE__);
-                  break;
-            }
+                int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort, &hints, &server_addr);
+                if (s != 0)
+                {
+                   fprintf(stderr, "getaddrinfo: %s %s %d", gai_strerror(s), __FILE__, __LINE__);
+                   break;
+                }
+                
+                for (rp = server_addr; rp != NULL; rp = rp->ai_next)
+                {
+                   m_sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+                   if (m_sockfd == -1)
+                       continue;
+                   
+                   nFlag = 1;
+                   setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
+                
+                   if (bind(m_sockfd, rp->ai_addr, rp->ai_addrlen) == 0)
+                       break;                  /* Success */
 
-            freeaddrinfo(server_addr);           /* No longer needed */
+                   close(m_sockfd);
+                }
+                
+                if (rp == NULL)
+                {               /* No address succeeded */
+                      fprintf(stderr, "Could not bind %s %d", __FILE__, __LINE__);
+                      break;
+                }
+
+                freeaddrinfo(server_addr);           /* No longer needed */
+            }
             
             nFlag = fcntl(m_sockfd, F_GETFL, 0);
             fcntl(m_sockfd, F_SETFL, nFlag|O_NONBLOCK);
@@ -1359,50 +1385,76 @@ int Service::Run(int fd, const char* hostip, unsigned short http_port, unsigned 
         //SSL
         if(https_port > 0)
         {
-            struct addrinfo hints2;
-            struct addrinfo *server_addr2, *rp2;
-            
-            memset(&hints2, 0, sizeof(struct addrinfo));
-            hints2.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-            hints2.ai_socktype = SOCK_STREAM; /* Datagram socket */
-            hints2.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-            hints2.ai_protocol = 0;          /* Any protocol */
-            hints2.ai_canonname = NULL;
-            hints2.ai_addr = NULL;
-            hints2.ai_next = NULL;
-            
-            char szPort2[32];
-            sprintf(szPort2, "%u", https_port);
-
-            int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort2, &hints2, &server_addr2);
-            if (s != 0)
+            if(!hostip || hostip[0] == '\0')
             {
-               fprintf(stderr, "getaddrinfo: %s %s %d", gai_strerror(s), __FILE__, __LINE__);
-               break;
+                sockaddr_in6 svr_addr6;
+                m_sockfd_ssl = socket(AF_INET6, SOCK_STREAM, 0);
+                if (m_sockfd_ssl == -1)
+                       break;
+                memset(&svr_addr6, 0, sizeof(sockaddr_in6));
+                svr_addr6.sin6_family = AF_INET6;
+                svr_addr6.sin6_port = htons(https_port);
+                svr_addr6.sin6_addr = in6addr_any;
+                
+                nFlag = 1;
+                setsockopt(m_sockfd_ssl, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
+                
+                nFlag = 0;
+                setsockopt(m_sockfd_ssl, SOL_SOCKET, IPV6_V6ONLY, (char*)&nFlag, sizeof(nFlag));
+                
+                if(bind(m_sockfd_ssl, (sockaddr*)&svr_addr6, sizeof(sockaddr_in6)) != 0)
+                {
+                    m_sockfd_ssl = -1;
+                    break;
+                }
             }
-            
-            for (rp2 = server_addr2; rp2 != NULL; rp2 = rp2->ai_next)
+            else
             {
-               m_sockfd_ssl = socket(rp2->ai_family, rp2->ai_socktype, rp2->ai_protocol);
-               if (m_sockfd_ssl == -1)
-                   continue;
-               
-               nFlag = 1;
-               setsockopt(m_sockfd_ssl, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
-            
-               if (bind(m_sockfd_ssl, rp2->ai_addr, rp2->ai_addrlen) == 0)
-                   break;                  /* Success */
+                struct addrinfo hints2;
+                struct addrinfo *server_addr2, *rp2;
+                
+                memset(&hints2, 0, sizeof(struct addrinfo));
+                hints2.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+                hints2.ai_socktype = SOCK_STREAM; /* Datagram socket */
+                hints2.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+                hints2.ai_protocol = 0;          /* Any protocol */
+                hints2.ai_canonname = NULL;
+                hints2.ai_addr = NULL;
+                hints2.ai_next = NULL;
+                
+                char szPort2[32];
+                sprintf(szPort2, "%u", https_port);
 
-               close(m_sockfd_ssl);
-            }
-            
-            if (rp2 == NULL)
-            {     /* No address succeeded */
-                  fprintf(stderr, "Could not bind %s %d", __FILE__, __LINE__);
-                  break;
-            }
+                int s = getaddrinfo((hostip && hostip[0] != '\0') ? hostip : NULL, szPort2, &hints2, &server_addr2);
+                if (s != 0)
+                {
+                   fprintf(stderr, "getaddrinfo: %s %s %d", gai_strerror(s), __FILE__, __LINE__);
+                   break;
+                }
+                
+                for (rp2 = server_addr2; rp2 != NULL; rp2 = rp2->ai_next)
+                {
+                   m_sockfd_ssl = socket(rp2->ai_family, rp2->ai_socktype, rp2->ai_protocol);
+                   if (m_sockfd_ssl == -1)
+                       continue;
+                   
+                   nFlag = 1;
+                   setsockopt(m_sockfd_ssl, SOL_SOCKET, SO_REUSEADDR, (char*)&nFlag, sizeof(nFlag));
+                
+                   if (bind(m_sockfd_ssl, rp2->ai_addr, rp2->ai_addrlen) == 0)
+                       break;                  /* Success */
 
-            freeaddrinfo(server_addr2);           /* No longer needed */
+                   close(m_sockfd_ssl);
+                }
+                
+                if (rp2 == NULL)
+                {     /* No address succeeded */
+                      fprintf(stderr, "Could not bind %s %d", __FILE__, __LINE__);
+                      break;
+                }
+
+                freeaddrinfo(server_addr2);           /* No longer needed */
+            }
             
             nFlag = fcntl(m_sockfd_ssl, F_GETFL, 0);
             fcntl(m_sockfd_ssl, F_SETFL, nFlag|O_NONBLOCK);
