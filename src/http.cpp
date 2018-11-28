@@ -224,7 +224,7 @@ int CHttp::AsyncHttpFlush()
 
 int CHttp::AsyncHttpSend(const char* buf, int len)
 {
-	if(len > 0)
+    if(len > 0)
     {
         m_async_send_buf_size = m_async_send_data_len + len;
         char* new_buf = (char*)malloc(m_async_send_buf_size);
@@ -265,86 +265,119 @@ int CHttp::AsyncHttpRecv(char* buf, int len)
 
 int CHttp::AsyncSend()
 {
-    int len = 0;
+    int sent_len = 0;
+    
     if(m_async_send_buf && m_async_send_data_len > 0)
     {
-        len = m_ssl ? SSL_write(m_ssl, m_async_send_buf, m_async_send_data_len) : send(m_sockfd, m_async_send_buf, m_async_send_data_len, 0);
-        
-        if(len > 0)
+        while(1)
         {
-            memmove(m_async_send_buf, m_async_send_buf + len, m_async_send_data_len - len);
-            m_async_send_data_len -= len;            
-        }
-        else if(len == 0)
-        {
-            return -1;
-        }
-        else
-        {
-            if(m_ssl)
+            sent_len = m_ssl ? SSL_write(m_ssl, m_async_send_buf, m_async_send_data_len) : send(m_sockfd, m_async_send_buf, m_async_send_data_len, 0);
+            
+            if(sent_len > 0)
             {
-                int ret = SSL_get_error(m_ssl, len);
-                if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
-                    len = 0;
+                memmove(m_async_send_buf, m_async_send_buf + sent_len, m_async_send_data_len - sent_len);
+                m_async_send_data_len -= sent_len;            
+            }
+            else if(sent_len == 0)
+            {
+                return -1;
             }
             else
             {
-                if( errno == EAGAIN)
-                    len = 0;
+                if(m_ssl)
+                {
+                    int ret = SSL_get_error(m_ssl, sent_len);
+                    if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+                        sent_len = 0;
+                }
+                else
+                {
+                    if(errno == EAGAIN)
+                    {
+                        sent_len = 0;
+                    }
+                }
             }
+            
+            if(sent_len <= 0)
+                break;
         }
         
         struct epoll_event event; 
         event.data.fd = m_sockfd;  
         event.events = m_async_send_data_len > 0 ? (EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR) : EPOLLIN | EPOLLHUP | EPOLLERR;
-        epoll_ctl (m_epoll_fd, EPOLL_CTL_MOD, m_sockfd, &event);
+        epoll_ctl(m_epoll_fd, EPOLL_CTL_MOD, m_sockfd, &event);
             
     }
     
-    return len;
+    return sent_len;
 		
 }
 
 int CHttp::AsyncRecv()
 {
-    char buf[1024];
-
-    int len = m_ssl ? SSL_read(m_ssl, buf, 1024) : recv(m_sockfd, buf, 1024, 0);
-    
-    if(len > 0)
+    char buf[4096];
+    int recv_len = -1;
+    while(1)
     {
-        m_async_recv_buf_size = m_async_recv_data_len + len;
-        char* new_buf = (char*)malloc(m_async_recv_buf_size);
+        recv_len = m_ssl ? SSL_read(m_ssl, buf, 4095) : recv(m_sockfd, buf, 4095, 0);
         
-        if(m_async_recv_buf)
+        if(recv_len > 0)
         {
-            memcpy(new_buf, m_async_recv_buf, m_async_recv_data_len);
-            free(m_async_recv_buf);
+            if(!m_async_recv_buf || m_async_recv_buf_size < m_async_recv_data_len + recv_len)
+            {
+                m_async_recv_buf_size = m_async_recv_data_len + recv_len + 4096;
+                char* new_buf = (char*)malloc(m_async_recv_buf_size);
+                if(new_buf && m_async_recv_buf)
+                {
+                    memcpy(new_buf, m_async_recv_buf, m_async_recv_data_len);
+                    free(m_async_recv_buf);
+                }
+                m_async_recv_buf = new_buf;
+            }
+            memcpy(m_async_recv_buf + m_async_recv_data_len, buf, recv_len);
+            m_async_recv_data_len += recv_len;
+            
         }
-        memcpy(new_buf + m_async_recv_data_len, buf, len);
-        m_async_recv_data_len += len;
-        m_async_recv_buf = new_buf;
-    }
-    else if(len == 0)
-    {
-        return -1;
-    }
-    else
-    {
-        if(m_ssl)
+        else if(recv_len == 0)
         {
-            int ret = SSL_get_error(m_ssl, len);
-            if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
-                len = 0;
+            recv_len = -1;
         }
         else
         {
-            if( errno == EAGAIN)
-                len = 0;
+            
+            if(m_ssl)
+            {
+                int ret = SSL_get_error(m_ssl, recv_len);
+                if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+                {
+                    recv_len = 0;
+                }
+                else
+                {
+                    recv_len = -1;
+                }
+            }
+            else
+            {
+                if( errno == EAGAIN)
+                {
+                    recv_len = 0;
+                }
+                else
+                {
+                    recv_len = -1;
+                }
+            }
+        }
+        
+        if(recv_len <= 0) //0 means there's no data; -1 means error occurs.
+        {
+            break;
         }
     }
     
-    return len;
+    return recv_len;
 }
 
 int CHttp::ProtRecv(char* buf, int len, int alive_timeout)
@@ -437,14 +470,15 @@ Http_Connection CHttp::AsyncProcessing()
 		while(m_http_state == httpReqHeader)
 		{
 			char sz_http_data[4096];
-			int result = AsyncProtRecv(sz_http_data, 4095);
-			if(result == 0)
+			int prot_len = AsyncProtRecv(sz_http_data, 4095);
+            if(prot_len == 0)
 			{
+                httpConn = httpContinue;
 				break;
 			}
 			else
 			{
-				sz_http_data[result] = '\0';
+                sz_http_data[prot_len] = '\0';
 				httpConn = LineParse((const char*)sz_http_data);
 			}
 		}
@@ -453,7 +487,9 @@ Http_Connection CHttp::AsyncProcessing()
 	if(m_http_state == httpReqData)
     {
         if(m_content_length > 0)
+        {
             httpConn = DataParse();
+        }
         else
         {
             m_http_state = httpAuthentication;
@@ -469,7 +505,14 @@ Http_Connection CHttp::AsyncProcessing()
     
 	if(m_http_state == httpComplete)
     {
-        httpConn = (m_keep_alive && m_enabled_keep_alive) ? httpKeepAlive : httpClose;
+        if(AsyncHttpFlush() == 0)
+        {
+            httpConn = (m_keep_alive && m_enabled_keep_alive) ? httpKeepAlive : httpClose;
+        }
+        else
+        {
+            httpConn = httpContinue;
+        }
     }
     
     return httpConn;
@@ -1008,15 +1051,24 @@ void CHttp::AsyncRecvPostData()
             if(!m_postdata_ex)
                 m_postdata_ex = new fbuffer(m_private_path.c_str());
             
-            char rbuf[1449];
-                int rlen = AsyncHttpRecv(rbuf, (m_content_length - m_postdata_ex->length()) > 1448 ? 1448 : ( m_content_length - m_postdata_ex->length()));
-            if(rlen > 0)
+            char rbuf[4096];
+            while(1)
             {
-                m_postdata_ex->bufcat(rbuf, rlen);
-            }
-            else
-            {
-                 m_http_state = httpAuthentication;
+                int rlen = AsyncHttpRecv(rbuf, (m_content_length - m_postdata_ex->length()) > 4095 ? 4095 : ( m_content_length - m_postdata_ex->length()));
+               
+                if(rlen > 0)
+                {
+                    m_postdata_ex->bufcat(rbuf, rlen);
+                }
+                else if(rlen == 0)
+                {
+                    break;
+                }
+                else
+                {
+                     m_http_state = httpAuthentication;
+                     break;
+                }
             }
             
             if(m_postdata_ex->length() == m_content_length)
@@ -1553,7 +1605,7 @@ Http_Connection CHttp::LineParse(const char* text)
         m_line_text = m_line_text.substr(new_line + 1);
 
         strtrim(strtext);
-        //printf("<<<< %s\r\n", strtext.c_str());
+        // printf("<<<< %s\r\n", strtext.c_str());
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)
         {

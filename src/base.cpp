@@ -398,6 +398,7 @@ BOOL CHttpBase::LoadConfig()
 			{
 #ifdef _WITH_ASYNC_
                 m_enablehttp2 = FALSE;
+                fprintf(stderr, "  [Warnning]: HTTP2 is disabled in ASYNC mode.\n");
 #else
 				string HTTP2Enable;
 				strcut(strline.c_str(), "=", NULL, HTTP2Enable );

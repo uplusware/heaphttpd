@@ -103,7 +103,6 @@ void Session_Group::Processing()
     {
         if (m_epoll_events[i].events & EPOLLOUT)
         {
-            
             map<int, Session*>::iterator iter = m_session_list.find(m_epoll_events[i].data.fd);
             if(iter != m_session_list.end() && iter->second)
             {
