@@ -36,11 +36,11 @@ bool get_file_etag(const char* path, unsigned char etag[33], char* filebuf = NUL
             {
                 break;
             }
-            //if(ifsResource.read(rbuf, 1448) < 0)
-            //{
-            //    break;
-            //}
+
             ifsResource.read(rbuf, 1448);
+            if(ifsResource.bad())
+                break;
+            
             int rlen = ifsResource.gcount();
             if(filebuf != NULL)
             {
@@ -461,9 +461,10 @@ void web_doc::Response()
                         if(ifsResource.eof())
                             break;
                         
-                        //if(ifsResource.read(rbuf, 1448) < 0)
-                        //    break;
                         ifsResource.read(rbuf, 1448);
+                        if(ifsResource.bad())
+                            break;
+                        
                         int rlen = ifsResource.gcount();
                         if(m_session->GetMethod() != hmHead)
                             m_session->SendContent(rbuf, rlen);
@@ -484,9 +485,10 @@ void web_doc::Response()
                             if(ifsResource.eof())
                                 break;
                             int rest_len = content_ranges[v].len - len_sum;
-                            //if(ifsResource.read(rbuf, rest_len  > 1448 ? 1448 : rest_len) < 0)
-                            //    break;
+
                             ifsResource.read(rbuf, rest_len  > 1448 ? 1448 : rest_len);
+                            if(ifsResource.bad())
+                                break;
                             
                             int rlen = ifsResource.gcount();
                             len_sum += rlen;
