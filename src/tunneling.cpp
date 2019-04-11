@@ -43,6 +43,8 @@ http_tunneling::http_tunneling(int epoll_fd, map<int, backend_session*>* backend
     m_async_backend_recv_data_len = 0;
     m_async_backend_recv_buf_size = 0;
         
+    m_is_http2 = FALSE;
+        
 }
 
 http_tunneling::~http_tunneling()
@@ -94,7 +96,7 @@ void http_tunneling::set_http_session_data(CHttp* http_session, CHttpResponseHdr
 
 int http_tunneling::async_processing()
 {
-     processing();
+     return processing();
 }
 
 int http_tunneling::processing()
@@ -119,19 +121,15 @@ int http_tunneling::processing()
         struct timeval timeout; 
         timeout.tv_sec = 0; 
         timeout.tv_usec = 0;
-        //printf("select 1\n");
         FD_ZERO(&backend_mask_r);
         FD_ZERO(&backend_mask_w);
-        //printf("select 2\n");
         FD_SET(m_backend_sockfd, &backend_mask_r);
         FD_SET(m_backend_sockfd, &backend_mask_w);
         
-        //printf("select 3\n");
         int ret_val = select(m_backend_sockfd + 1, &backend_mask_r, &backend_mask_w, NULL, &timeout);
         FD_CLR(m_backend_sockfd, &backend_mask_r);
         FD_CLR(m_backend_sockfd, &backend_mask_w);
         
-        //printf("select 4\n");
         if(ret_val > 0)
         {
             m_tunneling_state = TunnlingConnected;
@@ -188,7 +186,7 @@ int http_tunneling::processing()
                     ca_crt_root.c_str(),
                     ca_crt_client.c_str(), ca_password.c_str(),
                     ca_key_client.c_str(),
-                    &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout) == FALSE)
+                    &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout, &m_is_http2) == FALSE)
                 {
                     backend_close();
                     return false;
@@ -196,7 +194,7 @@ int http_tunneling::processing()
             }
             else
             {
-                if(connect_ssl(m_backend_sockfd, NULL, NULL, NULL, NULL, &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout) == FALSE)
+                if(connect_ssl(m_backend_sockfd, NULL, NULL, NULL, NULL, &m_backend_ssl, &m_backend_ssl_ctx, CHttpBase::m_connection_sync_timeout, &m_is_http2) == FALSE)
                 {
                     backend_close();
                     return false;
@@ -205,7 +203,7 @@ int http_tunneling::processing()
         }
         else if(m_type == HTTP_Tunneling_With_CONNECT)
         {
-            const char* connection_established = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: "VERSION_STRING"\r\n\r\n";
+            const char* connection_established = "HTTP/1.1 200 Connection Established\r\nProxy-Agent: " VERSION_STRING "\r\n\r\n";
             client_send(connection_established, strlen(connection_established));
         }
         
@@ -885,14 +883,14 @@ bool http_tunneling::acquire_cache_relay_to_client(CHttpResponseHdr* session_res
                     {
                         strVia = "HTTP/1.1 ";
                         strVia += CHttpBase::m_localhostname.c_str();
-                        strVia += "("VERSION_STRING")";                    
+                        strVia += "(" VERSION_STRING ")";                    
                     }
                     else
                     {
                         strVia = tunneling_cache_data->via;
                         strVia += ", HTTP/1.1 ";
                         strVia += CHttpBase::m_localhostname.c_str();
-                        strVia += "("VERSION_STRING")";
+                        strVia += "(" VERSION_STRING ")";
                     }
                     
                     cache_header.SetField("Via", strVia.c_str());
@@ -998,7 +996,7 @@ bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr
                 m_client = new http_client(m_cache, m_http_tunneling_url.c_str(), this);
             }
             
-            auto_ptr<char> response_buf_obj(new char[4096]);
+            std::unique_ptr<char> response_buf_obj(new char[4096]);
             char* response_buf = response_buf_obj.get();
             
             int len = 0;
@@ -1033,7 +1031,7 @@ bool http_tunneling::recv_response_from_backend_relay_to_client(CHttpResponseHdr
             if(!m_client)
                 m_client = new http_client(m_cache, m_http_tunneling_url.c_str(), this);
             
-            auto_ptr<char> response_buf_obj(new char[4096]);
+            std::unique_ptr<char> response_buf_obj(new char[4096]);
             char* response_buf = response_buf_obj.get();
             
             fd_set mask_r; 

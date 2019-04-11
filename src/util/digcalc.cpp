@@ -32,7 +32,7 @@ void CvtHex(
 
 /* calculate H(A1) as per spec */
 void DigestCalcHA1(
-    IN char * pszAlg,
+    IN const char * pszAlg,
     IN char * pszUserName,
     IN char * pszRealm,
     IN char * pszPassword,

@@ -7,7 +7,10 @@
 #ifndef _DES_H_
 #define _DES_H_
 
-#define LITTLE_ENDIAN
+#ifndef LITTLE_ENDIAN
+    #define LITTLE_ENDIAN
+#endif /* LITTLE_ENDIAN */
+
 #define CONSTANT_DATA
 #define PERMUTATION
 
@@ -38,7 +41,7 @@ public:
 	int Init(int mode);
 
 	/* Set key (initialize key schedule array) */
-	void SetKey(char *key);
+	void SetKey(const char *key);
 
 	/* In-place encryption of 64-bit block */
 	void Encode(char *block);

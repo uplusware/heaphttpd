@@ -218,7 +218,7 @@ bool WWW_Auth(CHttp* psession, AUTH_SCHEME scheme, bool integrate_local_users, c
 		char * pszUser = (char*)DigestMap["username"].c_str();
 		char * pszRealm = (char*)DigestMap["realm"].c_str();
 		char * pszPass = (char*)real_password.c_str();
-		char * pszAlg = "md5";
+		const char * pszAlg = "md5";
 		char * szNonceCount = (char*)DigestMap["nc"].c_str();
 		char * pszMethod = (char*)method;
 		char * pszQop = (char*)DigestMap["qop"].c_str();

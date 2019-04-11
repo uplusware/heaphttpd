@@ -59,7 +59,7 @@ LDLIST_TOOL = -lstdc++
 LDLIST_AUTH = -lstdc++
 LDLIST_WS = -lstdc++
 
-FLAGS = -O2 -std=c++03 -fPIC -w
+FLAGS = -O2 -std=c++11 -fPIC 
 
 all: libws libauth libhttp websrv pgmtool
 

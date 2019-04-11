@@ -4,7 +4,7 @@ HTTPREVERSE = libhttpreverse.so
 
 HTTPREVERSEOBJ = httpreverse.o
 
-FLAGS = -O2 -fPIC -w
+FLAGS = -O2 -fPIC
 
 INCDIR = -I../src/
 LDDIRS = -L../src/

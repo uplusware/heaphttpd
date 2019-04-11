@@ -11,9 +11,9 @@ class CHttp2;
 enum stream_state_e
 {
         stream_idle = 0,
-        stream_open,
         stream_reserved_local,
         stream_reserved_remote,
+        stream_open,
         stream_half_closed_remote,
         stream_half_closed_local,
         stream_closed

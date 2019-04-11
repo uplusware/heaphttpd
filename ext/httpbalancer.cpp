@@ -81,4 +81,5 @@ void* ext_request(CHttp* http_session, const char * name, const char * descripti
         
         *skip = TRUE;
     }
+    return NULL;
 }

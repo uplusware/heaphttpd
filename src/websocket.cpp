@@ -17,6 +17,7 @@ int WebSocket_Buffer_Alloc(WebSocket_Buffer * data, int len, bool mask, int opco
 	data->len = data->buf ? len : 0;
     data->mask = mask;
     data->opcode = opcode;
+    return 0;
 }
 
 int WebSocket_Buffer_Free(WebSocket_Buffer * data)
@@ -27,6 +28,7 @@ int WebSocket_Buffer_Free(WebSocket_Buffer * data)
 		data->buf = NULL;
 	}
 	data->len =0;
+    return 0;
 }
 
 int WebSocket::Send(WebSocket_Buffer * data)

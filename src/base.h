@@ -744,23 +744,7 @@ public:
                 ret = SSL_get_error(sslhd, len);
                 if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
                 {
-                    timeout.tv_sec = alive_timeout > 0 ? alive_timeout : CHttpBase::m_connection_idle_timeout;
-                    timeout.tv_usec = 0;
-
-                    FD_ZERO(&mask);
-                    FD_SET(sockfd, &mask);
-                    
-                    res = select(sockfd + 1, ret == SSL_ERROR_WANT_READ ? &mask : NULL, ret == SSL_ERROR_WANT_WRITE ? &mask : NULL, NULL, &timeout);
-
-                    if( res == 1)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        close(sockfd);
-                        return -1;
-                    }
+                    continue;
                 }
                 else
                 {

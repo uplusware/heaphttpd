@@ -653,6 +653,7 @@ int CHttp::SendHeader(const char* buf, int len)
         }
         return HttpSend(strHeader.c_str(), strHeader.length());
     }
+    return 0;
 }
 
 int CHttp::SendContent(const char* buf, int len)
@@ -1605,7 +1606,7 @@ Http_Connection CHttp::LineParse(const char* text)
         m_line_text = m_line_text.substr(new_line + 1);
 
         strtrim(strtext);
-        // printf("<<<< %s\r\n", strtext.c_str());
+        //printf("<<<< %s\r\n", strtext.c_str());
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)
         {
@@ -2049,7 +2050,7 @@ BOOL CHttp::GetClientCertCommonName(vector<string>& common_names)
                 if(!e)
                     break;
                 ASN1_STRING *d = X509_NAME_ENTRY_get_data(e);
-                char *commonName = (char*)ASN1_STRING_data(d);
+                char *commonName = (char*)ASN1_STRING_get0_data(d);
                 if(commonName)
                     common_names.push_back(commonName);
             }

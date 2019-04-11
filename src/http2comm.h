@@ -8,6 +8,14 @@
 
 #include "util/general.h"
 
+
+enum Http2_State
+{
+    http2Prefix = 0,
+    http2Header,
+    http2Payload
+};
+
 /*
    HTTP frame
    All frames begin with a fixed 9-octet header followed by a variable-
