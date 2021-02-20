@@ -72,19 +72,19 @@ apiperf: $(PERFAPI)
 apiupload: $(UPLOAD)
 
 $(UPLOAD): $(UPLOADOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(UPLOADOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp 
+	$(CC) -shared -W -fPIC -o $@ $(UPLOADOBJS) ${LDDIRS} -lstdc++ -lheaphttp 
     
 $(PERFAPI): $(PERFAPIOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(PERFAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp 
+	$(CC) -shared -W -fPIC -o $@ $(PERFAPIOBJS) ${LDDIRS} -lstdc++ -lheaphttp 
     
 $(HTTPAPI): $(HTTPAPIOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(HTTPAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp 
+	$(CC) -shared -W -fPIC -o $@ $(HTTPAPIOBJS) ${LDDIRS} -lstdc++ -lheaphttp 
 
 $(MYSQLDEMOAPI): $(MYSQLDEMOAPIOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(MYSQLDEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp -lmariadb
+	$(CC) -shared -W -fPIC -o $@ $(MYSQLDEMOAPIOBJS) ${LDDIRS} -lstdc++ -lheaphttp -lmariadb
 
 $(MONGODEMOAPI): $(MONGODEMOAPIOBJS)
-	$(CC) -shared -W -fPIC -o $@ $(MONGODEMOAPIOBJS) ${LDDIRS} -lstdc++ -lssl -lcrypto -lheaphttp `pkg-config --libs-only-l libmongoc-1.0`
+	$(CC) -shared -W -fPIC -o $@ $(MONGODEMOAPIOBJS) ${LDDIRS} -lstdc++ -lheaphttp `pkg-config --libs-only-l libmongoc-1.0`
 
 ifdef MONGODB	
 %.o : %.cpp
