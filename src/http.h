@@ -96,6 +96,7 @@ public:
     virtual int HttpRecv(char* buf, int len) = 0;
     virtual int AsyncHttpSend(const char* buf, int len) = 0;
     virtual int AsyncHttpRecv(char* buf, int len) = 0;
+    virtual int AsyncHttpFlush() = 0;
     virtual int AsyncSend() = 0;
     virtual int AsyncRecv() = 0;
     virtual http_tunneling* GetHttpTunneling() = 0;

@@ -313,43 +313,38 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
             {
                 int ret = SSL_get_error(ssl, ssl_rc);
                     
-                if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
+                if(ret == SSL_ERROR_NONE)
                 {
-                    fd_set mask;
-                    struct timeval timeout;
-            
-                    timeout.tv_sec = CHttpBase::m_connection_idle_timeout;
-                    timeout.tv_usec = 0;
-
-                    FD_ZERO(&mask);
-                    FD_SET(session_param->sockfd, &mask);
-                    
-                    int res = select(session_param->sockfd + 1, ret == SSL_ERROR_WANT_READ ? &mask : NULL, ret == SSL_ERROR_WANT_WRITE ? &mask : NULL, NULL, &timeout);
-
-                    if( res == 1)
-                    {
-                        continue;
-                    }
-                    else /* timeout or error */
-                    {
-                        
-                        fprintf(stderr, "SSL_accept: %s %s", ERR_error_string(ERR_get_error(),NULL), strerror(errno));
-                        goto FAIL_CLEAN_SSL_2;
-                    }
+                    break;
+                }
+                else if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE || ret == SSL_ERROR_WANT_CONNECT || ret == SSL_ERROR_WANT_ACCEPT)
+                {
+                    continue;
+                }
+                else if(ret == SSL_ERROR_WANT_X509_LOOKUP && SSL_get_state(ssl) == TLS_ST_SR_CLNT_HELLO)
+                {
+                    fprintf(stderr, "LOOKUP from certificate callback during accept\n");
+                    continue;
+                }
+                else if(ret == SSL_ERROR_SSL || ret == SSL_ERROR_SYSCALL || ret == SSL_ERROR_ZERO_RETURN)
+                {
+                    ERR_load_crypto_strings();
+                    SSL_load_error_strings(); // just once
+                    char msg[1024];
+                    ERR_error_string_n(ERR_get_error(), msg, sizeof(msg));
+                    fprintf(stderr, "Line: %d SSL_accept %s %s %s %s\n", __LINE__, msg, ERR_lib_error_string(ERR_get_error()), ERR_func_error_string(ERR_get_error()), ERR_reason_error_string(ERR_get_error()));
+                    goto FAIL_CLEAN_SSL_2;
                 }
                 else
                 {
-                    
-                    fprintf(stderr, "SSL_accept: %s", ERR_error_string(ERR_get_error(),NULL));
-                    goto FAIL_CLEAN_SSL_2;
+                    //fprintf(stderr, "SSL_accept %d: %s\n", __LINE__, ERR_error_string(ERR_get_error(),NULL));
+                    goto FAIL_CLEAN_SSL_4;
                 }
 
             }
             else if(ssl_rc == 0)
             {
-                
-                fprintf(stderr, "SSL_accept: %s", ERR_error_string(ERR_get_error(),NULL));
-                    
+                fprintf(stderr, "SSL_accept %d: %s\n", __LINE__, ERR_error_string(ERR_get_error(),NULL));
                 goto FAIL_CLEAN_SSL_1;
             }
             else if(ssl_rc == 1)
@@ -420,6 +415,7 @@ FAIL_CLEAN_SSL_3:
 		SSL_CTX_free(ssl_ctx);
         ssl_ctx = NULL;
     }
+FAIL_CLEAN_SSL_4:
 	close(session_param->sockfd);
 }
 
@@ -812,9 +808,11 @@ void Service::Stop()
         if(m_service_qid)
 		mq_close(m_service_qid);
 
+	if(m_service_qid != (mqd_t)-1)
+		mq_close(m_service_qid);
 	if(m_service_sid != SEM_FAILED)
 		sem_close(m_service_sid);
-        printf("Stop %s OK\n", SVR_DESP_TBL[m_st]);
+    printf("Stop %s OK\n", SVR_DESP_TBL[m_st]);
 }
 
 void Service::ReloadConfig()

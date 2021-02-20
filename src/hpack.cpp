@@ -374,7 +374,10 @@ int hpack::build(const char* http1_headrs, int len, map<int, pair<string, string
             response_len += hdr_string_len;
         }
         if(hdr_string)
+        {
             free(hdr_string);
+            hdr_string = NULL;
+        }
     }
     
     m_field = (HTTP2_Header_Field*)fields_buf;

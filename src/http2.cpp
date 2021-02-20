@@ -20,6 +20,8 @@
 
 #include "debug.h"
 
+// #define _http2_debug_ 1
+
 
 #ifdef _http2_debug_
     const char* error_table[] = {
@@ -75,6 +77,7 @@
 
 #define PRE_MALLOC_SIZE 1024
 
+#define HTTP2_MAX_WINDOW_SIZE (2147483647L)
 #define HTTP2_DEFAULT_WINDOW_SIZE 65535
 
 CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t connection_first_request_time, time_t connection_keep_alive_timeout, unsigned int connection_keep_alive_request_tickets,
@@ -88,6 +91,8 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
         const char* private_path, AUTH_SCHEME wwwauth_scheme, AUTH_SCHEME proxyauth_scheme,
 		SSL* ssl)
 {
+    m_http2_state = http2Prefix;
+    
     m_backend_list = backend_list;
     m_connection_first_request_time = connection_first_request_time;
     m_connection_keep_alive_timeout = connection_keep_alive_timeout;
@@ -105,7 +110,7 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
     m_enable_push = push_promise; // TRUE per rfc7540
     m_max_concurrent_streams = 101; // hardcode per rfc7540
     
-    m_initial_local_window_size = HTTP2_DEFAULT_WINDOW_SIZE; // hardcode per rfc7540
+    m_initial_local_window_size = HTTP2_MAX_WINDOW_SIZE; // hardcode per rfc7540
     m_initial_peer_window_size = HTTP2_DEFAULT_WINDOW_SIZE; // hardcode per rfc7540
     
     m_max_frame_size = 16384; // hardcode per rfc7540
@@ -157,8 +162,14 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
 		m_lsockfd = new linesock(m_sockfd);
 	}
     
-    init_header_table();
+    m_frame_hdr = new HTTP2_Frame;
+    m_frame_hdr_valid_len = 0;
+
+    m_payload = NULL;
+    m_payload_valid_len = 0;
     
+    init_header_table();
+#ifndef _WITH_ASYNC_
     memset(m_preface, 0, HTTP2_PREFACE_LEN);
     int ret = HttpRecv(m_preface, HTTP2_PREFACE_LEN);
 	m_preface[HTTP2_PREFACE_LEN] = '\0';
@@ -245,8 +256,10 @@ CHttp2::CHttp2(int epoll_fd, map<int, backend_session*>* backend_list, time_t co
         return;
     }
     free(server_preface);
-	
+
+    send_window_update(0, HTTP2_MAX_WINDOW_SIZE);
     send_initial_window_size(m_initial_local_window_size);
+#endif /* _WITH_ASYNC_ */
 }
 
 CHttp2::~CHttp2()
@@ -256,6 +269,9 @@ CHttp2::~CHttp2()
         delete m_stream_list[x];
         m_stream_list[x] = NULL;
     }
+    
+    if(m_frame_hdr)
+        delete m_frame_hdr;
     
     if(m_lssl)
         delete m_lssl;
@@ -351,6 +367,8 @@ void CHttp2::send_window_update(uint_32 stream_ind, uint_32 increament_window_si
     }
     else
         m_local_control_window_size += increament_window_size;
+
+    printf("+  Current local Connection Window Size: %u %d\n", m_local_control_window_size, increament_window_size);
 }
 
 void CHttp2::send_initial_window_size(uint_32 window_size)
@@ -430,7 +448,7 @@ http2_stream* CHttp2::create_stream_instance(uint_32 stream_ind)
 {
     if(stream_ind > 0)
     {
-        send_window_update(0, HTTP2_DEFAULT_WINDOW_SIZE);
+        //send_window_update(0, HTTP2_MAX_WINDOW_SIZE);
         
         return new http2_stream(m_epoll_fd, m_backend_list, stream_ind,
                                     m_initial_local_window_size,
@@ -515,6 +533,16 @@ int CHttp2::HttpRecv(char* buf, int len)
 		return m_lsockfd->drecv(buf, len);	
 #endif /* _WITH_ASYNC_ */	
 }
+
+int CHttp2::AsyncHttpFlush()
+{
+    if(m_async_send_data_len > 0)
+    {
+        AsyncSend();
+    }
+    return m_async_send_data_len;
+}
+
 
 int CHttp2::AsyncSend()
 {
@@ -631,37 +659,8 @@ int CHttp2::AsyncHttpRecv(char* buf, int len)
     return min_len;
 }
         
-int CHttp2::ProtRecv()
+int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 payload_len, uint_32 stream_ind)
 {
-    HTTP2_Frame frame_hdr;// = (HTTP2_Frame*)malloc(sizeof(HTTP2_Frame));
-	memset(&frame_hdr, 0, sizeof(HTTP2_Frame));
-	
-#ifdef _http2_debug_        
-		printf("\n\n>>>> Waiting the comming frame...\n");
-#endif /* _http2_debug_ */
-    char* payload = NULL;   
-	int ret = HttpRecv((char*)&frame_hdr, sizeof(HTTP2_Frame));
-	if(ret == sizeof(HTTP2_Frame))
-	{
-		uint_32 payload_len = frame_hdr.length.len24;
-        payload_len = ntohl(payload_len << 8) & 0x00FFFFFFU;
-        uint_32 stream_ind = frame_hdr.identifier;
-        
-        stream_ind = ntohl(stream_ind << 1) & 0x7FFFFFFFU;
-        
-#ifdef _http2_debug_        
-		printf(">>>> FRAME(%03d): length(%05d) type(%s)\n", stream_ind, payload_len, frame_names[frame_hdr.type]);
-#endif /* _http2_debug_ */
-        
-        if(payload_len > 0)
-        {
-            payload = (char*)malloc(payload_len + 1);
-            memset(payload, 0, payload_len + 1);
-            ret = HttpRecv(payload, payload_len);
-            if(ret != payload_len)
-                goto END_SESSION;
-        }
-        
         if(stream_ind > 0)
         {
             map<uint_32, http2_stream*>::iterator curr_it = m_stream_list.find(stream_ind);
@@ -732,7 +731,7 @@ int CHttp2::ProtRecv()
                 send_goaway(stream_ind, HTTP2_STREAM_CLOSED);
                 goto END_SESSION;
             }
-            else if (state == stream_closed && frame_hdr.type != HTTP2_FRAME_TYPE_PRIORITY)
+            /*else if (state == stream_closed && frame_hdr.type != HTTP2_FRAME_TYPE_PRIORITY)
             {
                 if(frame_hdr.type == HTTP2_FRAME_TYPE_WINDOW_UPDATE 
                     || frame_hdr.type == HTTP2_FRAME_TYPE_RST_STREAM)
@@ -744,7 +743,7 @@ int CHttp2::ProtRecv()
                     send_goaway(stream_ind, HTTP2_STREAM_CLOSED);
                     goto END_SESSION;
                 }
-            }
+            }*/
         }
         
         if(frame_hdr.type == HTTP2_FRAME_TYPE_GOAWAY)
@@ -1024,11 +1023,15 @@ int CHttp2::ProtRecv()
             printf("    Current Local Window Size: [0]: %d; [%d]: %d\n", m_local_control_window_size, stream_ind,
                 http2_stream_inst ? http2_stream_inst->GetLocalWindowSize() : m_local_control_window_size);
 #endif /* _http2_debug_ */
-            if(m_local_control_window_size < 1024 && m_initial_local_window_size > m_local_control_window_size)
+            /*if(m_local_control_window_size < 1024 && m_initial_local_window_size > m_local_control_window_size)
                 send_window_update(0, m_initial_local_window_size - m_local_control_window_size);
             if(http2_stream_inst && http2_stream_inst->GetLocalWindowSize() < 1024 && m_initial_local_window_size > http2_stream_inst->GetLocalWindowSize())
-                send_window_update(stream_ind, m_initial_local_window_size - http2_stream_inst->GetLocalWindowSize());
-            
+                send_window_update(stream_ind, m_initial_local_window_size - http2_stream_inst->GetLocalWindowSize());*/
+
+            //send_window_update(0, payload_len + 1);
+            send_window_update(stream_ind, payload_len);
+
+
             if(stream_ind == 0
                 || ( http2_stream_inst && http2_stream_inst->GetStreamState() != stream_open))
             {
@@ -1130,9 +1133,12 @@ int CHttp2::ProtRecv()
                 if(it_hpack != m_stream_list.end())
                 {
                     it_hpack->second->SetStreamState(stream_closed);
+                    m_stream_list.erase(it_hpack);
 #ifdef _http2_debug_                        
                     printf("  Reset HTTP2 Stream(%u) for %s\n", stream_ind, error_table[ntohl(rst_stream->error_code)]);
-#endif /* _http2_debug_ */                      
+#endif /* _http2_debug_ */
+                    if(rst_stream->error_code > HTTP2_NO_ERROR)
+                        send_goaway(stream_ind, rst_stream->error_code);
                 }
             }
         }
@@ -1166,6 +1172,46 @@ int CHttp2::ProtRecv()
             }
         }
 CONTINUE_SESSION:        
+	return payload_len;
+    
+END_SESSION:    
+    return -1;
+}
+
+int CHttp2::ProtRecv()
+{
+    HTTP2_Frame frame_hdr;// = (HTTP2_Frame*)malloc(sizeof(HTTP2_Frame));
+	memset(&frame_hdr, 0, sizeof(HTTP2_Frame));
+	
+#ifdef _http2_debug_        
+		printf("\n\n>>>> Waiting the comming frame...\n");
+#endif /* _http2_debug_ */
+    char* payload = NULL;   
+	int ret = HttpRecv((char*)&frame_hdr, sizeof(HTTP2_Frame));
+	if(ret == sizeof(HTTP2_Frame))
+	{
+		uint_32 payload_len = frame_hdr.length.len24;
+        payload_len = ntohl(payload_len << 8) & 0x00FFFFFFU;
+        uint_32 stream_ind = frame_hdr.identifier;
+        
+        stream_ind = ntohl(stream_ind << 1) & 0x7FFFFFFFU;
+        
+#ifdef _http2_debug_        
+		printf(">>>> FRAME(%03d): length(%05d) type(%s)\n", stream_ind, payload_len, frame_names[frame_hdr.type]);
+#endif /* _http2_debug_ */
+        
+        if(payload_len > 0)
+        {
+            payload = (char*)malloc(payload_len + 1);
+            memset(payload, 0, payload_len + 1);
+            ret = HttpRecv(payload, payload_len);
+            if(ret != payload_len)
+                goto END_SESSION;
+        }
+        
+
+        ret = ProtParse(frame_hdr, payload, payload_len, stream_ind);
+        
         if(payload)
             free(payload);
         
@@ -1197,8 +1243,137 @@ Http_Connection CHttp2::Processing()
 
 Http_Connection CHttp2::AsyncProcessing()
 {
-    Http_Connection httpConn = httpKeepAlive;
+    Http_Connection httpConn = httpContinue;
     
+    while(1)
+    {
+        int recv_len = AsyncRecv();
+        if(recv_len == 0)
+    	{
+            httpConn = httpContinue;
+    		break;
+    	}
+        else if(recv_len < 0)
+        {
+            httpConn = httpClose;
+    		break;
+        }
+    }
+    
+    if(m_http2_state == http2Prefix)
+    {
+        if(m_async_recv_data_len >= HTTP2_PREFACE_LEN)
+        {
+            memset(m_preface, 0, HTTP2_PREFACE_LEN);
+            int ret = HttpRecv(m_preface, HTTP2_PREFACE_LEN);
+        	m_preface[HTTP2_PREFACE_LEN] = '\0';
+#ifdef _http2_debug_
+            printf("[%s]\n", m_preface);
+#endif /* _http2_debug_ */
+            
+            char client_preface_str[] = {
+                0x50, 0x52, 0x49, 0x20, 0x2a, 0x20, 0x48, 0x54,
+                0x54, 0x50, 0x2f, 0x32, 0x2e, 0x30, 0x0d, 0x0a,
+                0x0d, 0x0a, 0x53, 0x4d, 0x0d, 0x0a, 0x0d, 0x0a,
+                0x00
+                };
+            if(strcmp(client_preface_str, m_preface) != 0)
+            {
+                send_goaway(0, HTTP2_PROTOCOL_ERROR);
+                return httpClose;
+            }
+
+            char * server_preface = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Setting));
+            
+        	HTTP2_Frame* preface_frame = (HTTP2_Frame*)server_preface;
+        	preface_frame->length.len3b[0] = 0x00;
+            preface_frame->length.len3b[1] = 0x00;
+            preface_frame->length.len3b[2] = 0x06; //length is 6
+        	preface_frame->type = HTTP2_FRAME_TYPE_SETTINGS;
+        	preface_frame->flags = HTTP2_FRAME_FLAG_UNSET;
+        	preface_frame->r = HTTP2_FRAME_R_UNSET;
+        	preface_frame->identifier = HTTP2_FRAME_IDENTIFIER_WHOLE;
+        	
+            HTTP2_Setting* preface_setting = (HTTP2_Setting*)(server_preface + sizeof(HTTP2_Frame));
+            preface_setting->identifier = htons(HTTP2_SETTINGS_MAX_CONCURRENT_STREAMS);
+            preface_setting->value = htonl(m_max_concurrent_streams);
+        	HttpSend(server_preface, sizeof(HTTP2_Frame) + sizeof(HTTP2_Setting));
+            free(server_preface);
+            
+            send_initial_window_size(m_initial_local_window_size);
+
+            m_http2_state = http2Header;
+        }
+
+        return httpContinue;
+            
+    }
+    else
+    {
+        char* new_payload1 = new char[m_payload_valid_len + m_async_recv_data_len];
+        memcpy(new_payload1, m_payload, m_payload_valid_len);
+        memcpy(new_payload1 + m_payload_valid_len, m_async_recv_buf, m_async_recv_data_len);
+        if(m_payload)
+            delete[] m_payload;
+        m_payload = new_payload1;
+        m_payload_valid_len += m_async_recv_data_len;
+        m_async_recv_data_len = 0;
+               
+        if(m_http2_state == http2Header)
+        {
+            uint_32 copy_len = m_payload_valid_len > (sizeof(HTTP2_Frame) - m_frame_hdr_valid_len) ? (sizeof(HTTP2_Frame) - m_frame_hdr_valid_len) : m_payload_valid_len;
+            memcpy(m_frame_hdr + m_frame_hdr_valid_len, m_payload, copy_len);
+            m_frame_hdr_valid_len += copy_len;
+            if(m_frame_hdr_valid_len >= sizeof(HTTP2_Frame))
+                m_http2_state = http2Payload;
+            if(copy_len < m_payload_valid_len)
+            {
+                char* new_payload2 = new char[m_payload_valid_len - copy_len];
+                memcpy(new_payload2, m_payload + copy_len, m_payload_valid_len - copy_len);
+                if(m_payload)
+                    delete[] m_payload;
+                m_payload = new_payload2;
+            }
+            m_payload_valid_len -= copy_len;
+        }
+
+        if(m_http2_state == http2Payload)
+        {
+            uint_32 payload_len = m_frame_hdr->length.len24;
+            payload_len = ntohl(payload_len << 8) & 0x00FFFFFFU;
+            uint_32 stream_ind = m_frame_hdr->identifier;
+            
+            stream_ind = ntohl(stream_ind << 1) & 0x7FFFFFFFU;
+            
+#ifdef _http2_debug_        
+    		printf(">>>> FRAME(%03d): length(%05d) type(%s)\n", stream_ind, payload_len, frame_names[m_frame_hdr->type]);
+#endif /* _http2_debug_ */
+
+            if(m_payload_valid_len >= payload_len)
+            {
+                if(ProtParse(*m_frame_hdr, m_payload, payload_len, stream_ind) == -1)
+                {
+                    httpConn = httpClose;
+                }
+
+                if(payload_len > 0)
+                {
+                    char* new_payload3 = new char[m_payload_valid_len - payload_len];
+                    memcpy(new_payload3, m_payload + payload_len, m_payload_valid_len - payload_len);
+                    if(m_payload)
+                        delete[] m_payload;
+                    m_payload = new_payload3;
+                    m_payload_valid_len -= payload_len;
+                }
+                m_http2_state = http2Header;
+                m_frame_hdr_valid_len = 0;
+                if(m_payload_valid_len >= sizeof(HTTP2_Frame))
+                {
+                    AsyncProcessing();
+                }
+            }
+        }
+    }
     return httpConn;
 }
 
@@ -1484,7 +1659,7 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
         pre_send_len = http2_stream_inst->GetPeerWindowSize() > pre_send_len ? pre_send_len : http2_stream_inst->GetPeerWindowSize();
         
 #ifdef _http2_debug_                    
-        printf("  Send DATA Frame as Length: %d/%d on stream %u\n", pre_send_len, len, stream_ind);
+        printf("  Send DATA Frame as Length: %d/%d/%d on stream %u\n", pre_send_len, http2_stream_inst->GetPeerWindowSize(), len, stream_ind);
 #endif /* _http2_debug_ */ 
         int response_len;
         char* response_buf = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data2) + pre_send_len);
@@ -1505,7 +1680,7 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
         if(response_buf)
             free(response_buf);
     
-        if(ret == 0)
+        if(ret != -1)
         {
 #ifdef _http2_debug_            
             printf("    Remote WIN[%d]: %d\n", stream_ind, http2_stream_inst ? http2_stream_inst->GetPeerWindowSize() : m_peer_control_window_size);
@@ -1522,7 +1697,11 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
         
         if(http2_stream_inst->GetPeerWindowSize() == 0)
         {
+#ifdef _WITH_ASYNC_
+            AsyncProcessing();
+#else
             ProtRecv();
+#endif /* _WITH_ASYNC_ */
         }
     }
     return ret;

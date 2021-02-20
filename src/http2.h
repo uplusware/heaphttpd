@@ -118,6 +118,7 @@ public:
         
 	virtual ~CHttp2();
 	
+    int ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 payload_len, uint_32 stream_ind);
 	int ProtRecv();
     virtual Http_Connection Processing();
     virtual Http_Connection AsyncProcessing();
@@ -127,6 +128,7 @@ public:
     virtual int AsyncHttpRecv(char* buf, int len);
     virtual int AsyncSend();
     virtual int AsyncRecv();
+    virtual int AsyncHttpFlush();
     virtual http_tunneling* GetHttpTunneling() { return m_http_tunneling; }
     virtual fastcgi* GetPhpFpm(){ return m_php_fpm_instance; }
     virtual void SetPhpFpm(fastcgi* inst){ m_php_fpm_instance = inst; }
@@ -218,6 +220,15 @@ private:
     map<string, fastcgi*>* m_fastcgi_instances;
     map<string, scgi*>* m_scgi_instances;
     map<int, backend_session*>* m_backend_list;
+
+    Http2_State m_http2_state;
+        
+    HTTP2_Frame* m_frame_hdr;
+    uint_32 m_frame_hdr_valid_len;
+
+    char* m_payload;
+    uint_32 m_payload_valid_len;
+    
 };
 
 #endif /* _HTTP2_H_ */

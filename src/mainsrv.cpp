@@ -123,6 +123,7 @@ static int Stop()
 
 	Service http_svr(stHTTP);
 	http_svr.Stop();
+    return 0;
 }
 
 static void Version()
@@ -136,6 +137,7 @@ static int Reload()
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadConfig();
+	return 0;
 }
 
 static int ReloadAccess()
@@ -144,6 +146,7 @@ static int ReloadAccess()
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadAccess();
+    return 0;
 }
 
 static int AppendReject(const char* data)
@@ -152,6 +155,7 @@ static int AppendReject(const char* data)
 
 	Service http_svr(stHTTP);
 	http_svr.AppendReject(data);
+    return 0;
 }
 
 static int ReloadExtension()
@@ -160,6 +164,7 @@ static int ReloadExtension()
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadExtension();
+    return 0;
 }
 
 static int ReloadReverseExtension()
@@ -168,6 +173,7 @@ static int ReloadReverseExtension()
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadReverseExtension();
+    return 0;
 }
 static int ReloadUsers()
 {
@@ -175,6 +181,7 @@ static int ReloadUsers()
 
 	Service http_svr(stHTTP);
 	http_svr.ReloadUsers();
+    return 0;
 }
 
 static int processcmd(const char* cmd, const char* conf, const char* permit, const char* reject, const char* data)
@@ -186,19 +193,20 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 		return -1;
 	}
 
-	if(strcasecmp(cmd, "stop") == 0)
-	{
-		Stop();
-	}
-	else if(strcasecmp(cmd, "start") == 0)
+	
+	if(strcmp(cmd, "start") == 0)
 	{
 		Run();
 	}
-	else if(strcasecmp(cmd, "reload") == 0)
+    else if(strcmp(cmd, "stop") == 0)
+	{
+		Stop();
+	}
+	else if(strcmp(cmd, "reload") == 0)
 	{
 		Reload();
 	}
-	else if(strcasecmp(cmd, "access") == 0)
+	else if(strcmp(cmd, "access") == 0)
 	{
 		ReloadAccess();
 	}
@@ -206,19 +214,19 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 	{
 		AppendReject(data);
 	}
-	else if(strcasecmp(cmd, "extension") == 0)
+	else if(strcmp(cmd, "extension") == 0)
 	{
 		ReloadExtension();
 	}
-    else if(strcasecmp(cmd, "reverse") == 0)
+    else if(strcmp(cmd, "reverse") == 0)
 	{
 		ReloadReverseExtension();
 	}
-    else if(strcasecmp(cmd, "users") == 0)
+    else if(strcmp(cmd, "users") == 0)
 	{
 		ReloadUsers();
 	}
-	else if(strcasecmp(cmd, "status") == 0)
+	else if(strcmp(cmd, "status") == 0)
 	{
 		char szFlag[128];
 		sprintf(szFlag, "/tmp/heaphttpd/%s.pid", SVR_NAME_TBL[stHTTP]);
@@ -232,7 +240,7 @@ static int processcmd(const char* cmd, const char* conf, const char* permit, con
 		}
 
 	}
-	else if(strcasecmp(cmd, "version") == 0)
+	else if(strcmp(cmd, "version") == 0)
 	{
 		Version();
 	}
