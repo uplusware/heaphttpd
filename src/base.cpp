@@ -683,16 +683,19 @@ BOOL CHttpBase::LoadAccessList()
 		sem_post(plock);
 		sem_close(plock);
 	}
+    return TRUE;
 }
 
 BOOL CHttpBase::LoadExtensionList()
 {
 	_load_ext_();
+    return TRUE;
 }
 
 BOOL CHttpBase::LoadReverseExtensionList()
 {
 	_load_reverse_ext_();
+    return TRUE;
 }
 
 void CHttpBase::_load_permit_()

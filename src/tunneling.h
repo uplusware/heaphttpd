@@ -169,5 +169,7 @@ protected:
     BOOL m_request_no_cache;
     CHttpResponseHdr* m_session_response_header;
     CHttp * m_http;
+
+    BOOL m_is_http2;
 };
 #endif /* _TUNNELING_H_ */

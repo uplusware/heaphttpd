@@ -323,7 +323,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
                 }
                 else if(ret == SSL_ERROR_WANT_X509_LOOKUP && SSL_get_state(ssl) == TLS_ST_SR_CLNT_HELLO)
                 {
-                    fprintf(stderr, "LOOKUP from certificate callback during accept\n");
+                    fprintf(stderr, "Lookup from certificate callback during accept\n");
                     continue;
                 }
                 else if(ret == SSL_ERROR_SSL || ret == SSL_ERROR_SYSCALL || ret == SSL_ERROR_ZERO_RETURN)
@@ -337,7 +337,7 @@ void Worker::SESSION_HANDLING(SESSION_PARAM* session_param)
                 }
                 else
                 {
-                    //fprintf(stderr, "SSL_accept %d: %s\n", __LINE__, ERR_error_string(ERR_get_error(),NULL));
+                    fprintf(stderr, "SSL_accept %d: %s\n", __LINE__, ERR_error_string(ERR_get_error(),NULL));
                     goto FAIL_CLEAN_SSL_4;
                 }
 
@@ -438,7 +438,7 @@ void Worker::INIT_THREAD_POOL_HANDLER()
 void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 {
     printf("START_THREAD_POOL_HANDLER\n");
-    PoolArg* pArg = (PoolArg*)arg;
+    PoolArg* pArg = static_cast<PoolArg*>(arg);
     Worker* pWorkerInstance;
 
     memcpy(&pWorkerInstance, pArg->data, sizeof(Worker*));
@@ -526,7 +526,7 @@ void* Worker::START_THREAD_POOL_HANDLER(void* arg)
 #endif /* HEAPHTTPD_DYNAMIC_WORKDERS */
 
 	if(arg != NULL)
-		delete arg;
+		delete static_cast<PoolArg*>(arg);
 	
 	pthread_exit(0);
 }

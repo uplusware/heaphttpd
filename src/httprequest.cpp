@@ -82,7 +82,7 @@ void http_request::set_service_obj(const char * name, IServiceObj* obj)
 
 IServiceObj* http_request::get_service_obj(const char * name)
 {
-    m_session->GetServiceObject(name);
+    return m_session->GetServiceObject(name);
 }
 
 int http_request::get_multipart_formdata(const char* content_name,

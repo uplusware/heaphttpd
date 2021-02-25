@@ -36,6 +36,7 @@ int cgi_base::Close()
     if(m_sockfd > 0)
         close(m_sockfd);
     m_sockfd = -1;
+    return 0;
 }
     
 int cgi_base::Connect()

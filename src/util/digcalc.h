@@ -12,7 +12,7 @@ typedef char HASHHEX[HASHHEXLEN+1];
 
 /* calculate H(A1) as per HTTP Digest spec */
 void DigestCalcHA1(
-    IN char * pszAlg,
+    IN const char * pszAlg,
     IN char * pszUserName,
     IN char * pszRealm,
     IN char * pszPassword,

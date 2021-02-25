@@ -20,7 +20,7 @@
 
 #include "debug.h"
 
-// #define _http2_debug_ 1
+//#define _http2_debug_ 1
 
 
 #ifdef _http2_debug_
@@ -75,6 +75,7 @@
     };
 #endif /* _http2_debug_ */ 
 
+#define HTTP2_DATA_PADDING_LEN  8
 #define PRE_MALLOC_SIZE 1024
 
 #define HTTP2_MAX_WINDOW_SIZE (2147483647L)
@@ -305,11 +306,11 @@ void CHttp2::send_rst_stream(uint_32 stream_ind)
 {
     http2_stream* http2_stream_inst = get_stream_instance(stream_ind);
     
-    if(http2_stream_inst && (http2_stream_inst->GetStreamState() == stream_half_closed_local
+    /*if(http2_stream_inst && (http2_stream_inst->GetStreamState() == stream_half_closed_local
         || http2_stream_inst->GetStreamState() == stream_closed))
     {
         return;
-    }
+    }*/
     char* http2_buf = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Rst_Stream));
     HTTP2_Frame* http2_frm = (HTTP2_Frame*)http2_buf;
     http2_frm->length.len3b[0] = 0x00;
@@ -367,8 +368,10 @@ void CHttp2::send_window_update(uint_32 stream_ind, uint_32 increament_window_si
     }
     else
         m_local_control_window_size += increament_window_size;
-
+#ifdef _http2_debug_
     printf("+  Current local Connection Window Size: %u %d\n", m_local_control_window_size, increament_window_size);
+#endif /* _http2_debug_ */
+
 }
 
 void CHttp2::send_initial_window_size(uint_32 window_size)
@@ -421,7 +424,7 @@ void CHttp2::send_push_promise_request(uint_32 stream_ind)
 void CHttp2::send_goaway(uint_32 last_stream_ind, uint_32 error_code)
 {
 #ifdef _http2_debug_
-    printf("  Send GOAWAY for %d as %s\n", last_stream_ind, error_table[error_code]);
+    printf("  Send GOAWAY for %d as %d: %s\n", last_stream_ind, error_code, error_code <= HTTP2_HTTP_1_1_REQUIRED ? error_table[error_code] : "Unassigned error");
 #endif /* _http2_debug_ */
 
     char* http2_buf = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Goaway));
@@ -899,17 +902,20 @@ int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 paylo
                 if((frame_hdr.flags & HTTP2_FRAME_FLAG_END_STREAM) == HTTP2_FRAME_FLAG_END_STREAM)
                 {
 #ifdef _http2_debug_                    
-                    printf("  Recieved HTTP2_FRAME_FLAG_END_STREAM. Close Stream(%d)\n", stream_ind);
-                    printf("  State: {%s}\n", stream_state_desc[http2_stream_inst->GetStreamState()]);
+                    printf("  Recieved HTTP2_FRAME_FLAG_END_STREAM. Close Stream(%d). Line: %d\n", stream_ind, __LINE__);
+                    printf("  State Before: {%s}\n", stream_state_desc[http2_stream_inst->GetStreamState()]);
 #endif /* _http2_debug_ */
                     if(http2_stream_inst->GetStreamState() != stream_half_closed_local)
+                    {
                         http2_stream_inst->SetStreamState(stream_half_closed_remote);
+                        send_rst_stream(stream_ind);
+                    }
                     else
                     {
                         http2_stream_inst->SetStreamState(stream_closed);
                     }
 #ifdef _http2_debug_        
-                    printf("  State: {%s}\n", stream_state_desc[http2_stream_inst->GetStreamState()]);
+                    printf("  State After: {%s}\n", stream_state_desc[http2_stream_inst->GetStreamState()]);
 #endif /* _http2_debug_ */                    
                 }
             }
@@ -1072,14 +1078,18 @@ int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 paylo
                 if((frame_hdr.flags & HTTP2_FRAME_FLAG_END_STREAM) == HTTP2_FRAME_FLAG_END_STREAM)
                 {
 #ifdef _http2_debug_                    
-                    printf("  Recieved HTTP2_FRAME_FLAG_END_STREAM. Close Stream(%d)\n", stream_ind);
+                    printf("  Recieved HTTP2_FRAME_FLAG_END_STREAM. Close Stream(%d): Line %d\n", stream_ind, __LINE__);
                     printf("  State: {%s}\n", stream_state_desc[http2_stream_inst->GetStreamState()]);
 #endif /* _http2_debug_ */
                     if(stream_ind == 0 || http2_stream_inst->GetStreamState() != stream_half_closed_local)
+                    {
                         http2_stream_inst->SetStreamState(stream_half_closed_remote);
+                        send_rst_stream(stream_ind);
+                    }
                     else
                     {
                         http2_stream_inst->SetStreamState(stream_closed);
+                        
                     }
 #ifdef _http2_debug_                    
                     printf("  State: {%s}\n", stream_state_desc[http2_stream_inst->GetStreamState()]);
@@ -1135,10 +1145,10 @@ int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 paylo
                     it_hpack->second->SetStreamState(stream_closed);
                     m_stream_list.erase(it_hpack);
 #ifdef _http2_debug_                        
-                    printf("  Reset HTTP2 Stream(%u) for %s\n", stream_ind, error_table[ntohl(rst_stream->error_code)]);
+                    printf("  Reset HTTP2 Stream(%u) for %d: %s\n", stream_ind, ntohl(rst_stream->error_code), ntohl(rst_stream->error_code) <= HTTP2_HTTP_1_1_REQUIRED ? error_table[ntohl(rst_stream->error_code)] : "Unassigned error");
 #endif /* _http2_debug_ */
                     if(rst_stream->error_code > HTTP2_NO_ERROR)
-                        send_goaway(stream_ind, rst_stream->error_code);
+                        send_goaway(stream_ind, ntohl(rst_stream->error_code));
                 }
             }
         }
@@ -1159,7 +1169,7 @@ int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 paylo
                 HTTP2_Frame_Ping* ping_frm = (HTTP2_Frame_Ping*)payload;
                 memcpy(ping_ack_frm->data, ping_frm->data, sizeof(HTTP2_Frame_Ping));
 #ifdef _http2_debug_                
-                printf("  Send PING Ack\n");
+                printf("  Send PING Ack with payload[%02X %02X %02X %02X %02X %02X %02X %02X]\n", ping_frm[0], ping_frm[1], ping_frm[2], ping_frm[3], ping_frm[4], ping_frm[5], ping_frm[6], ping_frm[7]);
 #endif /* _http2_debug_ */                
                 HttpSend((const char*)ping_ack, sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Ping));
                 free(ping_ack);
@@ -1636,7 +1646,11 @@ int CHttp2::TransHttp1SendHttp2Header(uint_32 stream_ind, const char* buf, int l
         http2_frm_data->identifier = htonl(stream_ind) >> 1;
     }
     int ret = HttpSend(response_buf, response_len);
-    
+
+#ifdef _http2_debug_                    
+        printf("  Send DATA on stream %u @TransHttp1SendHttp2Header\n", stream_ind);
+#endif /* _http2_debug_ */ 
+
     http2_stream_inst->SetStreamState(stream_open);
     if(response_buf)
         free(response_buf);
@@ -1654,29 +1668,63 @@ int CHttp2::TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint
     int sent_len = 0;
     while(1)
     {
-        uint_32 pre_send_len = (len - sent_len) > m_max_frame_size ? m_max_frame_size : (len - sent_len);
+        int response_len = 0;
+        char* response_buf = NULL;
+        uint_32 pre_send_len = 0;
         
-        pre_send_len = http2_stream_inst->GetPeerWindowSize() > pre_send_len ? pre_send_len : http2_stream_inst->GetPeerWindowSize();
-        
+        if(m_max_frame_size > (HTTP2_DATA_PADDING_LEN + sizeof(HTTP2_Frame_Data1)))
+        {
+            pre_send_len = (len - sent_len) > (m_max_frame_size - HTTP2_DATA_PADDING_LEN - sizeof(HTTP2_Frame_Data1)) ? (m_max_frame_size - HTTP2_DATA_PADDING_LEN - sizeof(HTTP2_Frame_Data1)) : (len - sent_len);
+            
+            pre_send_len = http2_stream_inst->GetPeerWindowSize() > pre_send_len ? pre_send_len : http2_stream_inst->GetPeerWindowSize();
+            int curr_padding_len  = HTTP2_DATA_PADDING_LEN - pre_send_len%HTTP2_DATA_PADDING_LEN;
+
+            response_len = sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data1) + pre_send_len + curr_padding_len;
+            response_buf = (char*)malloc(response_len);
+            memset(response_buf, 0, response_len);
+            HTTP2_Frame * http2_frm_data = (HTTP2_Frame *)response_buf;
+            http2_frm_data->length.len24 = htonl(response_len - sizeof(HTTP2_Frame)) >> 8;
+            http2_frm_data->type = HTTP2_FRAME_TYPE_DATA;
+            http2_frm_data->flags = HTTP2_FRAME_FLAG_PADDED;
+            http2_frm_data->r = HTTP2_FRAME_R_UNSET;
+
+            http2_frm_data->identifier = htonl(stream_ind) >> 1;
+            
+            HTTP2_Frame_Data1* padding_data = (HTTP2_Frame_Data1*)(response_buf + sizeof(HTTP2_Frame));
+            padding_data->pad_length = curr_padding_len;
+            memcpy(padding_data->data_padding, buf + sent_len, pre_send_len);
 #ifdef _http2_debug_                    
-        printf("  Send DATA Frame as Length: %d/%d/%d on stream %u\n", pre_send_len, http2_stream_inst->GetPeerWindowSize(), len, stream_ind);
+                    printf("  Send DATA Frame as Length: %d/%d/%d on stream %u @TransHttp1SendHttp2Content LEN: %d with  PADDING %d\n", pre_send_len, http2_stream_inst->GetPeerWindowSize(), len, stream_ind, response_len - sizeof(HTTP2_Frame), curr_padding_len);
 #endif /* _http2_debug_ */ 
-        int response_len;
-        char* response_buf = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data2) + pre_send_len);
-        response_len = sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data2) + pre_send_len;
-        HTTP2_Frame * http2_frm_data = (HTTP2_Frame *)response_buf;
-        http2_frm_data->length.len24 = htonl(pre_send_len) >> 8;
-        http2_frm_data->type = HTTP2_FRAME_TYPE_DATA;
-        http2_frm_data->flags = HTTP2_FRAME_FLAG_UNSET;
-        http2_frm_data->r = HTTP2_FRAME_R_UNSET;
+
+
+        }
+        else
+        {
+            pre_send_len = (len - sent_len) > m_max_frame_size ? m_max_frame_size : (len - sent_len);
         
-        http2_frm_data->identifier = htonl(stream_ind) >> 1;
+            pre_send_len = http2_stream_inst->GetPeerWindowSize() > pre_send_len ? pre_send_len : http2_stream_inst->GetPeerWindowSize();
         
-        HTTP2_Frame_Data2* data = (HTTP2_Frame_Data2*)(response_buf + sizeof(HTTP2_Frame));
-        memcpy(data->data, buf + sent_len, pre_send_len);
-        
+            response_buf = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data2) + pre_send_len);
+            response_len = sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data2) + pre_send_len;
+            HTTP2_Frame * http2_frm_data = (HTTP2_Frame *)response_buf;
+            http2_frm_data->length.len24 = htonl(pre_send_len) >> 8;
+            http2_frm_data->type = HTTP2_FRAME_TYPE_DATA;
+            http2_frm_data->flags = HTTP2_FRAME_FLAG_UNSET;
+            http2_frm_data->r = HTTP2_FRAME_R_UNSET;
+            
+            http2_frm_data->identifier = htonl(stream_ind) >> 1;
+            
+            HTTP2_Frame_Data2* data = (HTTP2_Frame_Data2*)(response_buf + sizeof(HTTP2_Frame));
+            memcpy(data->data, buf + sent_len, pre_send_len);
+
+#ifdef _http2_debug_                    
+        printf("  Send DATA Frame as Length: %d/%d/%d on stream %u @TransHttp1SendHttp2Content LEN: %d without PADDING\n", pre_send_len, http2_stream_inst->GetPeerWindowSize(), len, stream_ind, response_len - sizeof(HTTP2_Frame));
+#endif /* _http2_debug_ */ 
+
+        }
         ret = HttpSend(response_buf, response_len);
-        
+
         if(response_buf)
             free(response_buf);
     
@@ -1713,24 +1761,33 @@ int CHttp2::SendHttp2EmptyContent(uint_32 stream_ind, uint_8 flags)
     
     if(!http2_stream_inst)
         return -1;
-    
-    int response_len;
-    char* response_buf = (char*)malloc(sizeof(HTTP2_Frame));
-    response_len = sizeof(HTTP2_Frame);
+    int curr_padding_len  = (HTTP2_DATA_PADDING_LEN + sizeof(HTTP2_Frame_Data1)) > m_max_frame_size ? (m_max_frame_size - sizeof(HTTP2_Frame_Data1) ) : HTTP2_DATA_PADDING_LEN;
+    int response_len = sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Data1) + curr_padding_len;
+    char* response_buf = (char*)malloc(response_len);
+    memset(response_buf, 0, response_len);
     HTTP2_Frame * http2_frm_data = (HTTP2_Frame *)response_buf;
-    http2_frm_data->length.len24 = 0;
+    http2_frm_data->length.len24 = htonl(response_len - sizeof(HTTP2_Frame)) >> 8;;
     http2_frm_data->type = HTTP2_FRAME_TYPE_DATA;
     http2_frm_data->flags = flags;
     http2_frm_data->r = HTTP2_FRAME_R_UNSET;
     
     http2_frm_data->identifier = htonl(stream_ind) >> 1;
-    
+
+    HTTP2_Frame_Data1 * padding_data = (HTTP2_Frame_Data1 *)(response_buf + sizeof(HTTP2_Frame));
+    padding_data->pad_length = curr_padding_len;
     int ret = HttpSend(response_buf, response_len);
-    
+
+#ifdef _http2_debug_                    
+        printf("  Send DATA Frame on stream %u @SendHttp2EmptyContent LEN: %d\n", stream_ind, response_len - sizeof(HTTP2_Frame));
+#endif /* _http2_debug_ */ 
+
     if(http2_stream_inst && http2_stream_inst->GetStreamState() != stream_half_closed_remote)
         http2_stream_inst->SetStreamState(stream_half_closed_local);
     else
         http2_stream_inst->SetStreamState(stream_closed);
+        
+    send_rst_stream(stream_ind);
+    
     if(response_buf)
         free(response_buf);
     return ret;

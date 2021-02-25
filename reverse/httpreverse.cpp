@@ -40,5 +40,6 @@ void* reverse_delivery(const char * name, const char * description, const char *
     /* test code, doesn't do any change for request method and url. */
     *output_method_url = input_method_url;
     
-    printf("Original URL: [%s], Reverse URL: [%s] from %s\n", input_method_url, output_method_url->c_str(), clientip);
+    fprintf(stderr, "Original URL: [%s], Reverse URL: [%s] from %s\n", input_method_url, output_method_url->c_str(), clientip);
+    return NULL;
 }

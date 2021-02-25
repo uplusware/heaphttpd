@@ -9,7 +9,7 @@ void usage()
 }
 
 int main(int argc, char* argv[])
-{
+{    
 	if(argc == 2 && strcmp(argv[1], "--encode") == 0)
 	{
 		string strpwd = getpass("Input: ");

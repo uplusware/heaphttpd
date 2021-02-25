@@ -140,7 +140,7 @@ public:
     int TransHttp1SendHttp2Header(uint_32 stream_ind, const char* buf, int len, uint_8 frame_type = HTTP2_FRAME_TYPE_HEADERS, uint_32 promised_stream_ind = 0);
     int TransHttp1SendHttp2Content(uint_32 stream_ind, const char* buf, uint_32 len);
     
-    int SendHttp2EmptyContent(uint_32 stream_ind, uint_8 flags = HTTP2_FRAME_FLAG_END_STREAM);
+    int SendHttp2EmptyContent(uint_32 stream_ind, uint_8 flags = (HTTP2_FRAME_FLAG_END_STREAM | HTTP2_FRAME_FLAG_PADDED));
     void SendHttp2PushPromiseRequest(uint_32 stream_ind);
     void SendHttp2PushPromiseResponse();
     

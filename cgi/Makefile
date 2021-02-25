@@ -7,7 +7,7 @@ INCDIR = -I../src
 LDDIRS = -L.
 LDLIST_CGIPGM = -lstdc++
 
-FLAGS = -O2 -fPIC -w
+FLAGS = -O2 -fPIC
 
 all: pgm
 

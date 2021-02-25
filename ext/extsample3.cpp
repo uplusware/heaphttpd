@@ -8,15 +8,18 @@
 
 void* ext_request(CHttp* http_session, const char * name, const char * description, const char * parameters, BOOL * skip)
 {
-    printf("%s %s %s %s\n", __FILE__, __FUNCTION__, name, description);
+    fprintf(stderr, "%s %s %s %s\n", __FILE__, __FUNCTION__, name, description);
+    return NULL;
 }
 
 void* ext_response(CHttp* m_session, const char * name, const char * description, const char * parameters, Htdoc* doc)
 {
-    printf("%s %s %s %s\n", __FILE__, __FUNCTION__, name, description);
+    fprintf(stderr, "%s %s %s %s\n", __FILE__, __FUNCTION__, name, description);
+    return NULL;
 }
 
 void* ext_finish(CHttp* http_session, const char * name, const char * description, const char * parameters, Htdoc* doc)
 {
-    printf("%s %s %s %s\n", __FILE__, __FUNCTION__, name, description);
+    fprintf(stderr, "%s %s %s %s\n", __FILE__, __FUNCTION__, name, description);
+    return NULL;
 }

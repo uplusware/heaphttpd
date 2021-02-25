@@ -3,7 +3,7 @@ CC = gcc
 HTTPWS = libecho.so
 HTTPWSOBJS = echo.o
 
-FLAGS = -O2 -fPIC -w
+FLAGS = -O2 -fPIC
 
 INCDIR = -I../src/
 LDDIRS = -L../src/

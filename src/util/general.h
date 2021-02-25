@@ -49,7 +49,6 @@ typedef  unsigned int uint_32;
 typedef  unsigned short uint_16;
 typedef  unsigned char uint_8;
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
 #define HICH(c) (( (c) >= 'a' )&&((c) <= 'z')) ? ((c)+'A'-'a'):(c)
 #define LOCH(c) (( (c) >= 'A' )&&((c) <= 'Z')) ? ((c)-'A'+'a'):(c)
 
@@ -366,8 +365,21 @@ int __inline__ _Send_(int sockfd, const char * buf, unsigned int buf_len, unsign
 	return 0;
 }
 
-BOOL __inline__ connect_ssl(int sockfd,  const char* ca_crt_root, const char* ca_crt_client, const char* ca_password, const char* ca_key_client, SSL** pp_ssl, SSL_CTX** pp_ssl_ctx, unsigned int idle_timeout)
+BOOL __inline__ connect_ssl(int sockfd,  const char* ca_crt_root, const char* ca_crt_client, const char* ca_password, const char* ca_key_client,
+        SSL** pp_ssl, SSL_CTX** pp_ssl_ctx, unsigned int idle_timeout, BOOL* isHttp2)
 {
+    //currently only support http/1.1
+    unsigned char protos[] = {
+        /* 2, 'h','2', */ 
+        8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+    };
+    unsigned int protos_len = sizeof(protos);
+
+    const unsigned char *data = NULL;
+    unsigned int data_len;
+                             
+    *isHttp2 = FALSE;
+
     SSL_METHOD* meth = NULL;
 #if OPENSSL_VERSION_NUMBER >= 0x010100000L
     meth = (SSL_METHOD*)TLS_client_method();
@@ -420,6 +432,14 @@ BOOL __inline__ connect_ssl(int sockfd,  const char* ca_crt_root, const char* ca
         goto FAIL_CLEAN_SSL_2;
     }
     
+    if(SSL_CTX_set_alpn_protos(*pp_ssl_ctx , protos, protos_len) <= 0)
+    {
+        
+        fprintf(stderr, "SSL_CTX_set_alpn_protos: %s", ERR_error_string(ERR_get_error(),NULL));
+        goto FAIL_CLEAN_SSL_2;
+
+    }
+    
     if(SSL_set_fd(*pp_ssl, sockfd) <= 0)
     {
         
@@ -435,27 +455,7 @@ BOOL __inline__ connect_ssl(int sockfd,  const char* ca_crt_root, const char* ca
             int ret = SSL_get_error(*pp_ssl, ssl_rc);
             if(ret == SSL_ERROR_WANT_READ || ret == SSL_ERROR_WANT_WRITE)
             {
-                fd_set mask;
-                struct timeval timeout;
-        
-                timeout.tv_sec = idle_timeout;
-                timeout.tv_usec = 0;
-
-                FD_ZERO(&mask);
-                FD_SET(sockfd, &mask);
-                
-                int res = select(sockfd + 1, ret == SSL_ERROR_WANT_READ ? &mask : NULL, ret == SSL_ERROR_WANT_WRITE ? &mask : NULL, NULL, &timeout);
-
-                if( res == 1)
-                {
-                    continue;
-                }
-                else /* timeout or error */
-                {
-                    
-                    fprintf(stderr, "SSL_connect: %s %s", ERR_error_string(ERR_get_error(),NULL), strerror(errno));
-                    goto FAIL_CLEAN_SSL_2;
-                }
+                continue;
             }
             else
             {
@@ -477,6 +477,12 @@ BOOL __inline__ connect_ssl(int sockfd,  const char* ca_crt_root, const char* ca
             break;
         }
     } while(1);
+    
+    SSL_get0_alpn_selected(*pp_ssl, &data, &data_len);
+    if(data && memcmp(data, "http/2", data_len) == 0)
+    {
+        *isHttp2 = TRUE;
+    }
     
     X509* client_cert;
     client_cert = SSL_get_peer_certificate(*pp_ssl);
@@ -509,7 +515,7 @@ FAIL_CLEAN_SSL_3:
     return FALSE;
 }
 
-BOOL __inline__ close_ssl(SSL* p_ssl, SSL_CTX* p_ssl_ctx)
+void __inline__ close_ssl(SSL* p_ssl, SSL_CTX* p_ssl_ctx)
 {
 	if(p_ssl)
     {
@@ -654,81 +660,22 @@ void __inline__ _strdelete_(string& src, const char* str)
 
 void __inline__ strtrim(string &src)
 {
-	string::size_type ops1, ops2, ops3, ops4;
-	BOOL bExit = FALSE;
-	while(!bExit)
-	{
-		bExit = TRUE;
-		ops1 = src.find_first_not_of(" ");
-		if((ops1 != string::npos)&&(ops1 != 0))
-		{
-			src.erase(0, ops1);
-			bExit = FALSE;
-		}
-		else if(ops1 == string::npos)
-		{
-			src.erase(0, src.length());
-		}
-		ops2 = src.find_first_not_of("\t");
-		if((ops2 != string::npos)&&(ops2 != 0))
-		{
-			src.erase(0, ops2);
-		}
-		else if(ops2 == string::npos)
-		{
-			src.erase(0, src.length());
-		}
-		ops3 = src.find_first_not_of("\r");
-		if((ops3 != string::npos)&&(ops3 != 0))
-		{
-			src.erase(0, ops3);
-		}
-		else if(ops3 == string::npos)
-		{
-			src.erase(0, src.length());
-		}
-			
-		ops4 = src.find_first_not_of("\n");
-		if((ops4 != string::npos)&&(ops4 != 0))
-		{
-			src.erase(0, ops4);
-		}
-		else if(ops4 == string::npos)
-		{
-			src.erase(0, src.length());
-		}
-	}
-	bExit = FALSE;
-	while(!bExit)
-	{
-		bExit = TRUE;
-		ops1 = src.find_last_not_of(" ");
-		if((ops1 != string::npos)&&(ops1 != src.length() - 1 ))
-		{
-			src.erase(ops1 + 1, src.length() - ops1 - 1);
-			bExit = FALSE;
-		}
-		
-		ops2 = src.find_last_not_of("\t");
-		if((ops2 != string::npos)&&(ops2 != src.length() - 1 ))
-		{
-			src.erase(ops2 + 1, src.length() - ops2 - 1);
-			bExit = FALSE;
-		}
-		ops3 = src.find_last_not_of("\r");
-		if((ops3 != string::npos)&&(ops3 != src.length() - 1 ))
-		{
-			src.erase(ops3 + 1, src.length() - ops3 - 1);
-			bExit = FALSE;
-		}
-			
-		ops4 = src.find_last_not_of("\n");
-		if((ops4 != string::npos)&&(ops4 != src.length() - 1 ))
-		{
-			src.erase(ops4 + 1, src.length() - ops4 - 1);
-			bExit = FALSE;
-		}
-	}
+    if (src.empty() || src[0] == '\0') 
+        return;
+    std::size_t p1 = src.find_first_not_of(" \r\n\t");
+    if((src[0] == ' ' || src[0] == '\r' || src[0] == '\n' || src[0] == '\t') && (p1 == string::npos))
+    {
+        src.erase();
+        return;
+    }
+    else if(p1 != string::npos)
+        src.erase((std::size_t)0, (std::size_t)p1);
+    
+    std::size_t p2 = src.find_last_not_of(" \r\n\t");
+    if(p2 != string::npos)
+    {
+        src.erase((std::size_t)p2 + 1, string::npos);
+    }
 }
 
 void __inline__ strtrim(string &src, const char* aim)
