@@ -20,7 +20,7 @@
 
 #include "debug.h"
 
-//#define _http2_debug_ 1
+/* #define _http2_debug_ 1 */
 
 
 #ifdef _http2_debug_
@@ -306,11 +306,6 @@ void CHttp2::send_rst_stream(uint_32 stream_ind)
 {
     http2_stream* http2_stream_inst = get_stream_instance(stream_ind);
     
-    /*if(http2_stream_inst && (http2_stream_inst->GetStreamState() == stream_half_closed_local
-        || http2_stream_inst->GetStreamState() == stream_closed))
-    {
-        return;
-    }*/
     char* http2_buf = (char*)malloc(sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Rst_Stream));
     HTTP2_Frame* http2_frm = (HTTP2_Frame*)http2_buf;
     http2_frm->length.len3b[0] = 0x00;
@@ -329,6 +324,9 @@ void CHttp2::send_rst_stream(uint_32 stream_ind)
     HttpSend((const char*)http2_buf, sizeof(HTTP2_Frame) + sizeof(HTTP2_Frame_Rst_Stream));
     
     free(http2_buf);
+
+    //set the current stream as closed
+    http2_stream_inst->SetStreamState(stream_closed);
 }
 
 void CHttp2::send_window_update(uint_32 stream_ind, uint_32 increament_window_size)
@@ -734,19 +732,14 @@ int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 paylo
                 send_goaway(stream_ind, HTTP2_STREAM_CLOSED);
                 goto END_SESSION;
             }
-            /*else if (state == stream_closed && frame_hdr.type != HTTP2_FRAME_TYPE_PRIORITY)
-            {
-                if(frame_hdr.type == HTTP2_FRAME_TYPE_WINDOW_UPDATE 
-                    || frame_hdr.type == HTTP2_FRAME_TYPE_RST_STREAM)
-                {
-                   goto CONTINUE_SESSION;
-                }
-                else
+            else if (state == stream_closed
+                && frame_hdr.type != HTTP2_FRAME_TYPE_PRIORITY
+                && frame_hdr.type != HTTP2_FRAME_TYPE_WINDOW_UPDATE
+                && frame_hdr.type != HTTP2_FRAME_TYPE_RST_STREAM)
                 {
                     send_goaway(stream_ind, HTTP2_STREAM_CLOSED);
                     goto END_SESSION;
                 }
-            }*/
         }
         
         if(frame_hdr.type == HTTP2_FRAME_TYPE_GOAWAY)
@@ -880,8 +873,6 @@ int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 paylo
             
             if(stream_ind > 0 && http2_stream_inst)
             {
-                
-                
                 http2_stream_inst->SetStreamState(stream_open);
                 
                 if(http2_stream_inst->hpack_parse((HTTP2_Header_Field*)header3->block_fragment, fragment_len) < 0)
@@ -908,7 +899,6 @@ int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 paylo
                     if(http2_stream_inst->GetStreamState() != stream_half_closed_local)
                     {
                         http2_stream_inst->SetStreamState(stream_half_closed_remote);
-                        send_rst_stream(stream_ind);
                     }
                     else
                     {
@@ -1084,7 +1074,6 @@ int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 paylo
                     if(stream_ind == 0 || http2_stream_inst->GetStreamState() != stream_half_closed_local)
                     {
                         http2_stream_inst->SetStreamState(stream_half_closed_remote);
-                        send_rst_stream(stream_ind);
                     }
                     else
                     {
@@ -1131,11 +1120,16 @@ int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 paylo
         }
         else if(frame_hdr.type == HTTP2_FRAME_TYPE_RST_STREAM)
         {
-            
             http2_stream* http2_stream_inst = get_stream_instance(stream_ind);
                 
             if(stream_ind > 0 && http2_stream_inst)
             {
+                if(http2_stream_inst->GetStreamState() == stream_idle)
+                {
+                    send_goaway(stream_ind, HTTP2_PROTOCOL_ERROR);
+                }
+                else
+                {
                 http2_stream_inst->SetStreamState(stream_closed);
         
                 HTTP2_Frame_Rst_Stream* rst_stream = (HTTP2_Frame_Rst_Stream*)payload;
@@ -1145,11 +1139,16 @@ int CHttp2::ProtParse(const HTTP2_Frame& frame_hdr, char* payload, uint_32 paylo
                     it_hpack->second->SetStreamState(stream_closed);
                     m_stream_list.erase(it_hpack);
 #ifdef _http2_debug_                        
-                    printf("  Reset HTTP2 Stream(%u) for %d: %s\n", stream_ind, ntohl(rst_stream->error_code), ntohl(rst_stream->error_code) <= HTTP2_HTTP_1_1_REQUIRED ? error_table[ntohl(rst_stream->error_code)] : "Unassigned error");
+                        printf("  Reset HTTP2 Stream(%u) for %s\n", stream_ind, ntohl(rst_stream->error_code) <= HTTP2_HTTP_1_1_REQUIRED ? error_table[ntohl(rst_stream->error_code)] : "Unassigned error");
 #endif /* _http2_debug_ */
                     if(rst_stream->error_code > HTTP2_NO_ERROR)
                         send_goaway(stream_ind, ntohl(rst_stream->error_code));
                 }
+            }
+        }
+            else
+            {
+                send_goaway(stream_ind, HTTP2_PROTOCOL_ERROR);
             }
         }
         else if(frame_hdr.type == HTTP2_FRAME_TYPE_PING)
@@ -1781,12 +1780,13 @@ int CHttp2::SendHttp2EmptyContent(uint_32 stream_ind, uint_8 flags)
         printf("  Send DATA Frame on stream %u @SendHttp2EmptyContent LEN: %d\n", stream_ind, response_len - sizeof(HTTP2_Frame));
 #endif /* _http2_debug_ */ 
 
+    if((http2_frm_data->flags & HTTP2_FRAME_FLAG_END_STREAM) == HTTP2_FRAME_FLAG_END_STREAM)
+    {
     if(http2_stream_inst && http2_stream_inst->GetStreamState() != stream_half_closed_remote)
         http2_stream_inst->SetStreamState(stream_half_closed_local);
     else
         http2_stream_inst->SetStreamState(stream_closed);
-        
-    send_rst_stream(stream_ind);
+    }
     
     if(response_buf)
         free(response_buf);
