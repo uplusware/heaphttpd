@@ -9,4 +9,5 @@
 * [Project Wiki](https://github.com/uplusware/heaphttpd/wiki/)
 
 ### History
-This project was splited from erisemail's build-in web server in 2014. And It supported HTTP/2 in 2015.
+
+This project was splited from the [erisemail](https://github.com/uplusware/erisemail)'s build-in web server in 2015. It supported HTTP/2 in 2016.
