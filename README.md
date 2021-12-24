@@ -7,3 +7,6 @@
 * Support Asynchronous IO Mode and distributed deployment.
 * Support Service Object (For example, a persistent MariabDB or MongoDB connection)
 * [Project Wiki](https://github.com/uplusware/heaphttpd/wiki/)
+
+### History
+This project was splited from erisemail's build-in web server in 2014. And It supported HTTP/2 in 2015.
