@@ -20,13 +20,11 @@ session_var::session_var(const char* szline)
     vector<string> vVars;
     vSplitString(szline, vVars, ";", TRUE);
     vector<string>::iterator iter_c;
-    //printf("var line: %s\n", szline);
     SessionVarParsePhase phase = SESSION_VAR_UID;
     for(iter_c = vVars.begin(); iter_c != vVars.end(); iter_c++)
     {
         string strField(*iter_c);
         strtrim(strField);
-        //printf("var field: %s\n", strField.c_str());
         
         if(phase == SESSION_VAR_UID)
         {
@@ -51,8 +49,6 @@ session_var::session_var(const char* szline)
             strtrim(m_name);
             strtrim(m_value);
             phase = SESSION_VAR_OPTION;
-            
-            //printf("var name: %s value: %s\n", m_name.c_str(), m_value.c_str());
         }
     }
 }

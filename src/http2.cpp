@@ -1241,7 +1241,6 @@ Http_Connection CHttp2::Processing()
         int result = ProtRecv();
         if(result <= 0)
         {
-            /* printf("result: %d\n", result); */
             httpConn = httpClose;
             break;
         }

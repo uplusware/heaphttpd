@@ -499,7 +499,6 @@ void memory_cache::push_server_var(const char* name, const char* value)
         if(m_memcached_map.find(pthread_self()) == m_memcached_map.end())
             m_memcached_map[pthread_self()] = memcached_clone(NULL, m_memcached);     
         memcached_return memc_rc = memcached_set(m_memcached_map[pthread_self()], szMD5dst, 40, value, strlen(value) + 1, (time_t)0, (uint32_t)0);
-        //printf("memcached_set: %s %s: %s\n", memc_rc == MEMCACHED_SUCCESS ? "OK" : "Error", szMD5dst, value);
     }
 #endif /* _WITH_MEMCACHED_ */
 }
@@ -566,7 +565,6 @@ int  memory_cache::get_server_var(const char * name, string& value)
                 
                 ret = 0;
             }
-            //printf("memcached_get: %s %s: %s\n", memc_rc == MEMCACHED_SUCCESS ? "OK" : "Error", szMD5dst, value.c_str());
         }
 #endif /* _WITH_MEMCACHED_ */
     }

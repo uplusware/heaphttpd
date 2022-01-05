@@ -262,8 +262,6 @@ bool http_client::parse(const char* text)
 
         strtrim(strtext);
         
-        //printf(">>>>> %s\r\n", strtext.c_str());
-        
         //format the header line.
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)

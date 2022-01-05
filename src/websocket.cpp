@@ -120,7 +120,6 @@ int WebSocket::Send(WebSocket_Buffer * data)
 			websocket_framing.payload_buf[i] = data->buf[i];
         
         websocket_framing.payload_buf[i] = '\0';
-        //printf("%s\n", websocket_framing.payload_buf);
 	}
 	
 	if(!websocket_framing.payload_buf)
@@ -150,7 +149,6 @@ int WebSocket::Recv(WebSocket_Buffer * data)
 	
 	websocket_framing.base_hdr.h.huint16 = ntohs(websocket_framing.base_hdr.h.huint16);
 	
-	//printf("%04x %d\n", websocket_framing.base_hdr.h.huint16, websocket_framing.base_hdr.h.hstruct.payload_len_7bit);
 	websocket_framing.payload_len = 0;
 	if(websocket_framing.base_hdr.h.hstruct.payload_len_7bit < 126)
 	{
@@ -179,8 +177,6 @@ int WebSocket::Recv(WebSocket_Buffer * data)
 		websocket_framing.payload_len = be64toh(data_len); //64 bit
 	}
 	
-	//printf("websocket_framing.payload_len = %d\n", websocket_framing.payload_len);
-	
 	if(websocket_framing.base_hdr.h.hstruct.mask == 1)
 	{
         if(m_ssl)
@@ -189,7 +185,6 @@ int WebSocket::Recv(WebSocket_Buffer * data)
             res = _Recv_(m_sockfd, (char*)websocket_framing.masking_key, 4, CHttpBase::m_connection_idle_timeout);
 		if(res == -1)
 			return -1;
-		//printf("websocket_framing.masking_key = %02x%02x%02x%02x\n", websocket_framing.masking_key[0],  websocket_framing.masking_key[1],  websocket_framing.masking_key[2],  websocket_framing.masking_key[3]);
 	}
 	
     if(websocket_framing.payload_len > 0)

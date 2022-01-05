@@ -78,7 +78,6 @@ int cgi_base::Connect()
         char szPort[32];
         sprintf(szPort, "%u", m_nPort);
         
-        /*printf("fast-cgi: %s %s\n", m_strIP.c_str(), szPort);*/
         int s = getaddrinfo(m_strIP != "" ? m_strIP.c_str() : NULL, szPort, &hints, &server_addr);
         if (s != 0)
         {
@@ -114,8 +113,7 @@ int cgi_base::Connect()
     {
         char local_sockfile[256];
         sprintf(local_sockfile, "/tmp/heaphttpd/fastcgi.sock.%05d.%05d", getpid(), gettid());
-
-        //printf("local sock file: %s\n", local_sockfile);        
+       
         memset(&ser_unix, 0, sizeof(ser_unix));
 	    ser_unix.sun_family = AF_UNIX;
 	    strcpy(ser_unix.sun_path, local_sockfile);

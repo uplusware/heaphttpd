@@ -253,7 +253,6 @@ int hpack::build(const char* http1_headrs, int len, map<int, pair<string, string
                     strtrim(strName);
                     strtrim(strValue);
                     
-                    //printf("%s | %s\n", strName.c_str(), strValue.c_str());
                     string strNameLow;
                     lowercase(strName.c_str(), strNameLow);
 

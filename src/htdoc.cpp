@@ -186,8 +186,6 @@ void Htdoc::Response()
 	}
 	
 	m_session->SetResource(strResource.c_str());
-	
-    //printf("[%s]\n", strResource.c_str());
     
 	if(strncmp(strResource.c_str(), "/api/", 5) == 0)
 	{

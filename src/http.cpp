@@ -962,7 +962,6 @@ BOOL CHttp::PushPostData(const char* buf, int len)
         rbuf[len] = '\0';
         m_postdata += rbuf;
         free(rbuf);
-        //printf("~~~~~~~~~~~~~~~~~~~~~~~~~ PushPostData %d %d %d\n", m_content_length, m_postdata.length(), m_postdata_ex ? m_postdata_ex->length() : 0);
         if(m_postdata.length() >= m_content_length)
             return FALSE;
     }
@@ -971,7 +970,6 @@ BOOL CHttp::PushPostData(const char* buf, int len)
         if(!m_postdata_ex)
             m_postdata_ex = new fbuffer(m_private_path.c_str());
         m_postdata_ex->bufcat(buf, len);
-        //printf("~~~~~~~~~~~~~~~~~~~~~~~~~ PushPostData %d %d %d\n", m_content_length, m_postdata.length(), m_postdata_ex ? m_postdata_ex->length() : 0);
         if(m_postdata_ex->length() >= m_content_length)
             return FALSE;
     }
@@ -1606,7 +1604,6 @@ Http_Connection CHttp::LineParse(const char* text)
         m_line_text = m_line_text.substr(new_line + 1);
 
         strtrim(strtext);
-        //printf("<<<< %s\r\n", strtext.c_str());
         BOOL High = TRUE;
         for(int c = 0; c < strtext.length(); c++)
         {
