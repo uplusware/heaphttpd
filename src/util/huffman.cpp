@@ -86,7 +86,6 @@ int hf_byte_encode(unsigned char ch, int remain, unsigned char *buff){
 	int i			= 0;
 	int codes		= HEX_TO_HF_CODE(ch);
 	int nbits		= HEX_TO_HF_CODE_LEN(ch);
-	//printf("'%c'|codes(%d)|len(%d)\n", ch, codes, nbits );
 	for(;;){
 		if( remain > nbits){
 			t = (unsigned char)(codes << (remain-nbits));
@@ -149,8 +148,6 @@ int hf_string_decode(NODE* h_node, unsigned char *enc, int enc_sz, char *out_buf
 				printf("invalid huffmand code\n");
 				return -1; //invalid huffmand code
 			}
-			//printf("n->sym : %c , n->size = %d\n", n->sym, n->size);	
-			//if( n->children == NULL){
 			if( n->size == 0){
 				if( out_sz > 0 && at > out_sz){
 					printf("out of length\n");

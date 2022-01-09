@@ -176,7 +176,6 @@ int DatabaseStorage::Ping()
 
         return (ret_val ? 0 : -1);
 #else
-		//printf("mysql ping\n");
 		return mysql_ping(m_hMySQL);
 #endif /* _MONGODB_ */
 	}
