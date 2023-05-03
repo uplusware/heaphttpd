@@ -1,6 +1,6 @@
 /*
-	Copyright (c) openheap, uplusware
-	uplusware@gmail.com
+        Copyright (c) openheap, uplusware
+        uplusware@gmail.com
 */
 
 #ifndef _HTTP2COMM_H_
@@ -8,13 +8,7 @@
 
 #include "util/general.h"
 
-
-enum Http2_State
-{
-    http2Prefix = 0,
-    http2Header,
-    http2Payload
-};
+enum Http2_State { http2Prefix = 0, http2Header, http2Payload };
 
 /*
    HTTP frame
@@ -32,74 +26,72 @@ enum Http2_State
     +---------------------------------------------------------------+
 */
 
-#define HTTP2_FRAME_TYPE_DATA             0x00
-#define HTTP2_FRAME_TYPE_HEADERS          0x01
-#define HTTP2_FRAME_TYPE_PRIORITY         0x02
-#define HTTP2_FRAME_TYPE_RST_STREAM       0x03
-#define HTTP2_FRAME_TYPE_SETTINGS         0x04
-#define HTTP2_FRAME_TYPE_PUSH_PROMISE     0x05
-#define HTTP2_FRAME_TYPE_PING             0x06
-#define HTTP2_FRAME_TYPE_GOAWAY           0x07
-#define HTTP2_FRAME_TYPE_WINDOW_UPDATE    0x08
-#define HTTP2_FRAME_TYPE_CONTINUATION     0x09
+#define HTTP2_FRAME_TYPE_DATA 0x00
+#define HTTP2_FRAME_TYPE_HEADERS 0x01
+#define HTTP2_FRAME_TYPE_PRIORITY 0x02
+#define HTTP2_FRAME_TYPE_RST_STREAM 0x03
+#define HTTP2_FRAME_TYPE_SETTINGS 0x04
+#define HTTP2_FRAME_TYPE_PUSH_PROMISE 0x05
+#define HTTP2_FRAME_TYPE_PING 0x06
+#define HTTP2_FRAME_TYPE_GOAWAY 0x07
+#define HTTP2_FRAME_TYPE_WINDOW_UPDATE 0x08
+#define HTTP2_FRAME_TYPE_CONTINUATION 0x09
 
-#define HTTP2_NO_ERROR                    0x00
-#define HTTP2_PROTOCOL_ERROR              0x01
-#define HTTP2_INTERNAL_ERROR              0x02
-#define HTTP2_FLOW_CONTROL_ERROR          0x03
-#define HTTP2_SETTINGS_TIMEOUT            0x04
-#define HTTP2_STREAM_CLOSED               0x05
-#define HTTP2_FRAME_SIZE_ERROR            0x06
-#define HTTP2_REFUSED_STREAM              0x07
-#define HTTP2_CANCEL                      0x08
-#define HTTP2_COMPRESSION_ERROR           0x09
-#define HTTP2_CONNECT_ERROR               0x0a
-#define HTTP2_ENHANCE_YOUR_CALM           0x0b
-#define HTTP2_INADEQUATE_SECURITY         0x0c
-#define HTTP2_HTTP_1_1_REQUIRED           0x0d
+#define HTTP2_NO_ERROR 0x00
+#define HTTP2_PROTOCOL_ERROR 0x01
+#define HTTP2_INTERNAL_ERROR 0x02
+#define HTTP2_FLOW_CONTROL_ERROR 0x03
+#define HTTP2_SETTINGS_TIMEOUT 0x04
+#define HTTP2_STREAM_CLOSED 0x05
+#define HTTP2_FRAME_SIZE_ERROR 0x06
+#define HTTP2_REFUSED_STREAM 0x07
+#define HTTP2_CANCEL 0x08
+#define HTTP2_COMPRESSION_ERROR 0x09
+#define HTTP2_CONNECT_ERROR 0x0a
+#define HTTP2_ENHANCE_YOUR_CALM 0x0b
+#define HTTP2_INADEQUATE_SECURITY 0x0c
+#define HTTP2_HTTP_1_1_REQUIRED 0x0d
 
+#define HTTP2_FRAME_FLAG_UNSET 0x00
+#define HTTP2_FRAME_FLAG_END_STREAM 0x01
+#define HTTP2_FRAME_FLAG_SETTING_ACK 0x01
+#define HTTP2_FRAME_FLAG_PING_ACK 0x01
+#define HTTP2_FRAME_FLAG_END_HEADERS 0x04
+#define HTTP2_FRAME_FLAG_PADDED 0x08
+#define HTTP2_FRAME_FLAG_PRIORITY 0x20
 
-#define HTTP2_FRAME_FLAG_UNSET            0x00
-#define HTTP2_FRAME_FLAG_END_STREAM	      0x01
-#define HTTP2_FRAME_FLAG_SETTING_ACK	  0x01
-#define HTTP2_FRAME_FLAG_PING_ACK	      0x01
-#define HTTP2_FRAME_FLAG_END_HEADERS      0x04
-#define HTTP2_FRAME_FLAG_PADDED	          0x08
-#define HTTP2_FRAME_FLAG_PRIORITY	      0x20
+#define HTTP2_FRAME_R_UNSET 0x0
+#define HTTP2_FRAME_R_SET 0x1
 
-#define HTTP2_FRAME_R_UNSET               0x0
-#define HTTP2_FRAME_R_SET                 0x1
+#define HTTP2_STREAM_DEPENDENCY_E_UNSET 0x0
+#define HTTP2_STREAM_DEPENDENCY_E_SET 0x1
 
-#define HTTP2_STREAM_DEPENDENCY_E_UNSET   0x0
-#define HTTP2_STREAM_DEPENDENCY_E_SET     0x1
+#define HTTP2_FRAME_IDENTIFIER_WHOLE 0x00
 
-#define HTTP2_FRAME_IDENTIFIER_WHOLE     0x00
-
-#define HTTP2_SETTINGS_HEADER_TABLE_SIZE        0x01
-#define HTTP2_SETTINGS_ENABLE_PUSH              0x02
-#define HTTP2_SETTINGS_MAX_CONCURRENT_STREAMS   0x03
-#define HTTP2_SETTINGS_INITIAL_WINDOW_SIZE      0x04
-#define HTTP2_SETTINGS_MAX_FRAME_SIZE           0x05
-#define HTTP2_SETTINGS_MAX_HEADER_LIST_SIZE     0x06
+#define HTTP2_SETTINGS_HEADER_TABLE_SIZE 0x01
+#define HTTP2_SETTINGS_ENABLE_PUSH 0x02
+#define HTTP2_SETTINGS_MAX_CONCURRENT_STREAMS 0x03
+#define HTTP2_SETTINGS_INITIAL_WINDOW_SIZE 0x04
+#define HTTP2_SETTINGS_MAX_FRAME_SIZE 0x05
+#define HTTP2_SETTINGS_MAX_HEADER_LIST_SIZE 0x06
 
 #pragma pack(push)
 #pragma pack(1)
 
-typedef struct
-{
-	union{
-	uint_8  len3b[3];
-	uint_32 len24 : 24;
-	} length;
-	uint_8 type;
-	uint_8 flags;
-	uint_32 r : 1;
-	uint_32 identifier : 31;
-	char payload[0];
+typedef struct {
+  union {
+    uint_8 len3b[3];
+    uint_32 len24 : 24;
+  } length;
+  uint_8 type;
+  uint_8 flags;
+  uint_32 r : 1;
+  uint_32 identifier : 31;
+  char payload[0];
 } HTTP2_Frame;
 
 /* Maxximn padding length */
-#define MAX_PADDING_LEN     255
+#define MAX_PADDING_LEN 255
 /*
     DATA frames
     +---------------+
@@ -111,19 +103,17 @@ typedef struct
     +---------------------------------------------------------------+
 */
 
-typedef struct
-{
-	uint_8 pad_length;
-	char data_padding[0];
+typedef struct {
+  uint_8 pad_length;
+  char data_padding[0];
 } HTTP2_Frame_Data1;
 
-typedef struct
-{
-	char data[0];
+typedef struct {
+  char data[0];
 } HTTP2_Frame_Data2;
 
 /*
-	HEADERS Frame Payload
+        HEADERS Frame Payload
     +---------------+
     |Pad Length? (8)|
     +-+-------------+-----------------------------------------------+
@@ -137,42 +127,38 @@ typedef struct
     +---------------------------------------------------------------+
 */
 
-typedef struct
-{
-	uint_8 pad_length;
-	uint_32 e : 1;
-	uint_32 dependency : 31;
-	uint_8 weight;
-	char block_fragment_padding[0];
+typedef struct {
+  uint_8 pad_length;
+  uint_32 e : 1;
+  uint_32 dependency : 31;
+  uint_8 weight;
+  char block_fragment_padding[0];
 } HTTP2_Frame_Header;
 
-typedef struct
-{
-	uint_8 pad_length;
-	char bottom[0];
+typedef struct {
+  uint_8 pad_length;
+  char bottom[0];
 } HTTP2_Frame_Header_Pad;
 
-typedef struct
-{
-	uint_32 e : 1;
-	uint_32 dependency : 31;
-	uint_8 weight;
-    char block_fragment_padding[0];
+typedef struct {
+  uint_32 e : 1;
+  uint_32 dependency : 31;
+  uint_8 weight;
+  char block_fragment_padding[0];
 } HTTP2_Frame_Header_Weight;
 
-typedef struct
-{
-	unsigned char block_fragment[0];
-    char padding[0];
+typedef struct {
+  unsigned char block_fragment[0];
+  char padding[0];
 } HTTP2_Frame_Header_Fragment;
 
 /*
-	Setting Format
-	+-------------------------------+
-	| Identifier (16)               |
-	+-------------------------------+-------------------------------+
-	| Value (32)                                                    |
-	+---------------------------------------------------------------+
+        Setting Format
+        +-------------------------------+
+        | Identifier (16)               |
+        +-------------------------------+-------------------------------+
+        | Value (32)                                                    |
+        +---------------------------------------------------------------+
 */
 
 /*
@@ -184,10 +170,9 @@ typedef struct
     #define HTTP2_SETTINGS_MAX_HEADER_LIST_SIZE      0x06
 */
 
-typedef struct
-{
-	uint_16 identifier;
-	uint_32 value;
+typedef struct {
+  uint_16 identifier;
+  uint_32 value;
 } HTTP2_Setting;
 
 /*
@@ -198,11 +183,10 @@ typedef struct
     | Weight (8)    |
     +-+-------------+
 */
-typedef struct
-{
-	uint_32 e : 1;
-	uint_32 dependency : 31;
-	uint_8 weight;
+typedef struct {
+  uint_32 e : 1;
+  uint_32 dependency : 31;
+  uint_8 weight;
 } HTTP2_Frame_Priority;
 
 /*
@@ -215,12 +199,11 @@ typedef struct
     | Additional Debug Data (*)                                     |
     +---------------------------------------------------------------+
 */
-typedef struct
-{
-	uint_32 r : 1;
-	uint_32 last_stream_id : 31;
-	uint_32 error_code;
-    char debug_data[0];
+typedef struct {
+  uint_32 r : 1;
+  uint_32 last_stream_id : 31;
+  uint_32 error_code;
+  char debug_data[0];
 } HTTP2_Frame_Goaway;
 
 /*
@@ -229,10 +212,9 @@ typedef struct
     |R| Window Size Increment (31)                                  |
     +-+-------------------------------------------------------------+
 */
-typedef struct
-{
-	uint_32 r : 1;
-	uint_32 win_size : 31;
+typedef struct {
+  uint_32 r : 1;
+  uint_32 win_size : 31;
 } HTTP2_Frame_Window_Update;
 
 /*
@@ -244,9 +226,8 @@ typedef struct
     +---------------------------------------------------------------+
 */
 
-typedef struct
-{
-	uint_8 data[8];
+typedef struct {
+  uint_8 data[8];
 } HTTP2_Frame_Ping;
 
 /*
@@ -255,9 +236,8 @@ typedef struct
     | Header Block Fragment (*)                                   ...
     +---------------------------------------------------------------+
 */
-typedef struct
-{
-	unsigned char block_fragment[0];
+typedef struct {
+  unsigned char block_fragment[0];
 } HTTP2_Frame_Continuation;
 
 /*
@@ -270,28 +250,25 @@ typedef struct
     | Header Block Fragment (*)                                   ...
     +---------------------------------------------------------------+
     | Padding (*)                                                 ...
-    +---------------------------------------------------------------+ 
+    +---------------------------------------------------------------+
 */
 
-typedef struct
-{
-	uint_8 pad_length;
-	uint_32 r : 1;
-	uint_32 promised_stream_ind : 31;
-	char block_fragment_padding[0];
+typedef struct {
+  uint_8 pad_length;
+  uint_32 r : 1;
+  uint_32 promised_stream_ind : 31;
+  char block_fragment_padding[0];
 } HTTP2_Frame_Push_Promise;
 
-typedef struct
-{
-	uint_32 r : 1;
-	uint_32 promised_stream_ind : 31;
-	char block_fragment[0];
+typedef struct {
+  uint_32 r : 1;
+  uint_32 promised_stream_ind : 31;
+  char block_fragment[0];
 } HTTP2_Frame_Push_Promise_Without_Pad;
 
-typedef struct
-{
-	char block_fragment[0];
-    char padding[0];
+typedef struct {
+  char block_fragment[0];
+  char padding[0];
 } HTTP2_Frame_Push_Promise_Fragment;
 
 /*
@@ -300,9 +277,8 @@ typedef struct
     | Error Code (32)                                               |
     +---------------------------------------------------------------+
 */
-typedef struct
-{
-	uint_32 error_code;
+typedef struct {
+  uint_32 error_code;
 } HTTP2_Frame_Rst_Stream;
 
 #pragma pack(pop)
