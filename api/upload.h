@@ -1,6 +1,6 @@
 /*
-	Copyright (c) openheap, uplusware
-	uplusware@gmail.com
+        Copyright (c) openheap, uplusware
+        uplusware@gmail.com
 */
 
 #ifndef _SAMPLE_H_
@@ -9,21 +9,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "heapapi.h"
 #include "http.h"
 #include "webdoc.h"
-#include "heapapi.h"
 
-class ApiUpload : public web_api
-{
-public:
-	ApiUpload(http_request* request, http_response *response) : web_api(request, response)
-	{}
-	
-	virtual ~ApiUpload() {}
-	
-	virtual void Response();	
+class ApiUpload : public web_api {
+ public:
+  ApiUpload(http_request* request, http_response* response)
+      : web_api(request, response) {}
+
+  virtual ~ApiUpload() {}
+
+  virtual void Response();
 };
 
-extern "C" void* api_upload_response(http_request* request, http_response *response);
+extern "C" void* api_upload_response(http_request* request,
+                                     http_response* response);
 
 #endif /* _SAMPLE_H_ */

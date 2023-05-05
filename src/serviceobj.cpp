@@ -1,12 +1,9 @@
 /*
-	Copyright (c) openheap, uplusware
-	uplusware@gmail.com
+        Copyright (c) openheap, uplusware
+        uplusware@gmail.com
 */
 
 #include "serviceobj.h"
 
 /* function body only */
-IServiceObj::~IServiceObj()
-{
-    
-}
+IServiceObj::~IServiceObj() {}

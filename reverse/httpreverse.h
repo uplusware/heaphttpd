@@ -1,6 +1,6 @@
 /*
-	Copyright (c) openheap, uplusware
-	uplusware@gmail.com
+        Copyright (c) openheap, uplusware
+        uplusware@gmail.com
 */
 
 #ifndef _HTTPREVERSE_H_
@@ -13,10 +13,15 @@
 using namespace std;
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif /* __cplusplus */
-    void* reverse_delivery(const char * name, const char * description, const char * parameters, const char* clientip, const char* input_method_url, string * output_method_url, int * skip);
+void* reverse_delivery(const char* name,
+                       const char* description,
+                       const char* parameters,
+                       const char* clientip,
+                       const char* input_method_url,
+                       string* output_method_url,
+                       int* skip);
 #ifdef __cplusplus
 };
 #endif /* __cplusplus */

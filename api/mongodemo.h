@@ -1,6 +1,6 @@
 /*
-	Copyright (c) openheap, uplusware
-	uplusware@gmail.com
+        Copyright (c) openheap, uplusware
+        uplusware@gmail.com
 */
 
 #ifndef _API_LOGIN_H_
@@ -10,22 +10,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "http.h"
-#include "webdoc.h"
 #include "heapapi.h"
+#include "http.h"
 #include "stgengine.h"
+#include "webdoc.h"
 
-class ApiMongoDemo : public web_api
-{
-public:
-	ApiMongoDemo(http_request* request, http_response *response) : web_api(request, response)
-	{}
-	
-	virtual ~ApiMongoDemo() {}
-	
-	virtual void Response();	
+class ApiMongoDemo : public web_api {
+ public:
+  ApiMongoDemo(http_request* request, http_response* response)
+      : web_api(request, response) {}
+
+  virtual ~ApiMongoDemo() {}
+
+  virtual void Response();
 };
 
-extern "C" void* api_mongodemo_response(http_request* request, http_response *response);
+extern "C" void* api_mongodemo_response(http_request* request,
+                                        http_response* response);
 
 #endif /* _API_LOGIN_H_ */
